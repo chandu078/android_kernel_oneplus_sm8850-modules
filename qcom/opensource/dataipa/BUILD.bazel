@@ -105,6 +105,16 @@ ddk_headers(
     includes = ["config"],
 )
 
+ddk_headers(
+    name = "ipa_uapi_headers",
+    hdrs = glob([
+        "drivers/platform/msm/include/uapi/linux/*.h",
+    ]),
+    includes = [
+        "drivers/platform/msm/include/uapi",
+    ],
+)
+
 genrule(
     name = "consolidate_defconfig",
     srcs = [
