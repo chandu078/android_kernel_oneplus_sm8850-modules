@@ -1,5 +1,5 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
-load("//build/kernel/oplus:oplus_modules_define.bzl",
+load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_define.bzl",
     "define_oplus_ddk_module", "oplus_ddk_get_kernel_version",
     "bazel_support_platform")
 load(":kleaf-scripts/targets.bzl", "oplus_modules_get_target_variant")

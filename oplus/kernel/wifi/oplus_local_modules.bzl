@@ -1,7 +1,7 @@
 load("//build/kernel/kleaf:kernel.bzl", "checkpatch", "ddk_headers", "ddk_module")
-load("//build/kernel/oplus:oplus_modules_define.bzl", "oplus_ddk_get_target", "define_oplus_ddk_module",
+load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_define.bzl", "oplus_ddk_get_target", "define_oplus_ddk_module",
  "oplus_ddk_get_kernel_version", "bazel_support_platform", "oplus_ddk_get_variant")
-load("//build/kernel/oplus:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
+load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
 
 def version_compare(v1, v2):
     v1_parts = [int(x) for x in v1.split(".")]
