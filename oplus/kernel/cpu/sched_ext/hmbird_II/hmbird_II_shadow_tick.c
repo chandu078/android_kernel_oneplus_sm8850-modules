@@ -1,3 +1,4 @@
+#include <linux/atomic.h>
 #include <linux/tick.h>
 #include <kernel/time/tick-sched.h>
 #include <trace/hooks/sched.h>
@@ -121,25 +122,25 @@ extern void hmbird_state_systrace_c(void);
 extern void gov_switch_state_systrace_c(void);
 extern void update_softlimit_systrace_c_wrapper(void);
 static volatile unsigned long next_systrace_jiff;
-static volatile u64 in_output;
+static atomic_t in_output = ATOMIC_INIT(0);
 
 static void scheduler_tick_handler(void *unused, struct rq *rq)
 {
 	start_shadow_tick_timer();
 
 	if (unlikely(hmbird_debug & HMBIRD_DEBUG_SYSTRACE)) {
-		if (__sync_val_compare_and_swap(&in_output, 0, 1)) {
+		if (atomic_cmpxchg(&in_output, 0, 1)) {
 			goto skip_systrace;
 		}
 		if (time_before(jiffies, next_systrace_jiff)) {
-			in_output = 0;
+			atomic_set_release(&in_output, 0);
 			goto skip_systrace;
 		}
 		hmbird_state_systrace_c();
 		update_softlimit_systrace_c_wrapper();
 		gov_switch_state_systrace_c();
 		next_systrace_jiff = jiffies + HM_SYSTRACE_INTERVAL_JIFF;
-		in_output = 0;
+		atomic_set_release(&in_output, 0);
 	}
 skip_systrace:
 	return;
