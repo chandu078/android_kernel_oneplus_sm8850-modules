@@ -81,11 +81,11 @@ module_entry(
         ],
     },
     deps = [
-            "//vendor/qcom/opensource/mm-drivers:mm_drivers_headers",
-            "//vendor/qcom/opensource/synx-kernel:synx_headers",
-            "//vendor/qcom/opensource/synx-kernel:%b_modules",
-            "//vendor/qcom/opensource/mm-drivers/hw_fence:%b_msm_hw_fence",
-            "//vendor/qcom/opensource/mmrm-driver:%b_mmrm_driver",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers:mm_drivers_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:synx_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:%b_modules",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/hw_fence:%b_msm_hw_fence",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mmrm-driver:%b_mmrm_driver",
         ],
 )
 
@@ -162,10 +162,10 @@ module_entry(
         ],
     },
     deps = [
-            "//vendor/qcom/opensource/mm-drivers:mm_drivers_headers",
-            "//vendor/qcom/opensource/synx-kernel:synx_headers",
-            "//vendor/qcom/opensource/synx-kernel:%b_modules",
-            "//vendor/qcom/opensource/mm-drivers/hw_fence:%b_msm_hw_fence",
-            "//vendor/qcom/opensource/mmrm-driver:%b_mmrm_driver",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers:mm_drivers_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:synx_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:%b_modules",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/hw_fence:%b_msm_hw_fence",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mmrm-driver:%b_mmrm_driver",
         ],
 )

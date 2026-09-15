@@ -1,17 +1,17 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
-load("//vendor/qcom/opensource/mm-drivers:target_variants.bzl", "get_all_variants")
+load("//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers:target_variants.bzl", "get_all_variants")
 
 def _define_module(target, variant):
     tv = "{}_{}".format(target, variant)
 
     deps = select({
         "//build/kernel/kleaf:socrepo_true": ["//vendor/qcom/kernel:all_headers"],
-        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
     kernel_build = select({
         "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(tv),
     })
 
     ddk_module(
@@ -21,7 +21,7 @@ def _define_module(target, variant):
         kconfig = "Kconfig",
         defconfig = "defconfig",
         deps = deps + [
-            "//vendor/qcom/opensource/mm-drivers:mm_drivers_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers:mm_drivers_headers",
         ],
         kernel_build = kernel_build,
     )

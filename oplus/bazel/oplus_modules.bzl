@@ -1,9 +1,9 @@
 load("@rules_pkg//pkg:install.bzl", "pkg_install")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
-load(":oplus_modules_define.bzl", "oplus_ddk_get_oplus_features")
+load(":oplus_modules_define.bzl", "bazel_support_platform", "oplus_ddk_get_oplus_features")
 
 def get_oplus_ddk_modules(target, msm_target, variant):
-    if msm_target != "canoe" or variant != "perf":
+    if bazel_support_platform != "qcom" or msm_target != "canoe" or variant != "perf":
         return []
 
     oplus_ddk_targets = [
@@ -168,6 +168,33 @@ def get_oplus_ddk_modules(target, msm_target, variant):
             "//vendor/qcom/sm8850-modules/oplus/kernel/wifi:wonder",
         ]
 
+    # Additional Qualcomm-compatible drivers declared by this repository.
+    oplus_ddk_targets += [
+        "//vendor/qcom/sm8850-modules/oplus/kernel/audio/bazel:snd-soc-tfa98xx",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bootargs",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/charger/bazel:canoe_perf_oplus_chg",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_afs_config",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/cs_press:oplus_bsp_cs_press_f71",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/oplus_fpga:oplus_bsp_fpga_monitor",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/pogo_keyboard:oplus_bsp_pogo_keyboard",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/tri_state_key:oplus_ak09970",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/tri_state_key:oplus_bsp_ist_down",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/tri_state_key:oplus_bsp_ist_up",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/tri_state_key:oplus_bsp_mxm_down",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/tri_state_key:oplus_bsp_mxm_up",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/tri_state_key:oplus_bsp_tri_key",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/dfr:oplus_bsp_dfr_oplus_saupwk",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/mm:oplus_bsp_mglru_opt",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/mm:oplus_bsp_zstdn_o",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/nfc:oplus_network_nfc_i2c",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/nfc:oplus_network_nfc_pn557_i2c",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/nfc:oplus_network_nfc_sn_ese",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/power/freeze_process:oplus_freeze_process",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/power/subsys_sleep_monitor/bazel:oplus_subsys_sleep_monitor",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/secureguard/gki2.0/rootguard:oplus_secure_guard",
+        "//vendor/qcom/sm8850-modules/oplus/kernel/storage:oplus_f2fslog_storage",
+    ]
+
     #conditional_build modules
     oplus_feature_list = oplus_ddk_get_oplus_features()
     if str(oplus_feature_list.get("OPLUS_FEATURE_BSP_DRV_INJECT_TEST", 'foo')).upper() == "1":
@@ -191,7 +218,7 @@ def define_oplus_ddk_modules(target, msm_target, variant):
     pkg_install(
         name = "{}_all_oplus_ddk_modules_dist".format(target),
         srcs = [":{}_all_oplus_ddk_modules_files".format(target)],
-        destdir = "out/msm-kernel-{}/techpack",
+        destdir = "out/msm-kernel-{}/techpack".format(target),
     )
 
     return oplus_ddk_targets

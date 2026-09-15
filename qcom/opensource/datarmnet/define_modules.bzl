@@ -13,7 +13,7 @@ def define_modules(target, variant):
 		"//vendor/qcom/kernel:{}/drivers/soc/qcom/qmi_helpers".format(kernel_build_variant),
 	],
 	"//build/kernel/kleaf:socrepo_false": [
-		"//msm-kernel:all_headers",
+		"//vendor/qcom/kernel:all_headers",
 	],
     })
 
@@ -24,13 +24,13 @@ def define_modules(target, variant):
 		"//vendor/qcom/kernel:{}/kernel/trace/qcom_ipc_logging".format(kernel_build_variant),
 	],
 	"//build/kernel/kleaf:socrepo_false": [
-		"//msm-kernel:all_headers",
+		"//vendor/qcom/kernel:all_headers",
 	],
     })
 
     kernel_build = select({
 	"//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build_variant),
-	"//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build_variant),
+	"//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build_variant),
     })
 
     ddk_module(
@@ -66,8 +66,8 @@ def define_modules(target, variant):
         },
         kernel_build = kernel_build,
         deps = deps_ctl + [
-            "//vendor/qcom/opensource/dataipa:{}_ipam".format(kernel_build_variant),
-            "//vendor/qcom/opensource/dataipa:include_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/dataipa:{}_ipam".format(kernel_build_variant),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/dataipa:include_headers",
         ],
     )
 
@@ -100,10 +100,10 @@ def define_modules(target, variant):
         deps = deps_core + [
             ":rmnet_core_headers",
             ":{}_rmnet_ctl".format(kernel_build_variant),
-            "//vendor/qcom/opensource/dataipa:{}_ipam".format(kernel_build_variant),
-            "//vendor/qcom/opensource/datarmnet-ext/mem:{}_rmnet_mem".format(kernel_build_variant),
-            "//vendor/qcom/opensource/dataipa:include_headers",
-            "//vendor/qcom/opensource/datarmnet-ext/mem:rmnet_mem_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/dataipa:{}_ipam".format(kernel_build_variant),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/datarmnet-ext/mem:{}_rmnet_mem".format(kernel_build_variant),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/dataipa:include_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/datarmnet-ext/mem:rmnet_mem_headers",
         ],
     )
 

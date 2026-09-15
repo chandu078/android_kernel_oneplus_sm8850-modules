@@ -94,7 +94,7 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
             "//vendor/qcom/kernel:{}/drivers/soc/qcom/socinfo".format(kernel_build_tv),
             "//vendor/qcom/kernel:{}/drivers/soc/qcom/panel_event_notifier".format(kernel_build_tv),
         ],
-        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
         })
 
     if not vm_target:
@@ -104,7 +104,7 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
         })
 
         deps += [
-            "//vendor/qcom/opensource/mm-drivers:mm_drivers_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers:mm_drivers_headers",
         ]
         deps += select({
             "//build/kernel/kleaf:socrepo_true": [
@@ -121,7 +121,7 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
 
     kernel_build = select({
         "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build_tv),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build_tv),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build_tv),
     })
     modules = [registry.get(module_name) for module_name in modules]
     options = _get_kernel_build_options(modules, config_options)

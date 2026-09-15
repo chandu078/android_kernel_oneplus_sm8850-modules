@@ -69,11 +69,11 @@ def _define_target_modules(target, variant, registry, modules, product = None, c
             "//vendor/qcom/kernel:{}_{}/drivers/soc/qcom/socinfo".format(target, variant),
             "//vendor/qcom/sm8850-modules/oplus/kernel/multimedia/feedback/bazel:oplus_mm_kevent_fb",
         ] + registry.hdrs,
-        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"] + registry.hdrs,
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"] + registry.hdrs,
     })
     kernel_build = select({
         "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_{}_base_kernel".format(target, variant),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}_{}".format(target, variant),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}_{}".format(target, variant),
     })
 
     submodule_rules = []

@@ -85,12 +85,12 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
             "//vendor/qcom/kernel:{}/drivers/remoteproc/rproc_qcom_common".format(kernel_build),
         ],
         "//build/kernel/kleaf:socrepo_false": [
-            "//msm-kernel:all_headers",
+            "//vendor/qcom/kernel:all_headers",
         ],
     })
     kernel_build_label = select({
         "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build),
     })
 
     modules = [registry.get(module_name) for module_name in modules]

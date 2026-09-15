@@ -28,13 +28,13 @@ def _define_module(target, variant):
         "//build/kernel/kleaf:socrepo_false": [
             ":camera_headers",
             ":camera_banner",
-            "//msm-kernel:all_headers",
+            "//vendor/qcom/kernel:all_headers",
         ],
     })
 
     kernel_build = select({
         "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(tv),
     })
 
     # Generate the defconfig file dynamically
@@ -52,33 +52,33 @@ def _define_module(target, variant):
 
     if target == "pineapple":
         deps.extend([
-            "//vendor/qcom/opensource/synx-kernel:synx_headers",
-            "//vendor/qcom/opensource/synx-kernel:{}_modules".format(tv),
-            "//vendor/qcom/opensource/securemsm-kernel:smcinvoke_kernel_headers",
-            "//vendor/qcom/opensource/securemsm-kernel:smmu_proxy_headers",
-            "//vendor/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
-            "//vendor/qcom/opensource/securemsm-kernel:{}_smmu_proxy_dlkm".format(tv),
-            "//vendor/qcom/opensource/mmrm-driver:{}_mmrm_driver".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:synx_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:{}_modules".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:smcinvoke_kernel_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:smmu_proxy_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smmu_proxy_dlkm".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mmrm-driver:{}_mmrm_driver".format(tv),
         ])
     if target == "sun":
         deps.extend([
-            "//vendor/qcom/opensource/synx-kernel:synx_headers",
-            "//vendor/qcom/opensource/synx-kernel:{}_modules".format(tv),
-            "//vendor/qcom/opensource/securemsm-kernel:smcinvoke_kernel_headers",
-            "//vendor/qcom/opensource/securemsm-kernel:smmu_proxy_headers",
-            "//vendor/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
-            "//vendor/qcom/opensource/securemsm-kernel:{}_smmu_proxy_dlkm".format(tv),
-            "//vendor/qcom/opensource/mmrm-driver:{}_mmrm_driver".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:synx_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:{}_modules".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:smcinvoke_kernel_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:smmu_proxy_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smmu_proxy_dlkm".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mmrm-driver:{}_mmrm_driver".format(tv),
         ])
     if target == "canoe":
         deps.extend([
-           "//vendor/qcom/opensource/synx-kernel:synx_headers",
-            "//vendor/qcom/opensource/synx-kernel:{}_modules".format(tv),
-            "//vendor/qcom/opensource/securemsm-kernel:smcinvoke_kernel_headers",
-            "//vendor/qcom/opensource/securemsm-kernel:smmu_proxy_headers",
-            "//vendor/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
-            "//vendor/qcom/opensource/securemsm-kernel:{}_smmu_proxy_dlkm".format(tv),
-			"//vendor/qcom/opensource/mmrm-driver:{}_mmrm_driver".format(tv),
+           "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:synx_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:{}_modules".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:smcinvoke_kernel_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:smmu_proxy_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smmu_proxy_dlkm".format(tv),
+			"//vendor/qcom/sm8850-modules/qcom/opensource/mmrm-driver:{}_mmrm_driver".format(tv),
             "//vendor/qcom/sm8850-modules/oplus/kernel/dft/bazel:oplus_bsp_dft_kernel_fb",
         ])
     ddk_module(

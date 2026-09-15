@@ -81,11 +81,11 @@ def define_target_variant_modules(target, variant, modules, extra_options = [], 
             "//vendor/qcom/kernel:{}/drivers/virt/gunyah/gh_msgq".format(kernel_build_variant),
             "//vendor/qcom/kernel:{}/drivers/dma-buf/heaps/qcom_dma_heaps".format(kernel_build_variant),
         ],
-        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
     kernel_build = select({
         "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(tv),
     })
     if not vm_target:
         deps += select({

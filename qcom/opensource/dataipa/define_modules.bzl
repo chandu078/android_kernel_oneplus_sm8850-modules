@@ -13,7 +13,7 @@ def define_modules(target, variant):
 
     kernel_build = select({
         "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build_variant),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build_variant),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build_variant),
     })
 
     gsim_deps = [
@@ -23,7 +23,7 @@ def define_modules(target, variant):
 
     gsim_deps += select({
         "//build/kernel/kleaf:socrepo_true": ["//vendor/qcom/kernel:all_headers"],
-        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
 
     ipam_deps = [
@@ -33,7 +33,7 @@ def define_modules(target, variant):
         ":ipa_headers",
         ":ipa_clients",
         ":{}_gsim".format(kernel_build_variant),
-        "//vendor/qcom/opensource/datarmnet-ext/mem:{}_rmnet_mem".format(kernel_build_variant),
+        "//vendor/qcom/sm8850-modules/qcom/opensource/datarmnet-ext/mem:{}_rmnet_mem".format(kernel_build_variant),
     ]
 
     ipam_deps += select({
@@ -50,7 +50,7 @@ def define_modules(target, variant):
             "//vendor/qcom/kernel:{}/drivers/usb/gadget/function/usb_f_gsi".format(kernel_build_variant),
         ],
         "//build/kernel/kleaf:socrepo_false": [
-            "//msm-kernel:all_headers",
+            "//vendor/qcom/kernel:all_headers",
         ],
     })
 
@@ -77,7 +77,7 @@ def define_modules(target, variant):
             "//vendor/qcom/kernel:{}/kernel/trace/qcom_ipc_logging".format(kernel_build_variant),
         ],
         "//build/kernel/kleaf:socrepo_false": [
-            "//msm-kernel:all_headers",
+            "//vendor/qcom/kernel:all_headers",
         ],
     })
 
@@ -96,7 +96,7 @@ def define_modules(target, variant):
                 "//vendor/qcom/kernel:all_headers",
             ],
             "//build/kernel/kleaf:socrepo_false": [
-                "//msm-kernel:all_headers",
+                "//vendor/qcom/kernel:all_headers",
             ],
         })
 

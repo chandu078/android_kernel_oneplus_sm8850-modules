@@ -79,7 +79,7 @@ def _define_modules_for_target_variant(target, variant):
 
     kernel_build = select({
         "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(tv),
     })
 
     cnss2_enabled = 0
@@ -120,14 +120,14 @@ def _define_modules_for_target_variant(target, variant):
                   "//vendor/qcom/kernel:{}/drivers/soc/qcom/qmi_helpers".format(tv),
                ],
                "//build/kernel/kleaf:socrepo_false": [
-                  "//msm-kernel:all_headers",
+                  "//vendor/qcom/kernel:all_headers",
                ],
         })
 
         if target != "x1e80100" and target != "sdxkova":
             deps += select({
                   "//build/kernel/kleaf:socrepo_true": [
-                    "//vendor/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
+                    "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
                     "//vendor/qcom/kernel:{}/kernel/trace/qcom_ipc_logging".format(tv),
                     "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_ramdump".format(tv),
                     "//vendor/qcom/kernel:{}/drivers/soc/qcom/socinfo".format(tv),
@@ -216,7 +216,7 @@ def _define_modules_for_target_variant(target, variant):
                 "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_aoss".format(tv),
                ],
                "//build/kernel/kleaf:socrepo_false": [
-                  "//msm-kernel:all_headers",
+                  "//vendor/qcom/kernel:all_headers",
                ],
         })
         ddk_module(
@@ -262,7 +262,7 @@ def _define_modules_for_target_variant(target, variant):
 
     deps = select({
         "//build/kernel/kleaf:socrepo_true": ["//vendor/qcom/kernel:all_headers"],
-        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
 
     ddk_module(
@@ -305,11 +305,11 @@ def _define_modules_for_target_variant(target, variant):
 
     cnss_utils_dep_list += select({
         "//build/kernel/kleaf:socrepo_true": ["//vendor/qcom/kernel:all_headers"],
-        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
 
     if target == "sun" or target == "canoe":
-        cnss_utils_dep_list = cnss_utils_dep_list + ["//vendor/qcom/opensource/data-kernel/drivers/smem-mailbox:{}_smem_mailbox".format(tv),]
+        cnss_utils_dep_list = cnss_utils_dep_list + ["//vendor/qcom/sm8850-modules/qcom/opensource/data-kernel/drivers/smem-mailbox:{}_smem_mailbox".format(tv),]
     if target == "sdxkova":
         tgt = "target-aarch64_cortex-a53_musl"
         board = "sdx85"
@@ -338,7 +338,7 @@ def _define_modules_for_target_variant(target, variant):
             "//vendor/qcom/kernel:all_headers",
             "//vendor/qcom/kernel:{}/drivers/soc/qcom/qmi_helpers".format(tv),
         ],
-        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
 
     ddk_module(
@@ -366,7 +366,7 @@ def _define_modules_for_target_variant(target, variant):
               "//vendor/qcom/kernel:{}/drivers/soc/qcom/qmi_helpers".format(tv),
               "//vendor/qcom/kernel:{}/kernel/trace/qcom_ipc_logging".format(tv),
           ],
-          "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+          "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
       })
 
       ddk_module(

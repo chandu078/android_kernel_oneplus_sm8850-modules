@@ -10,12 +10,12 @@ def define_shs(target, variant):
 		"//vendor/qcom/kernel:all_headers",
 		"//vendor/qcom/kernel:{}/kernel/sched/walt/sched-walt".format(kernel_build_variant),
 	],
-	"//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+	"//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
 
     kernel_build = select({
 	"//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build_variant),
-	"//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build_variant),
+	"//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build_variant),
     })
 
 
@@ -45,8 +45,8 @@ def define_shs(target, variant):
 	kernel_build = kernel_build,
 	deps = deps_shs + [
 		":include_headers",
-		"//vendor/qcom/opensource/datarmnet:{}_rmnet_core".format(kernel_build_variant),
-		"//vendor/qcom/opensource/datarmnet:rmnet_core_headers",
+		"//vendor/qcom/sm8850-modules/qcom/opensource/datarmnet:{}_rmnet_core".format(kernel_build_variant),
+		"//vendor/qcom/sm8850-modules/qcom/opensource/datarmnet:rmnet_core_headers",
         ],
         copts = ["-Wno-misleading-indentation"],
     )

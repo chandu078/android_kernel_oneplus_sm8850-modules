@@ -73,12 +73,12 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
             "//vendor/qcom/kernel:{}/drivers/iommu/msm_dma_iommu_mapping".format(kernel_build),
         ],
         "//build/kernel/kleaf:socrepo_false": [
-            "//msm-kernel:all_headers",
+            "//vendor/qcom/kernel:all_headers",
         ],
     })
     kernel_build_label = select({
         "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build),
     })
 
     modules = [registry.get(module_name) for module_name in modules]
@@ -142,12 +142,12 @@ def define_lunch_target_variant_modules(target, variant, registry, modules, lunc
             "//vendor/qcom/kernel:{}/drivers/iommu/msm_dma_iommu_mapping".format(kernel_build),
         ],
         "//build/kernel/kleaf:socrepo_false": [
-            "//msm-kernel:all_headers",
+            "//vendor/qcom/kernel:all_headers",
         ],
     })
     kernel_build_label = select({
         "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build),
     })
 
     if lunch_target != None:

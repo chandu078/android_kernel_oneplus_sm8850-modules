@@ -57,7 +57,7 @@ def define_target_variant_modules(target, variant, modules, config_options = [])
     kernel_build = "{}_{}".format(target, variant)
     kernel_build_label = select({
         "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build),
     })
     deps = select({
             "//build/kernel/kleaf:socrepo_true": [
@@ -68,7 +68,7 @@ def define_target_variant_modules(target, variant, modules, config_options = [])
               "//vendor/qcom/kernel:{}/drivers/slimbus/slimbus".format(kernel_build),
               "//vendor/qcom/kernel:{}/drivers/pinctrl/qcom/pinctrl-msm".format(kernel_build),
             ],
-            "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+            "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
 
     modules = [bt_modules.get(module_name) for module_name in modules]

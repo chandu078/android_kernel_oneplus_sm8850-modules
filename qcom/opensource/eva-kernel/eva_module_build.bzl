@@ -83,7 +83,7 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
 
     kernel_build_label = select({
         "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_{}_base_kernel".format(target, variant),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}_{}".format(target, variant),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}_{}".format(target, variant),
     })
 
     modules = [registry.get(module_name) for module_name in modules]
@@ -101,7 +101,7 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
             "//vendor/qcom/kernel:{}_{}/drivers/virt/gunyah/gh_rm_drv".format(target, variant),
             "//vendor/qcom/kernel:{}_{}/drivers/virt/gunyah/gh_msgq".format(target, variant),
             ],
-         "//build/kernel/kleaf:socrepo_false":["//msm-kernel:all_headers"],
+         "//build/kernel/kleaf:socrepo_false":["//vendor/qcom/kernel:all_headers"],
     })
 
     all_module_rules = []

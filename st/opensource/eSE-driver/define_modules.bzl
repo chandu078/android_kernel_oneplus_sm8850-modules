@@ -7,11 +7,11 @@ def define_modules(target, variant):
     deps = []
     deps = select({
         "//build/kernel/kleaf:socrepo_true": ["//vendor/qcom/kernel:all_headers"],
-        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
     kernel_build = select({
         "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(tv),
     })
 
     ddk_module(

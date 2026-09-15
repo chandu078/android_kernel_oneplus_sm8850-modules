@@ -10,25 +10,25 @@ def define_modules(target, variant):
             "//vendor/qcom/kernel:all_headers",
             "//vendor/qcom/kernel:{}/drivers/pinctrl/qcom/pinctrl-msm".format(tv),
         ],
-        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
     kernel_build = select({
         "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(tv),
     })
     if target == "sun":
         copts.append("-DNFC_SECURE_PERIPHERAL_ENABLED")
         deps += [
-            "//vendor/qcom/opensource/securemsm-kernel:smcinvoke_kernel_headers",
-            "//vendor/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:smcinvoke_kernel_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
         ]
 
     if target == "canoe":
         copts.append("-DCONFIG_NFC_BOB1")
         copts.append("-DNFC_SECURE_PERIPHERAL_ENABLED")
         deps += [
-            "//vendor/qcom/opensource/securemsm-kernel:smcinvoke_kernel_headers",
-            "//vendor/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:smcinvoke_kernel_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
         ]
 
     ddk_module(

@@ -15,7 +15,7 @@ def define_modules(target, variant):
 
     kernel_build = select({
         "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build_variant),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build_variant),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build_variant),
     })
     ddk_deps = select({
         "//build/kernel/kleaf:socrepo_true":[
@@ -25,7 +25,7 @@ def define_modules(target, variant):
             "//vendor/qcom/kernel:{}/drivers/soc/qcom/pdr_interface".format(kernel_build_variant),
             "//vendor/qcom/kernel:{}/drivers/rpmsg/qcom_glink".format(kernel_build_variant),
         ],
-        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
 
     # Path to dsp folder from soc-repo/include/trace directory
@@ -71,7 +71,7 @@ def define_vm_modules(target, variant):
 
     kernel_build = select({
         "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build_variant),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build_variant),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build_variant),
     })
 
     deps = select({
@@ -81,7 +81,7 @@ def define_vm_modules(target, variant):
             "//vendor/qcom/kernel:{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(kernel_build_variant),
             "//vendor/qcom/kernel:{}/drivers/dma-buf/heaps/qcom_dma_heaps".format(kernel_build_variant),
             ] ,
-        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
 
     # Path to dsp folder from soc-repo/include/trace directory

@@ -92,23 +92,23 @@ def external_deps(target, variant):
     # Add msm_hw_fence in the dependency and defconfig lists for targets that use it
     if target in [ "pineapple" ]:
         deplist = deplist + [
-            "//vendor/qcom/opensource/mm-drivers/hw_fence:{}_msm_hw_fence".format(tv),
-            "//vendor/qcom/opensource/mm-drivers/hw_fence:hw_fence_headers"
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/hw_fence:{}_msm_hw_fence".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/hw_fence:hw_fence_headers"
             ]
         defconfigs = defconfigs + [
-            "//vendor/qcom/opensource/mm-drivers/hw_fence:defconfig"
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/hw_fence:defconfig"
             ]
 
     # Add synx-kernel in the dependency list for targets that use it for hardware fences
     if target in [ "sun", "niobe", "seraph", "canoe" ]:
         deplist = deplist + [
-            "//vendor/qcom/opensource/synx-kernel:{}_modules".format(tv),
-            "//vendor/qcom/opensource/synx-kernel:synx_headers"
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:{}_modules".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:synx_headers"
             ]
 
     if target in [ "monaco", "parrot", "vienna", "lahaina" ]:
         deplist = deplist + [
-            "//vendor/qcom/opensource/mm-drivers/hw_fence:hw_fence_headers"
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/hw_fence:hw_fence_headers"
             ]
 
     native.genrule(
@@ -128,12 +128,12 @@ def define_target_variant_module(target, variant):
         kernel_build = select({
             "//build/kernel/kleaf:microxr_kernel_build_true": "//:target_kernel_build",
             "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
-            "//conditions:default": "//msm-kernel:{}".format(tv),
+            "//conditions:default": "//vendor/qcom/kernel:{}".format(tv),
         })
     else:
         kernel_build = select({
             "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
-            "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+            "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(tv),
         })
 
     ext_deps = external_deps(target, variant)
@@ -159,10 +159,10 @@ def define_target_variant_module(target, variant):
                   "//vendor/qcom/kernel:{}/drivers/soc/qcom/secure_buffer".format(tv),
                   "//vendor/qcom/kernel:{}/drivers/soc/qcom/socinfo".format(tv),
                   "//vendor/qcom/kernel:{}/kernel/msm_sysstats".format(tv),
-                  "//vendor/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
+                  "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
                   "//vendor/qcom/sm8850-modules/oplus/kernel/mm:oplus_bsp_mm_osvelte".format(tv),
                 ],
-                "//build/kernel/kleaf:socrepo_false": [ "//msm-kernel:all_headers" ],
+                "//build/kernel/kleaf:socrepo_false": [ "//vendor/qcom/kernel:all_headers" ],
         })
 
     ddk_module(
