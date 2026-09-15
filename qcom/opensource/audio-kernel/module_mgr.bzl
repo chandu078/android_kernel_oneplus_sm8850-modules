@@ -57,22 +57,22 @@ def _define_target_modules(target, variant, registry, modules, product = None, c
     options = _combine_target_module_options(enabled_modules, config_options)
     headers = select({
         "//build/kernel/kleaf:socrepo_true": [
-            "//soc-repo:all_headers",
-            "//soc-repo:{}_{}/drivers/firmware/qcom/qcom-scm".format(target, variant),
-            "//soc-repo:{}_{}/drivers/pinctrl/qcom/pinctrl-msm".format(target, variant),
-            "//soc-repo:{}_{}/drivers/soc/qcom/pdr_interface".format(target, variant),
-            "//soc-repo:{}_{}/drivers/remoteproc/rproc_qcom_common".format(target, variant),
-            "//soc-repo:{}_{}/drivers/base/regmap/qti-regmap-debugfs".format(target, variant),
-            "//vendor/oplus/kernel/charger/bazel:{}_{}_oplus_chg_v2".format(target, variant),
-            "//soc-repo:{}_{}/drivers/soc/qcom/wcd_usbss_i2c".format(target, variant),
-            "//soc-repo:{}_{}/kernel/trace/qcom_ipc_logging".format(target, variant),
-            "//soc-repo:{}_{}/drivers/soc/qcom/socinfo".format(target, variant),
-            "//vendor/oplus/kernel/multimedia/feedback/bazel:oplus_mm_kevent_fb",
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}_{}/drivers/firmware/qcom/qcom-scm".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/pinctrl/qcom/pinctrl-msm".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/soc/qcom/pdr_interface".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/remoteproc/rproc_qcom_common".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/base/regmap/qti-regmap-debugfs".format(target, variant),
+            "//vendor/qcom/sm8850-modules/oplus/kernel/charger/bazel:{}_{}_oplus_chg_v2".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/soc/qcom/wcd_usbss_i2c".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/kernel/trace/qcom_ipc_logging".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/soc/qcom/socinfo".format(target, variant),
+            "//vendor/qcom/sm8850-modules/oplus/kernel/multimedia/feedback/bazel:oplus_mm_kevent_fb",
         ] + registry.hdrs,
         "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"] + registry.hdrs,
     })
     kernel_build = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_{}_base_kernel".format(target, variant),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_{}_base_kernel".format(target, variant),
         "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}_{}".format(target, variant),
     })
 

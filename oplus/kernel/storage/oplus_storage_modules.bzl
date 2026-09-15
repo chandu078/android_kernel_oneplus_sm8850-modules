@@ -10,7 +10,7 @@ def define_oplus_storage_modules():
                     "-DCONFIG_OPLUS_QCOM_UFS_DRIVER",
                     "-I$(srctree)/drivers/ufs/host/",
                 ]
-        ko_deps = ["//vendor/oplus/kernel/device_info/device_info/bazel:device_info"]
+        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/device_info/device_info/bazel:device_info"]
         hdrs = [
             "storage_feature_in_module/common/ufs_oplus_dbg/ufs-oplus-dbg.h",
             "storage_feature_in_module/common/ufs_oplus_dbg/ufs-qcom.h",
@@ -106,7 +106,7 @@ def define_oplus_storage_modules():
     # add for oplus_uprobe
     if bazel_support_platform == "qcom":
         copts = []
-        ko_deps = ["//vendor/oplus/kernel/storage:storage_log"]
+        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/storage:storage_log"]
         hdrs = ["storage_feature_in_module/common/oplus_uprobe/kernel/trace/trace_probe.h",
                 "storage_feature_in_module/common/oplus_uprobe/kernel/trace/trace.h",
                 "storage_feature_in_module/common/oplus_uprobe/kernel/trace/pid_list.h",
@@ -187,7 +187,7 @@ def define_oplus_storage_modules():
     if bazel_support_platform == "qcom":
         copts = []
         ko_deps = [
-            "//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist",
         ]
         hdrs = [
             "storage_feature_in_module/common/wq_dynamic_priority/oplus_wq_dynamic_priority.h"
@@ -195,7 +195,7 @@ def define_oplus_storage_modules():
     else:
         copts = []
         ko_deps = [
-            "//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist",
         ]
         hdrs = [
             "storage_feature_in_module/common/wq_dynamic_priority/oplus_wq_dynamic_priority.h",

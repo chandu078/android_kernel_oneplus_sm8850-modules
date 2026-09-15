@@ -9,7 +9,7 @@ def define_oplus_task_load_local_modules():
     kernel_version = oplus_ddk_get_kernel_version()
 
     if bazel_support_platform == "qcom" :
-        ko_deps = ["//soc-repo:{}/kernel/sched/walt/sched-walt".format(kernel_build_variant)]
+        ko_deps = ["//vendor/qcom/kernel:{}/kernel/sched/walt/sched-walt".format(kernel_build_variant)]
         copts = ["-DCONFIG_SCHED_WALT"]
     else :
         ko_deps = [
@@ -29,6 +29,6 @@ def define_oplus_task_load_local_modules():
             "qcom": ["CONFIG_OPLUS_SYSTEM_KERNEL_QCOM","CONFIG_SCHED_WALT"],
         },
         copts = copts,
-        ko_deps = ["//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist",
-            "//soc-repo:{}/kernel/sched/walt/sched-walt".format(kernel_build_variant)],
+        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist",
+            "//vendor/qcom/kernel:{}/kernel/sched/walt/sched-walt".format(kernel_build_variant)],
     )

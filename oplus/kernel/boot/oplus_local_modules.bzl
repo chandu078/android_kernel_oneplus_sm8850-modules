@@ -23,7 +23,7 @@ def define_oplus_local_modules():
             "//kernel_device_modules-{}/drivers/misc/mediatek/boot_common:mtk_boot_common".format(kernel_version),
         ]
         kmsg_wb_ko_deps = [
-            "//vendor/oplus/kernel/boot:oplus_bsp_dfr_phoenix",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_dfr_phoenix",
             "//kernel_device_modules-{}/drivers/soc/oplus/boot:oplus_bsp_boot_projectinfo".format(kernel_version),
         ]
 
@@ -100,7 +100,7 @@ def define_oplus_local_modules():
         ko_deps = [
                 ":buildvariant",
                 ":oplusboot",
-                "//soc-repo:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
+                "//vendor/qcom/kernel:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
         ]
         copts = ["-DCONFIG_QCOM_SMEM"]
     else :

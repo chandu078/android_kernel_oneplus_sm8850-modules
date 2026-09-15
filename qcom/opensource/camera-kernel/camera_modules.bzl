@@ -11,19 +11,19 @@ def _define_module(target, variant):
         "//build/kernel/kleaf:socrepo_true": [
             ":camera_headers",
             ":camera_banner",
-            "//soc-repo:all_headers",
-            "//soc-repo:{}/drivers/firmware/qcom/qcom-scm".format(tv),
-            "//soc-repo:{}/drivers/iommu/qcom_iommu_util".format(tv),
-            "//soc-repo:{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(tv),
-            "//soc-repo:{}/drivers/soc/qcom/crm-v2".format(tv),
-            "//soc-repo:{}/drivers/clk/qcom/clk-qcom".format(tv),
-            "//soc-repo:{}/drivers/soc/qcom/qcom_rpmh".format(tv),
-            "//soc-repo:{}/drivers/soc/qcom/socinfo".format(tv),
-            "//soc-repo:{}/drivers/soc/qcom/llcc-qcom".format(tv),
-            "//soc-repo:{}/drivers/soc/qcom/mdt_loader".format(tv),
-            "//soc-repo:{}/drivers/leds/flash/leds-qcom-flash".format(tv),
-            "//soc-repo:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
-            "//soc-repo:{}/drivers/leds/leds-qti-flash".format(tv),
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}/drivers/firmware/qcom/qcom-scm".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/iommu/qcom_iommu_util".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/crm-v2".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/clk/qcom/clk-qcom".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_rpmh".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/socinfo".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/llcc-qcom".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/mdt_loader".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/leds/flash/leds-qcom-flash".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/leds/leds-qti-flash".format(tv),
         ],
         "//build/kernel/kleaf:socrepo_false": [
             ":camera_headers",
@@ -33,7 +33,7 @@ def _define_module(target, variant):
     })
 
     kernel_build = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
         "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
     })
 
@@ -79,7 +79,7 @@ def _define_module(target, variant):
             "//vendor/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
             "//vendor/qcom/opensource/securemsm-kernel:{}_smmu_proxy_dlkm".format(tv),
 			"//vendor/qcom/opensource/mmrm-driver:{}_mmrm_driver".format(tv),
-            "//vendor/oplus/kernel/dft/bazel:oplus_bsp_dft_kernel_fb",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/dft/bazel:oplus_bsp_dft_kernel_fb",
         ])
     ddk_module(
         name = "{}_camera".format(tv),

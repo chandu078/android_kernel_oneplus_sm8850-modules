@@ -82,7 +82,7 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
     kernel_build = "{}_{}".format(target, variant)
 
     kernel_build_label = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_{}_base_kernel".format(target, variant),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_{}_base_kernel".format(target, variant),
         "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}_{}".format(target, variant),
     })
 
@@ -93,13 +93,13 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
 
     headers = select({
          "//build/kernel/kleaf:socrepo_true": [
-            "//soc-repo:all_headers",
-            "//soc-repo:{}_{}/drivers/firmware/qcom/qcom-scm".format(target, variant),
-            "//soc-repo:{}_{}/drivers/soc/qcom/mdt_loader".format(target, variant),
-            "//soc-repo:{}_{}/drivers/soc/qcom/llcc-qcom".format(target, variant),
-            "//soc-repo:{}_{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(target, variant),
-            "//soc-repo:{}_{}/drivers/virt/gunyah/gh_rm_drv".format(target, variant),
-            "//soc-repo:{}_{}/drivers/virt/gunyah/gh_msgq".format(target, variant),
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}_{}/drivers/firmware/qcom/qcom-scm".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/soc/qcom/mdt_loader".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/soc/qcom/llcc-qcom".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/virt/gunyah/gh_rm_drv".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/virt/gunyah/gh_msgq".format(target, variant),
             ],
          "//build/kernel/kleaf:socrepo_false":["//msm-kernel:all_headers"],
     })

@@ -8,7 +8,7 @@ def define_oplus_local_modules():
     kernel_build_variant = "{}_{}".format(target, variant)
 
     if bazel_support_platform == "qcom" :
-        ko_deps = ["//soc-repo:{}/drivers/firmware/qcom/qcom-scm".format(kernel_build_variant)]
+        ko_deps = ["//vendor/qcom/kernel:{}/drivers/firmware/qcom/qcom-scm".format(kernel_build_variant)]
     else :
         ko_deps = []
 

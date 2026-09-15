@@ -18,7 +18,7 @@ def define_oplus_cfg_module():
         kconfig = None
         defconfig = None
         if version_compare(kernel_version, "6.12") :
-            ddk_config = "//soc-repo:{}_config".format(target)
+            ddk_config = "//vendor/qcom/kernel:{}_config".format(target)
     else:
         kconfig = ":kconfig.oplus_chg.generated"
         defconfig = ":oplus_chg_{}_defconfig".format(target)

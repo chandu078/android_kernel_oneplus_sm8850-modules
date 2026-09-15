@@ -19,7 +19,7 @@ def define_oplus_local_modules():
 	    "CONFIG_OPLUS_FEATURE_SECURE_SRGUARD",
 	    "CONFIG_OPLUS_FEATURE_SECURE_SOCKETGUARD",
 	],
-        ko_deps = ["//vendor/oplus/kernel/boot:oplusboot"],
+        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplusboot"],
         conditional_defines = {
             "qcom":  ["QCOM_PLATFORM"],
             "mtk":   ["MTK_PLATFORM"],

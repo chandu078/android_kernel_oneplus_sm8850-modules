@@ -106,15 +106,15 @@ def define_oplus_local_modules():
             "oplus_wificapcenter",
         ]
 
-        # QCOM only: used to form labels into //soc-repo:{target}_{variant}/
+        # QCOM only: used to form labels into //vendor/qcom/kernel:{target}_{variant}/
         if bazel_support_platform == "qcom" :
             _KERNEL_BUILD_VARIANT = "{}_{}".format(oplus_ddk_get_target(), oplus_ddk_get_variant())
             target = oplus_ddk_get_target()
 
             if target == "canoe":
                 wonder_ko_deps = [
-                    "//soc-repo:{}/net/wireless/cfg80211".format(_KERNEL_BUILD_VARIANT),
-                    "//soc-repo:{}/net/mac80211/mac80211".format(_KERNEL_BUILD_VARIANT),
+                    "//vendor/qcom/kernel:{}/net/wireless/cfg80211".format(_KERNEL_BUILD_VARIANT),
+                    "//vendor/qcom/kernel:{}/net/mac80211/mac80211".format(_KERNEL_BUILD_VARIANT),
                 ]
 
                 define_oplus_ddk_module(

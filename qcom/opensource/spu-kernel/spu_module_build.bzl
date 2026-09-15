@@ -58,19 +58,19 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
     kernel_build = "{}_{}".format(target, variant)
 
     headers = select({
-        "//build/kernel/kleaf:socrepo_true": ["//soc-repo:all_headers"],
+        "//build/kernel/kleaf:socrepo_true": ["//vendor/qcom/kernel:all_headers"],
         "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
     })
     kernel_build_label = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(kernel_build),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build),
         "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build),
     })
 
     deps = select({
         "//build/kernel/kleaf:socrepo_true": [
-            "//soc-repo:{}/kernel/trace/qcom_ipc_logging".format(kernel_build),
-            "//soc-repo:{}/drivers/remoteproc/rproc_qcom_common".format(kernel_build),
-            "//soc-repo:{}/drivers/remoteproc/qcom_spss".format(kernel_build),
+            "//vendor/qcom/kernel:{}/kernel/trace/qcom_ipc_logging".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/remoteproc/rproc_qcom_common".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/remoteproc/qcom_spss".format(kernel_build),
         ],
         "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
     })

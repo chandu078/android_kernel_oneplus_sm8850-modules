@@ -44,7 +44,7 @@ def define_oplus_geas_cpu_local_modules():
             },
         },
         ko_deps = [
-            "//vendor/oplus/kernel/cpu:oplus_bsp_game_opt",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_game_opt",
     ],
     )
 

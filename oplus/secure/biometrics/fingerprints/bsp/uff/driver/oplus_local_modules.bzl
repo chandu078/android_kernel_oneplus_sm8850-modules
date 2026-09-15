@@ -29,8 +29,8 @@ def define_oplus_local_modules():
     else :
         oplus_fp_ko_deps =select({
                 "//build/kernel/kleaf:socrepo_true": [
-                    "//vendor/oplus/kernel/touchpanel/touchpanel_notify/bazel:oplus_bsp_tp_notify",
-                    "//soc-repo:{}/drivers/soc/qcom/panel_event_notifier".format(kernel_build_variant),
+                    "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/touchpanel_notify/bazel:oplus_bsp_tp_notify",
+                    "//vendor/qcom/kernel:{}/drivers/soc/qcom/panel_event_notifier".format(kernel_build_variant),
                 ],
                 "//build/kernel/kleaf:socrepo_false": [],
             })
@@ -57,7 +57,7 @@ def define_oplus_local_modules():
         },
         local_defines = ["CONFIG_OPLUS_FINGERPRINT_GKI_ENABLE","CONFIG_TOUCHPANEL_NOTIFY"],
         header_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:config_headers",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:config_headers",
         ],
     )
 

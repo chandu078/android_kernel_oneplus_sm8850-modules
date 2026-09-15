@@ -14,7 +14,7 @@ def define_oplus_local_modules():
         ]),
         includes = ["."],
         local_defines = ["CONFIG_OPLUS_BINDER_STRATEGY"],
-        ko_deps = ["//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist"],
+        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist"],
     )
 
     ddk_headers(

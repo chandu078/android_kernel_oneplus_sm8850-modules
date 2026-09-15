@@ -16,19 +16,19 @@ def define_oplus_local_modules():
 
     if bazel_support_target == "canoe" :
         oplusboot_ko_deps = [
-            "//vendor/oplus/kernel/boot:oplusboot",
-            "//vendor/oplus/kernel/boot:oplus_bsp_bootmode",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplusboot",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_bootmode",
         ]
         oplus_bsp_boot_projectinfo_ko_deps = [
-            "//vendor/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
         ]
         panel_event_notifier_ko_deps = [
-            "//soc-repo:{}/drivers/soc/qcom/panel_event_notifier".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/panel_event_notifier".format(kernel_build_variant),
         ]
         tp_others_ko_deps = [
-            "//vendor/oplus/kernel/device_info/device_info/bazel:device_info",
-            "//vendor/oplus/kernel/touchpanel/touchpanel_notify/bazel:oplus_bsp_tp_notify",
-            "//vendor/oplus/kernel/touchpanel/kernelFwUpdate/bazel:oplus_bsp_fw_update",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/device_info/bazel:device_info",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/touchpanel_notify/bazel:oplus_bsp_tp_notify",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/kernelFwUpdate/bazel:oplus_bsp_fw_update",
         ]
     else :
         oplusboot_ko_deps = []
@@ -39,13 +39,13 @@ def define_oplus_local_modules():
     if bazel_support_platform == "qcom" :
         tp_custom_ko_deps = []
         tp_common_ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
         ]
         oplus_bsp_tp_nt36672c_noflash_ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/touchpanel_notify/bazel:oplus_bsp_tp_notify",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_novatek_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/touchpanel_notify/bazel:oplus_bsp_tp_notify",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_novatek_common",
         ]
         copts = []
     else :
@@ -54,7 +54,7 @@ def define_oplus_local_modules():
                 "//kernel_device_modules-{}/drivers/soc/oplus/boot:oplus_bsp_boot_projectinfo".format(kernel_version),
             ]
             tp_common_ko_deps = [
-                "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+                "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
                 "//kernel_device_modules-{}/drivers/gpu/drm/mediatek/mediatek_v2:mtk_disp_notify".format(kernel_version),
                 "//kernel_device_modules-{}/drivers/gpu/drm/mediatek/mediatek_v2:mtk_panel_ext".format(kernel_version),
                 "//kernel_device_modules-{}/drivers/soc/oplus/boot:oplus_bsp_boot_projectinfo".format(kernel_version),
@@ -63,26 +63,26 @@ def define_oplus_local_modules():
                 "//kernel_device_modules-{}/drivers/soc/oplus/device_info:device_info".format(kernel_version),
                 "//kernel_device_modules-{}/drivers/base/kernelFwUpdate:oplus_bsp_fw_update".format(kernel_version),
                 "//kernel_device_modules-{}/drivers/base/touchpanel_notify:oplus_bsp_tp_notify".format(kernel_version),
-                "//vendor/oplus/kernel/dft/bazel:oplus_bsp_dft_olc".format(kernel_version),
+                "//vendor/qcom/sm8850-modules/oplus/kernel/dft/bazel:oplus_bsp_dft_olc".format(kernel_version),
             ]
             copts = [
                 "-I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/include/",
                 "-I$(DEVICE_MODULES_PATH)/drivers/gpu/drm/mediatek/mediatek_v2/",
             ]
             oplus_bsp_tp_nt36672c_noflash_ko_deps = [
-                "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-                "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-                "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_novatek_common",
+                "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+                "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+                "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_novatek_common",
             ]
         else :
             tp_custom_ko_deps = []
             tp_common_ko_deps = [
-                "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+                "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
             ]
             oplus_bsp_tp_nt36672c_noflash_ko_deps = [
-                "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-                "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-                "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_novatek_common",
+                "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+                "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+                "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_novatek_common",
             ]
             copts = []
 
@@ -96,8 +96,8 @@ def define_oplus_local_modules():
         includes = ["."],
         copts = copts,
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
         ],
 #        local_defines = ["CONFIG_REMOVE_OPLUS_FUNCTION"],
     )
@@ -110,9 +110,9 @@ def define_oplus_local_modules():
             "Synaptics/Syna_tcm_S3910/synaptics_tcm_device_S3910.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_syna_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_syna_common",
         ],
         includes = ["."],
         copts = copts,
@@ -130,9 +130,9 @@ def define_oplus_local_modules():
             "Synaptics/Syna_tcm_S3908/synaptics_tcm_device_S3908.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_syna_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_syna_common",
         ],
         includes = ["."],
         copts = copts,
@@ -150,8 +150,8 @@ def define_oplus_local_modules():
         includes = ["."],
         copts = copts,
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
         ],
 #        local_defines = ["CONFIG_REMOVE_OPLUS_FUNCTION"],
     )
@@ -178,9 +178,9 @@ def define_oplus_local_modules():
             "Novatek/NT36528_noflash/nvt_drivers_nt36528_noflash.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_novatek_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_novatek_common",
         ],
         includes = ["."],
         copts = copts,
@@ -197,9 +197,9 @@ def define_oplus_local_modules():
             "Novatek/NT36532_noflash/nvt_drivers_nt36532_noflash.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_novatek_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_novatek_common",
         ],
         includes = ["."],
         copts = copts,
@@ -213,9 +213,9 @@ def define_oplus_local_modules():
             "Novatek/NT36536_noflash/nvt_drivers_nt36536_noflash.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_novatek_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_novatek_common",
         ],
         includes = ["."],
         copts = copts,
@@ -231,8 +231,8 @@ def define_oplus_local_modules():
         includes = ["."],
         copts = copts,
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
         ],
 #        local_defines = ["CONFIG_REMOVE_OPLUS_FUNCTION"],
     )
@@ -248,9 +248,9 @@ def define_oplus_local_modules():
             "ilitek/ilitek7807s/ili7807s_qcom.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_ilitek_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_ilitek_common",
         ],
         includes = ["."],
         copts = copts,
@@ -268,9 +268,9 @@ def define_oplus_local_modules():
             "Focal/ft3683g/ft3683g_test.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_focal_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_focal_common",
         ],
         includes = ["."],
         copts = copts,
@@ -289,8 +289,8 @@ def define_oplus_local_modules():
         includes = ["."],
         copts = copts,
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
         ],
 #        local_defines = ["CONFIG_REMOVE_OPLUS_FUNCTION"],
     )
@@ -302,9 +302,9 @@ def define_oplus_local_modules():
             "Focal/ft3681/*.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_focal_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_focal_common",
         ],
         includes = ["."],
         copts = copts,
@@ -322,9 +322,9 @@ def define_oplus_local_modules():
             "Focal/ft3658u_spi/ft3658u_test.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_focal_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_focal_common",
         ],
         includes = ["."],
         copts = copts,
@@ -342,9 +342,9 @@ def define_oplus_local_modules():
             "Focal/ft3518/ft3518_test.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_focal_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_focal_common",
         ],
         includes = ["."],
         copts = copts,
@@ -359,9 +359,9 @@ def define_oplus_local_modules():
             "Focal/ft8057p/ft8057p_test.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_focal_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_focal_common",
         ],
         includes = ["."],
         copts = copts,
@@ -380,8 +380,8 @@ def define_oplus_local_modules():
             "Goodix/goodix_common.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
         ],
         includes = ["."],
         copts = copts,
@@ -396,9 +396,9 @@ def define_oplus_local_modules():
             "Goodix/GT9966/goodix_pen.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_goodix_comnon",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_goodix_comnon",
         ],
         includes = ["."],
         copts = copts,
@@ -413,9 +413,9 @@ def define_oplus_local_modules():
             "Goodix/GT9916/goodix_pen.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_goodix_comnon",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_goodix_comnon",
         ],
         includes = ["."],
         copts = copts,
@@ -432,9 +432,9 @@ def define_oplus_local_modules():
             "Synaptics/TD4377_noflash/synaptics_tcm_zeroflash.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_syna_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_common",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_syna_common",
         ],
         includes = ["."],
         copts = copts,

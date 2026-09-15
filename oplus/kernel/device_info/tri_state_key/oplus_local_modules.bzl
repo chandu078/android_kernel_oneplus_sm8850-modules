@@ -27,7 +27,7 @@ def define_oplus_local_modules():
             "hall_ic/hall_mxm1120_up.c"
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/device_info/tri_state_key:oplus_bsp_tri_key",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/tri_state_key:oplus_bsp_tri_key",
         ],
         includes = ["."],
     )
@@ -38,7 +38,7 @@ def define_oplus_local_modules():
             "hall_ic/hall_mxm1120_down.c"
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/device_info/tri_state_key:oplus_bsp_tri_key",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/tri_state_key:oplus_bsp_tri_key",
         ],
         includes = ["."],
     )
@@ -50,7 +50,7 @@ def define_oplus_local_modules():
             "ist_hall_ic/hall_ist8801_up.c"
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/device_info/tri_state_key:oplus_bsp_tri_key",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/tri_state_key:oplus_bsp_tri_key",
         ],
         includes = ["."],
     )
@@ -61,7 +61,7 @@ def define_oplus_local_modules():
             "ist_hall_ic/hall_ist8801_down.c"
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/device_info/tri_state_key:oplus_bsp_tri_key",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/tri_state_key:oplus_bsp_tri_key",
         ],
         includes = ["."],
     )
@@ -72,7 +72,7 @@ def define_oplus_local_modules():
             "digital_hall_ic/oplus_ak09970.c"
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/device_info/tri_state_key:oplus_bsp_tri_key",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/tri_state_key:oplus_bsp_tri_key",
         ],
         includes = ["."],
     )

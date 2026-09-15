@@ -12,7 +12,7 @@ def define_modules(target, variant):
     mod_list = []
 
     kernel_build = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(kernel_build_variant),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build_variant),
         "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build_variant),
     })
 
@@ -22,7 +22,7 @@ def define_modules(target, variant):
     ]
 
     gsim_deps += select({
-        "//build/kernel/kleaf:socrepo_true": ["//soc-repo:all_headers"],
+        "//build/kernel/kleaf:socrepo_true": ["//vendor/qcom/kernel:all_headers"],
         "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
     })
 
@@ -38,16 +38,16 @@ def define_modules(target, variant):
 
     ipam_deps += select({
         "//build/kernel/kleaf:socrepo_true": [
-            "//soc-repo:all_headers",
-            "//soc-repo:{}/drivers/soc/qcom/mdt_loader".format(kernel_build_variant),
-            "//soc-repo:{}/kernel/trace/qcom_ipc_logging".format(kernel_build_variant),
-            "//soc-repo:{}/drivers/firmware/qcom/qcom-scm".format(kernel_build_variant),
-            "//soc-repo:{}/drivers/iommu/qcom_iommu_util".format(kernel_build_variant),
-            "//soc-repo:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
-            "//soc-repo:{}/drivers/soc/qcom/qcom_ramdump".format(kernel_build_variant),
-            "//soc-repo:{}/drivers/soc/qcom/qmi_helpers".format(kernel_build_variant),
-            "//soc-repo:{}/drivers/remoteproc/rproc_qcom_common".format(kernel_build_variant),
-            "//soc-repo:{}/drivers/usb/gadget/function/usb_f_gsi".format(kernel_build_variant),
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/mdt_loader".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/kernel/trace/qcom_ipc_logging".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/firmware/qcom/qcom-scm".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/iommu/qcom_iommu_util".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_ramdump".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/qmi_helpers".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/remoteproc/rproc_qcom_common".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/usb/gadget/function/usb_f_gsi".format(kernel_build_variant),
         ],
         "//build/kernel/kleaf:socrepo_false": [
             "//msm-kernel:all_headers",
@@ -56,7 +56,7 @@ def define_modules(target, variant):
 
     ipam_deps += select({
         "//build/kernel/kleaf:socrepo_true": [
-            "//soc-repo:{}/drivers/soc/qcom/qcom_va_minidump".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_va_minidump".format(kernel_build_variant),
         ],
         "//build/kernel/kleaf:socrepo_false": [],
     })
@@ -72,9 +72,9 @@ def define_modules(target, variant):
 
     ipanetm_deps += select({
         "//build/kernel/kleaf:socrepo_true": [
-            "//soc-repo:all_headers",
-            "//soc-repo:{}/drivers/soc/qcom/mdt_loader".format(kernel_build_variant),
-            "//soc-repo:{}/kernel/trace/qcom_ipc_logging".format(kernel_build_variant),
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/mdt_loader".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/kernel/trace/qcom_ipc_logging".format(kernel_build_variant),
         ],
         "//build/kernel/kleaf:socrepo_false": [
             "//msm-kernel:all_headers",
@@ -93,7 +93,7 @@ def define_modules(target, variant):
         ]
         ipatestm_deps += select({
             "//build/kernel/kleaf:socrepo_true": [
-                "//soc-repo:all_headers",
+                "//vendor/qcom/kernel:all_headers",
             ],
             "//build/kernel/kleaf:socrepo_false": [
                 "//msm-kernel:all_headers",

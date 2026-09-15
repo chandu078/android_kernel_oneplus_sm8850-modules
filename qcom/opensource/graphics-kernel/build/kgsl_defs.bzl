@@ -127,12 +127,12 @@ def define_target_variant_module(target, variant):
     if target in [ "neo-la" ]:
         kernel_build = select({
             "//build/kernel/kleaf:microxr_kernel_build_true": "//:target_kernel_build",
-            "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+            "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
             "//conditions:default": "//msm-kernel:{}".format(tv),
         })
     else:
         kernel_build = select({
-            "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+            "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
             "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
         })
 
@@ -140,27 +140,27 @@ def define_target_variant_module(target, variant):
 
     ddk_deps = select({
                 "//build/kernel/kleaf:socrepo_true": [
-                  "//soc-repo:all_headers",
-                  "//soc-repo:{}/drivers/clk/qcom/clk-qcom".format(tv),
-                  "//soc-repo:{}/drivers/devfreq/governor_msm_adreno_tz".format(tv),
-                  "//soc-repo:{}/drivers/firmware/qcom/qcom-scm".format(tv),
-                  "//soc-repo:{}/drivers/hwtracing/coresight/coresight".format(tv),
-                  "//soc-repo:{}/drivers/iommu/qcom_iommu_util".format(tv),
-                  "//soc-repo:{}/drivers/remoteproc/qcom_q6v5_pas".format(tv),
-                  "//soc-repo:{}/drivers/soc/qcom/cmd-db".format(tv),
-                  "//soc-repo:{}/drivers/soc/qcom/dcvs/qcom-dcvs".format(tv),
-                  "//soc-repo:{}/drivers/soc/qcom/llcc-qcom".format(tv),
-                  "//soc-repo:{}/drivers/soc/qcom/mdt_loader".format(tv),
-                  "//soc-repo:{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(tv),
-                  "//soc-repo:{}/drivers/soc/qcom/minidump".format(tv),
-                  "//soc-repo:{}/drivers/soc/qcom/msm_performance".format(tv),
-                  "//soc-repo:{}/drivers/soc/qcom/qcom_aoss".format(tv),
-                  "//soc-repo:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
-                  "//soc-repo:{}/drivers/soc/qcom/secure_buffer".format(tv),
-                  "//soc-repo:{}/drivers/soc/qcom/socinfo".format(tv),
-                  "//soc-repo:{}/kernel/msm_sysstats".format(tv),
+                  "//vendor/qcom/kernel:all_headers",
+                  "//vendor/qcom/kernel:{}/drivers/clk/qcom/clk-qcom".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/devfreq/governor_msm_adreno_tz".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/firmware/qcom/qcom-scm".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/hwtracing/coresight/coresight".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/iommu/qcom_iommu_util".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/remoteproc/qcom_q6v5_pas".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/cmd-db".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/dcvs/qcom-dcvs".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/llcc-qcom".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/mdt_loader".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/minidump".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/msm_performance".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_aoss".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/secure_buffer".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/socinfo".format(tv),
+                  "//vendor/qcom/kernel:{}/kernel/msm_sysstats".format(tv),
                   "//vendor/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
-                  "//vendor/oplus/kernel/mm:oplus_bsp_mm_osvelte".format(tv),
+                  "//vendor/qcom/sm8850-modules/oplus/kernel/mm:oplus_bsp_mm_osvelte".format(tv),
                 ],
                 "//build/kernel/kleaf:socrepo_false": [ "//msm-kernel:all_headers" ],
         })

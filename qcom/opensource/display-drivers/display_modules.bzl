@@ -314,10 +314,10 @@ module_entry(
 
 #ifdef OPLUS_FEATURE_DISPLAY
       deps = [
-            "//vendor/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
-            "//vendor/oplus/kernel/boot:oplus_bsp_bootmode",
-            "//vendor/oplus/kernel/device_info/device_info/bazel:device_info",
-            "//vendor/oplus/kernel/touchpanel/touchpanel_notify/bazel:oplus_bsp_tp_notify",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_bootmode",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/device_info/bazel:device_info",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/touchpanel_notify/bazel:oplus_bsp_tp_notify",
       ],
 #endif /* OPLUS_FEATURE_DISPLAY */
 

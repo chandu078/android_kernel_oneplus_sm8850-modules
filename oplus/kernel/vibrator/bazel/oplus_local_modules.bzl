@@ -10,12 +10,12 @@ def define_oplus_local_modules():
 
     if bazel_support_platform == "qcom" :
         haptic_feedback_ko_deps = [
-            "//vendor/oplus/kernel/dft/bazel:oplus_bsp_dft_kernel_fb",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/dft/bazel:oplus_bsp_dft_kernel_fb",
         ]
         haptic_ko_deps = [
-            "//vendor/oplus/kernel/vibrator/bazel:oplus_bsp_haptic_feedback",
-            "//vendor/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
-            "//vendor/oplus/kernel/boot:oplus_bsp_bootmode",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/vibrator/bazel:oplus_bsp_haptic_feedback",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_bootmode",
         ]
         haptic_copts = []
     else :

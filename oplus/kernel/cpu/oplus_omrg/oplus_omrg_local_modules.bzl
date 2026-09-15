@@ -5,7 +5,7 @@ load("//build/kernel/oplus:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
 def define_oplus_omrg_local_modules():
     target = oplus_ddk_get_target()
     if target == "k6993v1_64" :
-        ko_deps = ["//vendor/oplus/kernel/cpu:oplus_freq_qos_arbiter",]
+        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_freq_qos_arbiter",]
     else :
         ko_deps = []
     copts = []

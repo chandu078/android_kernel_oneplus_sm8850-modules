@@ -10,32 +10,32 @@ def define_oplus_local_modules():
 
     if bazel_support_platform == "qcom" :
         combkey_monitor_ko_deps = [
-            "//vendor/oplus/kernel/dfr:oplus_bsp_dfr_keyevent_handler",
-            "//vendor/oplus/kernel/dfr:oplus_bsp_dfr_theia",
-            "//vendor/oplus/kernel/dft/bazel:oplus_bsp_dft_kernel_fb",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/dfr:oplus_bsp_dfr_keyevent_handler",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/dfr:oplus_bsp_dfr_theia",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/dft/bazel:oplus_bsp_dft_kernel_fb",
         ]
         hung_task_enhance_ko_deps = [
-            "//vendor/oplus/kernel/dfr:oplus_bsp_dfr_theia",
-            "//vendor/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/dfr:oplus_bsp_dfr_theia",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
         ]
         shutdown_detect_ko_deps = [
-            "//vendor/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
         ]
         theia_ko_deps = [
-            "//soc-repo:{}/drivers/soc/qcom/panel_event_notifier".format(kernel_build_variant)
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/panel_event_notifier".format(kernel_build_variant)
         ]
         dump_device_info_ko_deps = [
-            "//vendor/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
-            "//vendor/oplus/kernel/boot:oplusboot",
-            "//soc-repo:{}/drivers/soc/qcom/debug_symbol".format(kernel_build_variant),
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplusboot",
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/debug_symbol".format(kernel_build_variant),
         ]
         dump_reason_ko_deps = [
-            "//vendor/oplus/kernel/dfr:oplus_bsp_dfr_dump_device_info",
-            "//soc-repo:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
+            "//vendor/qcom/sm8850-modules/oplus/kernel/dfr:oplus_bsp_dfr_dump_device_info",
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
         ]
         pmic_watchdog_ko_deps = [
-            "//vendor/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
-            "//soc-repo:{}/drivers/input/misc/qpnp-power-on".format(kernel_build_variant),
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
+            "//vendor/qcom/kernel:{}/drivers/input/misc/qpnp-power-on".format(kernel_build_variant),
          ]
 
     define_oplus_ddk_module(
@@ -74,7 +74,7 @@ def define_oplus_local_modules():
         ]),
         includes = ["."],
         ko_deps = [
-            "//vendor/oplus/kernel/dfr:oplus_bsp_dfr_theia",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/dfr:oplus_bsp_dfr_theia",
         ],
         local_defines = ["CONFIG_OPLUS_FEATURE_THEIA"],
     )
@@ -108,7 +108,7 @@ def define_oplus_local_modules():
             "qcom": ["CONFIG_OPLUS_SYSTEM_KERNEL_QCOM"],
         },
 #        header_deps = [
-#            "//vendor/oplus/kernel/cpu:config_headers",
+#            "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:config_headers",
 #        ],
         includes = ["."],
     )
@@ -253,8 +253,8 @@ def define_oplus_local_modules():
             },
         },
         ko_deps = [
-            "//vendor/oplus/kernel/dfr:oplus_inject",
-            "//vendor/oplus/kernel/vibrator/bazel:oplus_bsp_haptic_feedback",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/dfr:oplus_inject",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/vibrator/bazel:oplus_bsp_haptic_feedback",
         ],
         includes = ["."],
         conditional_build = {
@@ -272,7 +272,7 @@ def define_oplus_local_modules():
         copts = ["-DCONFIG_QCOM_SMEM"],
         includes = ["."],
         ko_deps = [
-            "//soc-repo:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
         ],
         local_defines = ["CONFIG_OPLUS_FEATURE_FULLDUMP_BACK"],
     )

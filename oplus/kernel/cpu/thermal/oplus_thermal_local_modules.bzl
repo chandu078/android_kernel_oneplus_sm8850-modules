@@ -29,7 +29,7 @@ def define_oplus_thermal_local_modules():
 #            "oplus_ipa_thermal.c",
 #        ]),
 #        ko_deps = [
-#            "//vendor/oplus/kernel/cpu/thermal:horae_shell_temp",
+#            "//vendor/qcom/sm8850-modules/oplus/kernel/cpu/thermal:horae_shell_temp",
 #        ],
 #        includes = ["."],
 #    )

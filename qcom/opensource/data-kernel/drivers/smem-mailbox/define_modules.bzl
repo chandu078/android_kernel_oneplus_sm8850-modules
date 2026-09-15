@@ -5,11 +5,11 @@ def define_modules(target, variant):
     kernel_build_variant = "{}_{}".format(target, variant)
 
     deps = select({
-        "//build/kernel/kleaf:socrepo_true": ["//soc-repo:all_headers", "//soc-repo:{}/drivers/soc/qcom/smem".format(kernel_build_variant)],
+        "//build/kernel/kleaf:socrepo_true": ["//vendor/qcom/kernel:all_headers", "//vendor/qcom/kernel:{}/drivers/soc/qcom/smem".format(kernel_build_variant)],
         "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
     })
     kernel_build = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(kernel_build_variant),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build_variant),
         "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build_variant),
     })
 

@@ -11,8 +11,8 @@ def define_oplus_local_modules():
     if bazel_support_platform == "qcom" :
         ko_deps = select({
             "//build/kernel/kleaf:socrepo_true":[
-                    "//soc-repo:{}/drivers/soc/qcom/qcom_stats".format(kernel_build_variant),
-                    "//soc-repo:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
+                    "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_stats".format(kernel_build_variant),
+                    "//vendor/qcom/kernel:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
                 ],
             "//build/kernel/kleaf:socrepo_false": [],
         })

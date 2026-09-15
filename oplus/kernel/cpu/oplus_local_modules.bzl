@@ -49,7 +49,7 @@ def define_oplus_sched_assist_local_modules():
                  "-DCONFIG_HMBIRD_SCHED_BPF"]
         kconfig = None
         defconfig = None
-        ddk_config = "//soc-repo:{}_config".format(kernel_build_variant)
+        ddk_config = "//vendor/qcom/kernel:{}_config".format(kernel_build_variant)
     else :
         ko_deps = [
         ]
@@ -107,16 +107,16 @@ def define_oplus_sched_assist_local_modules():
 
     if bazel_support_platform == "qcom" :
         sched_ext_ko_deps = [
-            "//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist",
-            "//vendor/oplus/kernel/cpu:oplus_bsp_waker_identify",
-            "//vendor/oplus/kernel/synchronize:oplus_locking_strategy",
-            "//soc-repo:{}/drivers/soc/qcom/minidump".format(kernel_build_variant),
+            "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_waker_identify",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/synchronize:oplus_locking_strategy",
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/minidump".format(kernel_build_variant),
         ]
     else :
         sched_ext_ko_deps = [
-            "//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist",
-            "//vendor/oplus/kernel/cpu:oplus_bsp_waker_identify",
-            "//vendor/oplus/kernel/synchronize:oplus_locking_strategy",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_waker_identify",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/synchronize:oplus_locking_strategy",
             "//kernel_device_modules-6.12/drivers/misc/mediatek/aee/mrdump:mrdump",
         ]
     define_oplus_ddk_module(
@@ -136,7 +136,7 @@ def define_oplus_sched_assist_local_modules():
         },
         ko_deps = sched_ext_ko_deps,
         header_deps = [
-            "//vendor/oplus/kernel/cpu:config_headers",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:config_headers",
         ],
         generate_btf = True,
     )

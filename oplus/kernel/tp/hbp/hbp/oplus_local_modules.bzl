@@ -18,19 +18,19 @@ def define_oplus_local_modules():
     if bazel_support_platform == "qcom" :
         panel_event_notifier_ko_deps = select({
             "//build/kernel/kleaf:socrepo_true": [
-                "//soc-repo:{}/drivers/soc/qcom/panel_event_notifier".format(kernel_build_variant),
+                "//vendor/qcom/kernel:{}/drivers/soc/qcom/panel_event_notifier".format(kernel_build_variant),
             ],
             "//build/kernel/kleaf:socrepo_false": [],
         })
         tp_others_ko_deps = select({
             "//build/kernel/kleaf:socrepo_true": [
-                "//vendor/oplus/kernel/touchpanel/touchpanel_notify/bazel:oplus_bsp_tp_notify",
-                "//vendor/oplus/kernel/touchpanel/kernelFwUpdate/bazel:oplus_bsp_fw_update",
+                "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/touchpanel_notify/bazel:oplus_bsp_tp_notify",
+                "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/kernelFwUpdate/bazel:oplus_bsp_fw_update",
             ],
             "//build/kernel/kleaf:socrepo_false": [],
         })
         ko_deps = [
-                "//vendor/oplus/kernel/tp/hbp/hbp:oplus_hbp_core",
+                "//vendor/qcom/sm8850-modules/oplus/kernel/tp/hbp/hbp:oplus_hbp_core",
         ]
         copts = []
     else :
@@ -48,7 +48,7 @@ def define_oplus_local_modules():
                 "//kernel_device_modules-{}/drivers/base/kernelFwUpdate:oplus_bsp_fw_update".format(kernel_version),
             ]
             ko_deps = [
-                "//vendor/oplus/kernel/tp/hbp/hbp:oplus_hbp_core",
+                "//vendor/qcom/sm8850-modules/oplus/kernel/tp/hbp/hbp:oplus_hbp_core",
             ]
             copts = [
                 "-I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/include/",
@@ -58,7 +58,7 @@ def define_oplus_local_modules():
             panel_event_notifier_ko_deps = []
             tp_others_ko_deps = []
             ko_deps = [
-                "//vendor/oplus/kernel/tp/hbp/hbp:oplus_hbp_core",
+                "//vendor/qcom/sm8850-modules/oplus/kernel/tp/hbp/hbp:oplus_hbp_core",
             ]
             copts = []
 
@@ -100,7 +100,7 @@ def define_oplus_local_modules():
         ]),
         includes = ["."],
         ko_deps = [
-            "//vendor/oplus/kernel/tp/hbp/hbp:oplus_hbp_core",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/tp/hbp/hbp:oplus_hbp_core",
         ],
         local_defines = [
                  "BUILD_BY_BAZEL",
@@ -146,7 +146,7 @@ def define_oplus_local_modules():
         ]),
         includes = ["."],
         ko_deps = [
-            "//vendor/oplus/kernel/tp/hbp/hbp:oplus_hbp_core",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/tp/hbp/hbp:oplus_hbp_core",
         ],
         local_defines = [
             "BUILD_BY_BAZEL",

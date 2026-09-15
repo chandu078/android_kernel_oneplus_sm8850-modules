@@ -16,19 +16,19 @@ def define_oplus_local_modules():
 
     if bazel_support_target == "canoe" :
         oplusboot_ko_deps = [
-            "//vendor/oplus/kernel/boot:oplusboot",
-            "//vendor/oplus/kernel/boot:oplus_bsp_bootmode",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplusboot",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_bootmode",
         ]
         oplus_bsp_boot_projectinfo_ko_deps = [
-            "//vendor/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
         ]
         panel_event_notifier_ko_deps = [
-            "//soc-repo:{}/drivers/soc/qcom/panel_event_notifier".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/panel_event_notifier".format(kernel_build_variant),
         ]
         tp_others_ko_deps = [
-            "//vendor/oplus/kernel/device_info/device_info/bazel:device_info",
-            "//vendor/oplus/kernel/touchpanel/touchpanel_notify/bazel:oplus_bsp_tp_notify",
-            "//vendor/oplus/kernel/touchpanel/kernelFwUpdate/bazel:oplus_bsp_fw_update",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/device_info/bazel:device_info",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/touchpanel_notify/bazel:oplus_bsp_tp_notify",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/kernelFwUpdate/bazel:oplus_bsp_fw_update",
         ]
     else :
         oplusboot_ko_deps = []
@@ -38,13 +38,13 @@ def define_oplus_local_modules():
 
     if bazel_support_platform == "qcom" :
         ko_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
         ]
         copts = []
     else :
         if version_compare(kernel_version, "6.12") :
             ko_deps = [
-                "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+                "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
                 "//kernel_device_modules-{}/drivers/gpu/drm/mediatek/mediatek_v2:mtk_disp_notify".format(kernel_version),
                 "//kernel_device_modules-{}/drivers/gpu/drm/mediatek/mediatek_v2:mtk_panel_ext".format(kernel_version),
                 "//kernel_device_modules-{}/drivers/soc/oplus/boot:oplus_bsp_boot_projectinfo".format(kernel_version),
@@ -60,7 +60,7 @@ def define_oplus_local_modules():
             ]
         else :
             ko_deps = [
-                "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
+                "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:oplus_bsp_tp_custom",
             ]
             copts = []
 
@@ -99,7 +99,7 @@ def define_oplus_local_modules():
             "qcom":  ["CONFIG_QCOM_PANEL_EVENT_NOTIFIER"],
         },
         header_deps = [
-            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:config_headers",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:config_headers",
         ],
     )
 

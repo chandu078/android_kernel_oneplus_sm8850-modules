@@ -9,7 +9,7 @@ def define_oplus_local_modules():
     bazel_support_target = oplus_ddk_get_target()
     if bazel_support_target == "canoe" :
         smem_ko_deps = [
-            "//soc-repo:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
         ]
     else :
         smem_ko_deps = []

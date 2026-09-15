@@ -40,7 +40,7 @@ def define_oplus_uad_local_modules():
             "mtk":  ["CONFIG_OPLUS_SYSTEM_KERNEL_MTK"],
             "qcom": ["CONFIG_OPLUS_SYSTEM_KERNEL_QCOM","CONFIG_SCHED_WALT"],
         },
-        ko_deps = ["//vendor/oplus/kernel/cpu:oplus_bsp_frame_boost"],
+        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_frame_boost"],
         copts = copts,
         includes = ["."],
     )

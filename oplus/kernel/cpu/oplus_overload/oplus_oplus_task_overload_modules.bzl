@@ -9,13 +9,13 @@ def define_oplus_task_overload_local_modules():
     kernel_version = oplus_ddk_get_kernel_version()
 
     if bazel_support_platform == "qcom" :
-        ko_deps = ["//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist",
-            "//vendor/oplus/kernel/cpu:oplus_bsp_frame_boost"]
+        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_frame_boost"]
         copts = ["-DCONFIG_SCHED_WALT"]
         kconfig = None
         defconfig = None
     else :
-        ko_deps = ["//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist"]
+        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist"]
         copts = []
         kconfig = "oplus_overload/Kconfig"
         defconfig = "build/defconfig/{}/task_overload_configs".format(target)

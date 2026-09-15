@@ -16,7 +16,7 @@ def define_oplus_local_modules():
 
     if bazel_support_target == "canoe" :
         others_ko_deps = [
-            "//vendor/oplus/kernel/device_info/magtransfer:oplus_magcvr_notify",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/magtransfer:oplus_magcvr_notify",
         ]
     else :
         others_ko_deps = []
@@ -60,7 +60,7 @@ def define_oplus_local_modules():
             "magcvr_src/hardware/magcvr_ak09973.c"
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/device_info/magnetic_cover:oplus_magnetic_cover",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/magnetic_cover:oplus_magnetic_cover",
         ],
         includes = ["."],
     )
@@ -72,7 +72,7 @@ def define_oplus_local_modules():
             "magcvr_src/hardware/magcvr_mxm1120.c"
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/device_info/magnetic_cover:oplus_magnetic_cover",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/magnetic_cover:oplus_magnetic_cover",
         ],
         includes = ["."],
     )
@@ -84,7 +84,7 @@ def define_oplus_local_modules():
             "magcvr_src/hardware/magcvr_mkh100a.c"
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/device_info/magnetic_cover:oplus_magnetic_cover",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/magnetic_cover:oplus_magnetic_cover",
         ],
         includes = ["."],
     )

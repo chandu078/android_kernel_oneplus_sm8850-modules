@@ -7,19 +7,19 @@ def _define_module(target, variant):
 
     deps = select({
         "//build/kernel/kleaf:socrepo_true": [
-            "//soc-repo:all_headers",
-            "//soc-repo:{}/drivers/remoteproc/rproc_qcom_common".format(tv),
-            "//soc-repo:{}/drivers/remoteproc/qcom_q6v5_pas".format(tv),
-            "//soc-repo:{}/drivers/virt/gunyah/gh_dbl".format(tv),
-            "//soc-repo:{}/drivers/virt/gunyah/gh_rm_drv".format(tv),
-            "//soc-repo:{}/drivers/firmware/qcom/qcom-scm".format(tv),
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}/drivers/remoteproc/rproc_qcom_common".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/remoteproc/qcom_q6v5_pas".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/virt/gunyah/gh_dbl".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/virt/gunyah/gh_rm_drv".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/firmware/qcom/qcom-scm".format(tv),
         ],
         "//build/kernel/kleaf:socrepo_false": [
             "//msm-kernel:all_headers",
         ],
     })
     kernel_build = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
         "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
     })
 

@@ -10,7 +10,7 @@ def define_oplus_local_modules():
 
     if target == "canoe" :
         ko_oem_qmi_deps = [
-            "//soc-repo:{}/drivers/soc/qcom/qmi_helpers".format(kernel_build_variant)
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/qmi_helpers".format(kernel_build_variant)
         ]
     else :
         ko_oem_qmi_deps = []
@@ -163,7 +163,7 @@ def define_oplus_local_modules():
             "oplus_network_esim/oplus_network_esim.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/network:oplus_network_oem_qmi",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/network:oplus_network_oem_qmi",
         ],
         conditional_defines = {
             "qcom":  ["QCOM_PLATFORM"],
@@ -178,7 +178,7 @@ def define_oplus_local_modules():
             "oplus_network_sim_detect/sim_detect.c",
         ]),
         ko_deps = [
-            "//vendor/oplus/kernel/network:oplus_network_oem_qmi",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/network:oplus_network_oem_qmi",
         ],
         conditional_defines = {
             "qcom":  ["QCOM_PLATFORM"],

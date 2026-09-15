@@ -9,11 +9,11 @@ def define_oplus_task_sched_local_modules():
     kernel_version = oplus_ddk_get_kernel_version()
 
     if bazel_support_platform == "qcom" :
-        ko_deps = ["//vendor/oplus/kernel/cpu:oplus_bsp_frame_boost",
-                    "//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist"]
+        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_frame_boost",
+                    "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist"]
         copts = ["-DCONFIG_SCHED_WALT"]
     else :
-        ko_deps = ["//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist"]
+        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist"]
         copts = []
 
     define_oplus_ddk_module(

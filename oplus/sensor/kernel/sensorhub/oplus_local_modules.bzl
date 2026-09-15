@@ -41,7 +41,7 @@ def define_oplus_local_modules():
         includes = ["oplus_consumer_ir"],
         copts = oplus_mtk_copts,
         ko_deps = [
-            "//vendor/oplus/sensor/kernel/sensorhub:oplus_sensor_ir_core",
+            "//vendor/qcom/sm8850-modules/oplus/sensor/kernel/sensorhub:oplus_sensor_ir_core",
         ] + oplus_mtk_deps,
         local_defines = [],
         out = "oplus_sensor_kookong_ir_pwm.ko",

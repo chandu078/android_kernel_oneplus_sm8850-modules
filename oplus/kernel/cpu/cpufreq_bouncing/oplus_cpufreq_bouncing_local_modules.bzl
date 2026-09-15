@@ -14,14 +14,14 @@ def define_oplus_cpufreq_bouncing_local_modules():
         copts = ["-DCONFIG_SCHED_WALT"]
         kconfig = None
         defconfig = None
-        ddk_config = "//soc-repo:{}_config".format(kernel_build_variant)
+        ddk_config = "//vendor/qcom/kernel:{}_config".format(kernel_build_variant)
     else :
         copts = []
         kconfig = "cpufreq_bouncing/Kconfig"
         defconfig = "build/defconfig/{}/cpufreq_bouncing_configs".format(target)
         ddk_config = None
         if target == "k6993v1_64" :
-            ko_deps = ["//vendor/oplus/kernel/cpu:oplus_freq_qos_arbiter",]
+            ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_freq_qos_arbiter",]
         else :
             ko_deps = []
 

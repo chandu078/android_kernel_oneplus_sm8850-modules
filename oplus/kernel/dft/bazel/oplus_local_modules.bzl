@@ -20,7 +20,7 @@ def define_oplus_local_modules():
         olc_defconfig = None
         kfb_defconfig = None
         if version_compare(kernel_version, "6.12"):
-            ddk_config = "//soc-repo:{}_config".format(kernel_build_variant)
+            ddk_config = "//vendor/qcom/kernel:{}_config".format(kernel_build_variant)
     else :
         olc_kconfig = "common/olc/Kconfig"
         kfb_kconfig = "common/feedback/Kconfig"

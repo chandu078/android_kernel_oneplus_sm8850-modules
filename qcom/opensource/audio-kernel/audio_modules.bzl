@@ -692,6 +692,6 @@ audio_modules.register(
     srcs = [
         "oplus_typec_switch_i2c.c",
     ],
-    deps = ["//vendor/oplus/kernel/charger/bazel:oplus_chg_v2_headers"],
+    deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/charger/bazel:oplus_chg_v2_headers"],
 )
 #endif /* OPLUS_ARCH_EXTENDS */

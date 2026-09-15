@@ -2449,19 +2449,19 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     deps = select({
         "//build/kernel/kleaf:socrepo_true": [
-            "//soc-repo:all_headers",
-            "//soc-repo:{}/net/wireless/cfg80211".format(tv),
-            "//soc-repo:{}/drivers/iommu/qcom_iommu_util".format(tv),
-            "//soc-repo:{}/drivers/remoteproc/rproc_qcom_common".format(tv),
-            "//soc-repo:{}/drivers/soc/qcom/qmi_helpers".format(tv),
-            "//soc-repo:{}/kernel/sched/walt/sched-walt".format(tv),
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}/net/wireless/cfg80211".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/iommu/qcom_iommu_util".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/remoteproc/rproc_qcom_common".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/qmi_helpers".format(tv),
+            "//vendor/qcom/kernel:{}/kernel/sched/walt/sched-walt".format(tv),
         ],
         "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
     })
 
     deps += select({
         "//build/kernel/kleaf:socrepo_true": [
-            "//soc-repo:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
         ],
         "//build/kernel/kleaf:socrepo_false": [],
     })
@@ -2469,12 +2469,12 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     if target == "neo-la":
         kernel_build = select({
             "//build/kernel/kleaf:microxr_kernel_build_true": "//:target_kernel_build",
-            "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+            "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
             "//conditions:default": "//msm-kernel:{}".format(tv),
         })
     else:
         kernel_build = select({
-            "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+            "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
             "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
         })
 

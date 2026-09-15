@@ -21,7 +21,7 @@ def define_oplus_local_modules():
         ]),
         includes = ["."],
         ko_deps = [
-            "//vendor/oplus/kernel/nfc:oplus_network_nfc_i2c",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/nfc:oplus_network_nfc_i2c",
         ],
     )
     define_oplus_ddk_module(
@@ -43,8 +43,8 @@ def define_oplus_local_modules():
             ]
         else :
             ko_deps = [
-                     "//vendor/oplus/kernel/boot:oplus_bsp_bootmode",
-                     "//soc-repo:{}/drivers/pinctrl/qcom/pinctrl-msm".format(tv),
+                     "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_bootmode",
+                     "//vendor/qcom/kernel:{}/drivers/pinctrl/qcom/pinctrl-msm".format(tv),
             ]
     else :
        ko_deps = []
@@ -68,7 +68,7 @@ def define_oplus_local_modules():
             ]
         else :
             ko_deps_oplus_nfc = [
-                     "//vendor/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
+                     "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
             ]
     else :
        ko_deps_oplus_nfc = []

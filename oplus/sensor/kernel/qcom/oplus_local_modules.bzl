@@ -10,19 +10,19 @@ def define_oplus_local_modules():
 
     if bazel_support_target == "canoe" :
         oplus_bsp_boot_projectinfo_ko_deps = [
-            "//vendor/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
         ]
         oplus_bsp_kfb_ko_deps = [
-            "//vendor/oplus/kernel/dft/bazel:oplus_bsp_dft_kernel_fb",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/dft/bazel:oplus_bsp_dft_kernel_fb",
         ]
         smem_ko_deps = [
-            "//soc-repo:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
         ]
         panel_event_notifier_ko_deps = [
-            "//soc-repo:{}/drivers/soc/qcom/panel_event_notifier".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/panel_event_notifier".format(kernel_build_variant),
         ]
         qmi_ko_deps = [
-            "//soc-repo:{}/drivers/soc/qcom/qmi_helpers".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/qmi_helpers".format(kernel_build_variant),
         ]
     else :
         oplus_bsp_boot_projectinfo_ko_deps = []
@@ -48,7 +48,7 @@ def define_oplus_local_modules():
         ]),
         includes = ["oplus_consumer_ir"],
         ko_deps = [
-            "//vendor/oplus/sensor/kernel/qcom:oplus_sensor_ir_core",
+            "//vendor/qcom/sm8850-modules/oplus/sensor/kernel/qcom:oplus_sensor_ir_core",
         ] + smem_ko_deps,
     )
 
@@ -81,7 +81,7 @@ def define_oplus_local_modules():
                          "CONFIG_OPLUS_SENSOR_USE_SCREENSHOT_INFO",
                          "OPLUS_FEATURE_DISPLAY"],
         ko_deps = [
-            "//vendor/oplus/sensor/kernel/qcom:oplus_sensor_feedback",
+            "//vendor/qcom/sm8850-modules/oplus/sensor/kernel/qcom:oplus_sensor_feedback",
         ] + panel_event_notifier_ko_deps,
     )
 

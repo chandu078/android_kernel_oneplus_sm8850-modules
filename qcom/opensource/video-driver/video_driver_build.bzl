@@ -61,23 +61,23 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
     deps = []
     all_module_deps = select({
         "//build/kernel/kleaf:socrepo_true": [
-            "//soc-repo:all_headers",
-            "//soc-repo:{}/drivers/firmware/qcom/qcom-scm".format(kernel_build),
-            "//soc-repo:{}/drivers/clk/qcom/clk-qcom".format(kernel_build),
-            "//soc-repo:{}/drivers/soc/qcom/mdt_loader".format(kernel_build),
-            "//soc-repo:{}/drivers/soc/qcom/llcc-qcom".format(kernel_build),
-            "//soc-repo:{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(kernel_build),
-            "//soc-repo:{}/drivers/soc/qcom/qcom_va_minidump".format(kernel_build),
-            "//soc-repo:{}/drivers/soc/qcom/minidump".format(kernel_build),
-            "//soc-repo:{}/drivers/soc/qcom/socinfo".format(kernel_build),
-            "//soc-repo:{}/drivers/iommu/msm_dma_iommu_mapping".format(kernel_build),
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}/drivers/firmware/qcom/qcom-scm".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/clk/qcom/clk-qcom".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/mdt_loader".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/llcc-qcom".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_va_minidump".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/minidump".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/socinfo".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/iommu/msm_dma_iommu_mapping".format(kernel_build),
         ],
         "//build/kernel/kleaf:socrepo_false": [
             "//msm-kernel:all_headers",
         ],
     })
     kernel_build_label = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(kernel_build),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build),
         "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build),
     })
 
@@ -130,23 +130,23 @@ def define_lunch_target_variant_modules(target, variant, registry, modules, lunc
     deps = []
     all_module_deps = select({
         "//build/kernel/kleaf:socrepo_true": [
-            "//soc-repo:all_headers",
-            "//soc-repo:{}/drivers/firmware/qcom/qcom-scm".format(kernel_build),
-            "//soc-repo:{}/drivers/clk/qcom/clk-qcom".format(kernel_build),
-            "//soc-repo:{}/drivers/soc/qcom/mdt_loader".format(kernel_build),
-            "//soc-repo:{}/drivers/soc/qcom/llcc-qcom".format(kernel_build),
-            "//soc-repo:{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(kernel_build),
-            "//soc-repo:{}/drivers/soc/qcom/qcom_va_minidump".format(kernel_build),
-            "//soc-repo:{}/drivers/soc/qcom/minidump".format(kernel_build),
-            "//soc-repo:{}/drivers/soc/qcom/socinfo".format(kernel_build),
-            "//soc-repo:{}/drivers/iommu/msm_dma_iommu_mapping".format(kernel_build),
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}/drivers/firmware/qcom/qcom-scm".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/clk/qcom/clk-qcom".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/mdt_loader".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/llcc-qcom".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_va_minidump".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/minidump".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/socinfo".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/iommu/msm_dma_iommu_mapping".format(kernel_build),
         ],
         "//build/kernel/kleaf:socrepo_false": [
             "//msm-kernel:all_headers",
         ],
     })
     kernel_build_label = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(kernel_build),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build),
         "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build),
     })
 

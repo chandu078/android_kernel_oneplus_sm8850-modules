@@ -8,7 +8,7 @@ def define_oplus_local_modules():
     kernel_build_variant = "{}_{}".format(target, variant)
 
     if bazel_support_platform == "qcom" :
-        zram_opt_ko_deps = ["//soc-repo:{}/drivers/block/zram/zram".format(kernel_build_variant),"//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist",":oplus_bsp_mm_osvelte"]
+        zram_opt_ko_deps = ["//vendor/qcom/kernel:{}/drivers/block/zram/zram".format(kernel_build_variant),"//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist",":oplus_bsp_mm_osvelte"]
         hybridswap_zram_ko_deps = []
 
 #    define_oplus_ddk_module(
@@ -71,7 +71,7 @@ def define_oplus_local_modules():
         ]),
         includes = ["."],
         local_defines = ["CONFIG_OPLUS_FEATURE_UXMEM_OPT"],
-        ko_deps = [":oplus_bsp_mm_osvelte", "//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist"],
+        ko_deps = [":oplus_bsp_mm_osvelte", "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist"],
     )
 
     define_oplus_ddk_module(
@@ -82,7 +82,7 @@ def define_oplus_local_modules():
         ]),
         includes = ["."],
         local_defines = ["CONFIG_OPLUS_FEATURE_MGLRU_OPT"],
-        ko_deps = ["//vendor/oplus/kernel/mm:oplus_bsp_mm_osvelte"],
+        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/mm:oplus_bsp_mm_osvelte"],
     )
 
     define_oplus_ddk_module(
@@ -93,7 +93,7 @@ def define_oplus_local_modules():
         ]),
         includes = ["."],
         local_defines = ["CONFIG_OPLUS_FEATURE_DYNAMIC_READAHEAD"],
-        ko_deps = ["//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist"],
+        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist"],
     )
 
     define_oplus_ddk_module(

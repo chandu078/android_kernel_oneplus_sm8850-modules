@@ -29,7 +29,7 @@ def define_test_kit_module():
         kconfig = None
         defconfig = None
         if version_compare(kernel_version, "6.12") :
-            ddk_config = "//soc-repo:{}_config".format(target)
+            ddk_config = "//vendor/qcom/kernel:{}_config".format(target)
     else:
         ddk_header_deps = [
             "//kernel_device_modules-{}/drivers/pinctrl/mediatek:pinctrl_mtk_header".format(oplus_ddk_get_kernel_version()),

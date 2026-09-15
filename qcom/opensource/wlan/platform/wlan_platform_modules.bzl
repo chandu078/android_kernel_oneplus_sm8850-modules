@@ -78,7 +78,7 @@ def _define_modules_for_target_variant(target, variant):
     tv = "{}_{}".format(target, variant)
 
     kernel_build = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
         "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
     })
 
@@ -106,8 +106,8 @@ def _define_modules_for_target_variant(target, variant):
         #ifdef OPLUS_FEATURE_WIFI_MAC
         #lixiong2@CONNECTIVITY.HARDWARE.WIFI.MAC.9217452, add oplus symbol for 8850
         deps += [
-            "//vendor/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
-            "//vendor/oplus/kernel/boot:oplus_bsp_bootmode",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
+            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_bootmode",
         ]
         #endif
         if plat_ipc_qmi_svc_enabled:
@@ -116,8 +116,8 @@ def _define_modules_for_target_variant(target, variant):
             ]
         deps += select({
                "//build/kernel/kleaf:socrepo_true": [
-                  "//soc-repo:all_headers",
-                  "//soc-repo:{}/drivers/soc/qcom/qmi_helpers".format(tv),
+                  "//vendor/qcom/kernel:all_headers",
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/qmi_helpers".format(tv),
                ],
                "//build/kernel/kleaf:socrepo_false": [
                   "//msm-kernel:all_headers",
@@ -128,24 +128,24 @@ def _define_modules_for_target_variant(target, variant):
             deps += select({
                   "//build/kernel/kleaf:socrepo_true": [
                     "//vendor/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
-                    "//soc-repo:{}/kernel/trace/qcom_ipc_logging".format(tv),
-                    "//soc-repo:{}/drivers/soc/qcom/qcom_ramdump".format(tv),
-                    "//soc-repo:{}/drivers/soc/qcom/socinfo".format(tv),
-                    "//soc-repo:{}/drivers/soc/qcom/pdr_interface".format(tv),
-                    "//soc-repo:{}/drivers/remoteproc/rproc_qcom_common".format(tv),
-                    "//soc-repo:{}/drivers/soc/qcom/memory_dump_v2".format(tv),
-                    "//soc-repo:{}/drivers/soc/qcom/smem".format(tv),
-                    "//soc-repo:{}/drivers/bus/mhi/host/mhi".format(tv),
-                    "//soc-repo:{}/drivers/pinctrl/qcom/pinctrl-msm".format(tv),
-                    "//soc-repo:{}/drivers/soc/qcom/cmd-db".format(tv),
-                    "//soc-repo:{}/drivers/soc/qcom/qcom_aoss".format(tv),
-                    "//soc-repo:{}/drivers/pci/controller/pci-msm-drv".format(tv),
+                    "//vendor/qcom/kernel:{}/kernel/trace/qcom_ipc_logging".format(tv),
+                    "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_ramdump".format(tv),
+                    "//vendor/qcom/kernel:{}/drivers/soc/qcom/socinfo".format(tv),
+                    "//vendor/qcom/kernel:{}/drivers/soc/qcom/pdr_interface".format(tv),
+                    "//vendor/qcom/kernel:{}/drivers/remoteproc/rproc_qcom_common".format(tv),
+                    "//vendor/qcom/kernel:{}/drivers/soc/qcom/memory_dump_v2".format(tv),
+                    "//vendor/qcom/kernel:{}/drivers/soc/qcom/smem".format(tv),
+                    "//vendor/qcom/kernel:{}/drivers/bus/mhi/host/mhi".format(tv),
+                    "//vendor/qcom/kernel:{}/drivers/pinctrl/qcom/pinctrl-msm".format(tv),
+                    "//vendor/qcom/kernel:{}/drivers/soc/qcom/cmd-db".format(tv),
+                    "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_aoss".format(tv),
+                    "//vendor/qcom/kernel:{}/drivers/pci/controller/pci-msm-drv".format(tv),
                 ],
                     "//build/kernel/kleaf:socrepo_false": [],
             })
             deps += select({
                   "//build/kernel/kleaf:socrepo_true": [
-                    "//soc-repo:{}/drivers/soc/qcom/minidump".format(tv),
+                    "//vendor/qcom/kernel:{}/drivers/soc/qcom/minidump".format(tv),
                 ],
                     "//build/kernel/kleaf:socrepo_false": [],
             })
@@ -205,15 +205,15 @@ def _define_modules_for_target_variant(target, variant):
         defconfig = ":{}/{}_defconfig_generate_{}".format(module, tv, variant)
         deps = select({
                "//build/kernel/kleaf:socrepo_true": [
-                "//soc-repo:all_headers",
-                "//soc-repo:{}/kernel/trace/qcom_ipc_logging".format(tv),
-                "//soc-repo:{}/drivers/soc/qcom/qcom_ramdump".format(tv),
-                "//soc-repo:{}/drivers/soc/qcom/socinfo".format(tv),
-                "//soc-repo:{}/drivers/soc/qcom/pdr_interface".format(tv),
-                "//soc-repo:{}/drivers/remoteproc/rproc_qcom_common".format(tv),
-                "//soc-repo:{}/drivers/soc/qcom/qmi_helpers".format(tv),
-                "//soc-repo:{}/drivers/pinctrl/qcom/pinctrl-msm".format(tv),
-                "//soc-repo:{}/drivers/soc/qcom/qcom_aoss".format(tv),
+                "//vendor/qcom/kernel:all_headers",
+                "//vendor/qcom/kernel:{}/kernel/trace/qcom_ipc_logging".format(tv),
+                "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_ramdump".format(tv),
+                "//vendor/qcom/kernel:{}/drivers/soc/qcom/socinfo".format(tv),
+                "//vendor/qcom/kernel:{}/drivers/soc/qcom/pdr_interface".format(tv),
+                "//vendor/qcom/kernel:{}/drivers/remoteproc/rproc_qcom_common".format(tv),
+                "//vendor/qcom/kernel:{}/drivers/soc/qcom/qmi_helpers".format(tv),
+                "//vendor/qcom/kernel:{}/drivers/pinctrl/qcom/pinctrl-msm".format(tv),
+                "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_aoss".format(tv),
                ],
                "//build/kernel/kleaf:socrepo_false": [
                   "//msm-kernel:all_headers",
@@ -261,7 +261,7 @@ def _define_modules_for_target_variant(target, variant):
     defconfig = ":{}/{}_defconfig_generate_{}".format(module, tv, variant)
 
     deps = select({
-        "//build/kernel/kleaf:socrepo_true": ["//soc-repo:all_headers"],
+        "//build/kernel/kleaf:socrepo_true": ["//vendor/qcom/kernel:all_headers"],
         "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
     })
 
@@ -304,7 +304,7 @@ def _define_modules_for_target_variant(target, variant):
     ]
 
     cnss_utils_dep_list += select({
-        "//build/kernel/kleaf:socrepo_true": ["//soc-repo:all_headers"],
+        "//build/kernel/kleaf:socrepo_true": ["//vendor/qcom/kernel:all_headers"],
         "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
     })
 
@@ -335,8 +335,8 @@ def _define_modules_for_target_variant(target, variant):
 
     deps = select({
         "//build/kernel/kleaf:socrepo_true": [
-            "//soc-repo:all_headers",
-            "//soc-repo:{}/drivers/soc/qcom/qmi_helpers".format(tv),
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/qmi_helpers".format(tv),
         ],
         "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
     })
@@ -362,9 +362,9 @@ def _define_modules_for_target_variant(target, variant):
     if plat_ipc_qmi_svc_enabled:
       deps = select({
           "//build/kernel/kleaf:socrepo_true": [
-              "//soc-repo:all_headers",
-              "//soc-repo:{}/drivers/soc/qcom/qmi_helpers".format(tv),
-              "//soc-repo:{}/kernel/trace/qcom_ipc_logging".format(tv),
+              "//vendor/qcom/kernel:all_headers",
+              "//vendor/qcom/kernel:{}/drivers/soc/qcom/qmi_helpers".format(tv),
+              "//vendor/qcom/kernel:{}/kernel/trace/qcom_ipc_logging".format(tv),
           ],
           "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
       })
