@@ -99,6 +99,14 @@ ddk_headers(
     includes = ["linux", "include/uapi", "include/uapi/linux", "qcedev_fe"]
 )
 
+ddk_headers(
+    name = "smmu_proxy_uapi_headers",
+    hdrs = glob([
+        "smmu-proxy/include/uapi/linux/*.h",
+    ]),
+    includes = ["smmu-proxy/include/uapi"],
+)
+
 load(":build/pineapple.bzl", "define_pineapple")
 load(":build/blair.bzl", "define_blair")
 load(":build/sun.bzl", "define_sun")
