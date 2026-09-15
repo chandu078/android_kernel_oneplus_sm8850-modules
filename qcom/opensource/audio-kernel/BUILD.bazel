@@ -99,3 +99,9 @@ define_kalama()
 define_pineapple()
 define_blair()
 define_canoe()
+
+filegroup(
+    name = "inline_dt_bindings",
+    srcs = glob(["include/bindings/**/*.h"], allow_empty = False),
+    visibility = ["//visibility:public"],
+)

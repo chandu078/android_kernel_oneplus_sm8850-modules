@@ -41,3 +41,9 @@ define_canoe()
 load(":seraph.bzl", "define_seraph")
 
 define_seraph()
+
+filegroup(
+    name = "inline_dt_bindings",
+    srcs = glob(["dt-bindings/**/*.h"], allow_empty = False),
+    visibility = ["//visibility:public"],
+)

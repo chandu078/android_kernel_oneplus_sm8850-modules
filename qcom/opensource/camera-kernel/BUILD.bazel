@@ -179,3 +179,9 @@ config_setting(
     flag_values = {":project_name": "canoe"},
 )
 
+
+filegroup(
+    name = "inline_dt_bindings",
+    srcs = glob(["dt-bindings/**/*.h"], allow_empty = False),
+    visibility = ["//visibility:public"],
+)
