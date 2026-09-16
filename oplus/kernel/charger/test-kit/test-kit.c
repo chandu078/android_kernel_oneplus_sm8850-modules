@@ -18,7 +18,7 @@
 #include <linux/miscdevice.h>
 
 #include "test-kit.h"
-#include <linux/gpio/driver.h>
+#include "gpiolib.h"
 #if IS_ENABLED(CONFIG_OPLUS_CHG_V2) && (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
 #include "../v2/include/oplus_chg.h"
 #include <linux/platform_device.h>
