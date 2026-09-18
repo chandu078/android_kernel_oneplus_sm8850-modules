@@ -1,4 +1,3 @@
-load(":repo_paths.bzl", "modules_label", "soc_label")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load("//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers:target_variants.bzl", "get_all_variants")
@@ -8,21 +7,20 @@ def _define_module(target, variant):
 
     deps = select({
         "//build/kernel/kleaf:socrepo_true": [
-            soc_label("all_headers"),
-            soc_label("{}/drivers/remoteproc/rproc_qcom_common".format(tv)),
-            soc_label("{}/drivers/remoteproc/qcom_q6v5_pas".format(tv)),
-            soc_label("{}/drivers/virt/gunyah/gh_dbl".format(tv)),
-            soc_label("{}/drivers/virt/gunyah/gh_rm_drv".format(tv)),
-            soc_label("{}/drivers/firmware/qcom/qcom-scm".format(tv)),
-            soc_label("{}/drivers/soc/qcom/hab/msm_hab".format(tv)),
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}/drivers/remoteproc/rproc_qcom_common".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/remoteproc/qcom_q6v5_pas".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/virt/gunyah/gh_dbl".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/virt/gunyah/gh_rm_drv".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/firmware/qcom/qcom-scm".format(tv),
         ],
         "//build/kernel/kleaf:socrepo_false": [
-            "//msm-kernel:all_headers",
+            "//vendor/qcom/kernel:all_headers",
         ],
     })
     kernel_build = select({
-        "//build/kernel/kleaf:socrepo_true": soc_label("{}_base_kernel".format(tv)),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(tv),
     })
 
     if target in ["pineapple"]:
@@ -52,13 +50,10 @@ def _define_module(target, variant):
                     "src/hw_fence_drv_interop.c",
                 ],
             },
-            "CONFIG_MSM_HAB" : {
-                True: ["src/hw_fence_drv_virtio.c"],
-            }
         },
         deps = deps + [
-            modules_label("qcom/opensource/synx-kernel:synx_headers"),
-            modules_label("qcom/opensource/mm-drivers:mm_drivers_headers"),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:synx_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers:mm_drivers_headers",
         ],
         kernel_build = kernel_build,
     )
@@ -76,6 +71,4 @@ def _define_module(target, variant):
 
 def define_hw_fence():
     for (t, v) in get_all_variants():
-        if t == "malabar":
-            continue
         _define_module(t, v)

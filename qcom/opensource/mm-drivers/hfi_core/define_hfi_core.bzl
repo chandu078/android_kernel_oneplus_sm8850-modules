@@ -1,4 +1,3 @@
-load(":repo_paths.bzl", "modules_label", "soc_label")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load("//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers:target_variants.bzl", "get_all_variants")
@@ -8,19 +7,16 @@ def _define_module(target, variant):
 
     deps = select({
         "//build/kernel/kleaf:socrepo_true": [
-            soc_label("all_headers"),
-            soc_label("{}/drivers/firmware/qcom/qcom-scm".format(tv)),
-            soc_label("{}/drivers/soc/qcom/mdt_loader".format(tv)),
-            soc_label("{}/drivers/soc/qcom/smem".format(tv)),
+            "//vendor/qcom/kernel:all_headers",
         ],
         "//build/kernel/kleaf:socrepo_false": [
-            "//msm-kernel:all_headers",
+            "//vendor/qcom/kernel:all_headers",
         ],
     })
 
     kernel_build = select({
-        "//build/kernel/kleaf:socrepo_true": soc_label("{}_base_kernel".format(tv)),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(tv),
     })
 
     if target in ["seraph"]:
@@ -38,9 +34,6 @@ def _define_module(target, variant):
             "src/hfi_transport/hfi_queue_controller.c",
             "src/hfi_transport/hfi_if_abstraction.c",
             "src/hfi_base/hfi_core.c",
-            "src/hfi_base/hfi_core_irq.c",
-            "src/hfi_base/hfi_core_firmware.c",
-            "src/hfi_base/hfi_core_ssr.c",
             "src/hfi_dbg_packet.c",
             "src/hfi_core_debug.c",
             "src/hfi_core_probe.c",
@@ -49,7 +42,7 @@ def _define_module(target, variant):
         defconfig = target_config,
         kconfig = "Kconfig",
         deps = deps + [
-            modules_label("qcom/opensource/mm-drivers:mm_drivers_headers"),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers:mm_drivers_headers",
         ],
         kernel_build = kernel_build,
     )
@@ -67,6 +60,4 @@ def _define_module(target, variant):
 
 def define_hfi_core():
     for (t, v) in get_all_variants():
-        if t == "malabar":
-            continue
         _define_module(t, v)
