@@ -1,4 +1,3 @@
-load(":repo_paths.bzl", "modules_label")
 load(":synx_module_build.bzl", "create_module_registry")
 
 SYNX_KERNEL_ROOT = "synx-kernel"
@@ -17,36 +16,16 @@ register_synx_module(
         "synx/synx_debugfs_util.c",
         "synx/synx_compat.c",
         "synx/synx_test_ioctl.c",
-        "synx/synx_ioctl.c",
     ],
 
     # Configs are handled by config_options = []
     config_deps = {
         "CONFIG_QTI_HW_FENCE": [
-            modules_label("qcom/opensource/mm-drivers/hw_fence:%b_msm_hw_fence"),
-            modules_label("qcom/opensource/mm-drivers/hw_fence:hw_fence_headers"),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/hw_fence:%b_msm_hw_fence",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/hw_fence:hw_fence_headers",
         ],
     },
     deps = ["ipclite"],
-)
-
-register_synx_module(
-    name = "synx-stub",
-    path = "msm",
-    srcs = [
-        "synx/synx_stub.c",
-        "synx/synx_compat.c",
-        "synx/synx_ioctl.c",
-        "synx/synx_test_ioctl.c",
-    ],
-
-    # Configs are handled by config_options = []
-    config_deps = {
-        "CONFIG_QTI_HW_FENCE": [
-            modules_label("qcom/opensource/mm-drivers/hw_fence:%b_msm_hw_fence"),
-            modules_label("qcom/opensource/mm-drivers/hw_fence:hw_fence_headers"),
-        ],
-    },
 )
 
 register_synx_module(

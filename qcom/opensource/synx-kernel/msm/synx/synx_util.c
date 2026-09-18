@@ -7,7 +7,6 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/vmalloc.h>
-#include <linux/version.h>
 
 #include "synx_debugfs.h"
 #include "synx_util.h"
@@ -15,24 +14,6 @@
 #include "synx_private.h"
 static atomic64_t seq_counter = ATOMIC64_INIT(1);
 extern void synx_external_callback(s32 sync_obj, int status, void *data);
-
-static void *synx_dma_array_cb_func;
-const char *synx_dummy_fence_name(struct dma_fence *fence)
-{
-	return "Synx Dummy fence";
-}
-void synx_dummy_fence_release(struct dma_fence *fence)
-{
-	/* Release dma memory allocated during dma init */
-	kfree(fence->lock);
-	kfree(fence);
-	dprintk(SYNX_MEM, "Released dummy fence %pK\n", fence);
-}
-static struct dma_fence_ops synx_dummy_fence_ops = {
-	.get_driver_name = synx_dummy_fence_name,
-	.get_timeline_name = synx_dummy_fence_name,
-	.release = synx_dummy_fence_release,
-};
 
 int synx_util_init_coredata(struct synx_coredata *synx_obj,
 	struct synx_create_params *params,
@@ -104,10 +85,14 @@ int synx_util_init_coredata(struct synx_coredata *synx_obj,
 		dma_fence_init(fence, ops, fence_lock, dma_context, seq);
 
 		synx_obj->fence = fence;
+//#ifdef OPLUS_FEATURE_CAMERA_COMMON
 		dprintk(SYNX_MEM,
 			"allocated backing fence %pK, context %llu seqno %llu\n",
 			fence, dma_context, seq);
-
+//#else
+		//dprintk(SYNX_MEM,
+			//"allocated backing fence %pK\n", fence);
+//#endif
 		entry = kzalloc(sizeof(*entry), GFP_KERNEL);
 		if (IS_ERR_OR_NULL(entry)) {
 			rc = -SYNX_NOMEM;
@@ -169,7 +154,7 @@ int synx_dma_add_cb_no_enable_sig(struct dma_fence *fence,
 }
 
 int synx_util_add_callback(struct synx_coredata *synx_obj,
-	u32 h_synx, bool may_sleep)
+	u32 h_synx)
 {
 	int rc;
 	struct synx_signal_cb *signal_cb;
@@ -177,10 +162,7 @@ int synx_util_add_callback(struct synx_coredata *synx_obj,
 	if (IS_ERR_OR_NULL(synx_obj))
 		return -SYNX_INVALID;
 
-	if (may_sleep)
-		signal_cb = kzalloc(sizeof(*signal_cb), GFP_KERNEL);
-	else
-		signal_cb = kzalloc(sizeof(*signal_cb), GFP_ATOMIC);
+	signal_cb = kzalloc(sizeof(*signal_cb), GFP_KERNEL);
 	if (IS_ERR_OR_NULL(signal_cb)) {
 		dprintk(SYNX_ERR, "signal_cb allocation failed\n");
 		return -SYNX_NOMEM;
@@ -231,96 +213,12 @@ int synx_util_add_callback(struct synx_coredata *synx_obj,
 	return SYNX_SUCCESS;
 }
 
-void *synx_util_get_dma_func_cb(void)
-{
-	struct dma_fence *fence = NULL;
-	struct dma_fence_array *array = NULL;
-	u64 seq = 0;
-	u64 dma_context = 0;
-	spinlock_t *fence_lock;
-	struct dma_fence **fences = NULL;
-	struct dma_fence_cb *cur, *tmp;
-	unsigned long flags = 0;
-	void *dma_array_cb = NULL;
-
-	/* Create a dummy fence for fetching dma array cb purpose */
-	fence = kzalloc(sizeof(*fence), GFP_KERNEL);
-	if (IS_ERR_OR_NULL(fence)) {
-		dprintk(SYNX_ERR, "Memory allocation failed\n");
-		return NULL;
-	}
-
-	fence_lock = kzalloc(sizeof(*fence_lock), GFP_KERNEL);
-	if (IS_ERR_OR_NULL(fence_lock)) {
-		kfree(fence);
-		dprintk(SYNX_ERR, "Memory allocation failed\n");
-		return NULL;
-	}
-
-	fences = kzalloc(sizeof(struct dma_fence *), GFP_KERNEL);
-	if (IS_ERR_OR_NULL(fences)) {
-		kfree(fence);
-		kfree(fence_lock);
-		dprintk(SYNX_ERR, "Memory allocation failed\n");
-		return NULL;
-	}
-
-	spin_lock_init(fence_lock);
-	dma_context = dma_fence_context_alloc(1);
-
-	/* Initialize dummy fence */
-	dma_fence_init(fence, &synx_dummy_fence_ops, fence_lock, dma_context, seq);
-
-	/* Create dma_array fence */
-	fences[0] = fence;
-	array = dma_fence_array_create(1, fences,
-				dma_context, seq, false);
-
-	if (IS_ERR_OR_NULL(array)) {
-		dma_fence_signal(fence);
-		dma_fence_put(fence);
-		kfree(fences);
-		dprintk(SYNX_ERR, "Unable to create dma array fence\n");
-		return NULL;
-	}
-
-	/*
-	 * Enable signaling on dma array. This would add dma array callback function
-	 * pointer on child dma fence callback list.
-	 */
-	dma_fence_enable_sw_signaling(&array->base);
-
-	/*
-	 * Iterate dummy fence and find the dma_array callback. The callback node found
-	 * here should only be from dma array as no other callback is registered on the
-	 * dummy fence.
-	 */
-	spin_lock_irqsave(fence->lock, flags);
-	list_for_each_entry_safe(cur, tmp, &fence->cb_list, node) {
-		if (IS_ERR_OR_NULL(cur->func)) {
-			dprintk(SYNX_ERR, "Invalid callback pointer %pK\n", cur->func);
-			continue;
-		}
-		dma_array_cb = cur->func;
-		dprintk(SYNX_VERB, "dma array callback addr %pK\n", dma_array_cb);
-	}
-	spin_unlock_irqrestore(fence->lock, flags);
-
-	/* Signal the dummy fence to signal the dma_array callback */
-	dma_fence_signal(fence);
-
-	/*
-	 * Release the refcount on dma-array. This would release the refcount on the
-	 * child dma fence as part of dma array release cleanup
-	 */
-	dma_fence_put(&array->base);
-
-	return dma_array_cb;
-}
 static int synx_util_count_dma_array_fences(struct dma_fence *fence)
 {
 	struct dma_fence_cb *cur, *tmp;
 	int32_t num_dma_array = 0;
+	struct dma_fence_array_cb *cb_array = NULL;
+	struct dma_fence_array *array = NULL;
 
 	if (IS_ERR_OR_NULL(fence)) {
 		dprintk(SYNX_ERR, "invalid fence passed\n");
@@ -329,10 +227,14 @@ static int synx_util_count_dma_array_fences(struct dma_fence *fence)
 
 	list_for_each_entry_safe(cur, tmp, &fence->cb_list, node) {
 		// count for parent fences
-		if (!IS_ERR_OR_NULL(cur)) {
-			if (cur->func == synx_dma_array_cb_func)
-				num_dma_array++;
+		cb_array = container_of(cur, struct dma_fence_array_cb, cb);
+		if (IS_ERR_OR_NULL(cb_array)) {
+			dprintk(SYNX_VERB, "cb_array not found in fence %pK\n", fence);
+			continue;
 		}
+		array = cb_array->array;
+		if (!IS_ERR_OR_NULL(array) && dma_fence_is_array(&(array->base)))
+			num_dma_array++;
 	}
 
 	dprintk(SYNX_VERB, "number of fence_array found %d for child fence %pK\n",
@@ -506,11 +408,7 @@ void synx_util_object_destroy(struct synx_coredata *synx_obj)
 			dprintk(SYNX_VERB,
 				"Deleting timer synx_cb 0x%p, timeout 0x%llx\n",
 				synx_cb, synx_cb->timeout);
-#if (KERNEL_VERSION(6, 15, 0) <= LINUX_VERSION_CODE)
-				timer_delete_sync(&synx_cb->synx_timer);
-#else
-				del_timer_sync(&synx_cb->synx_timer);
-#endif
+			del_timer_sync(&synx_cb->synx_timer);
 		}
 
 		synx_cb->status = SYNX_STATE_SIGNALED_CANCEL;
@@ -553,20 +451,7 @@ void synx_util_object_destroy(struct synx_coredata *synx_obj)
 		kfree(data);
 	}
 
-	/*
-	 * Release the extra child map_entry references that were acquired
-	 * during merge creation (synx_util_populate_map_entries). Only
-	 * objects created by the SYNX_MERGE / SYNX_MERGE_N path have
-	 * SYNX_CREATE_MERGED_FENCE set in their type and own those extra
-	 * references. Objects created by SYNX_IMPORT wrapping an already-
-	 * signaled dma_fence_array never take those extra references, so
-	 * releasing them here would cause a double-put and potential UAF in
-	 * synx_util_release_map_entry(). Guard this block with
-	 * synx_util_is_merged_object() to ensure we only release references
-	 * that were actually acquired.
-	 */
-	if (synx_util_is_merged_object(synx_obj) &&
-		dma_fence_is_array(synx_obj->fence)) {
+	if (dma_fence_is_array(synx_obj->fence)) {
 		array = to_dma_fence_array(synx_obj->fence);
 		if (!IS_ERR_OR_NULL(array)) {
 			for (i = 0; i < array->num_fences; i++) {
@@ -582,19 +467,6 @@ void synx_util_object_destroy(struct synx_coredata *synx_obj)
 	}
 	mutex_destroy(&synx_obj->obj_lock);
 	synx_util_release_fence_entry((u64)synx_obj->fence);
-
-	/*
-	 * Fetching the dma array callback function pointer which can be used
-	 * to check if synx is owning the last refcount on dma-fence apart from
-	 * dma array refcount which can only be put as part of dma-fence signal.
-	 * This is one time call as the address of dma array callback function will
-	 * remain same after device is booted up.
-	 */
-	if (!synx_dma_array_cb_func) {
-		// Get the dma_array function callback
-		synx_dma_array_cb_func = synx_util_get_dma_func_cb();
-	}
-
 
 	/* dma fence framework expects handles are signaled before release,
 	 * so signal if active handle and has last refcount. Synx handles
@@ -635,7 +507,7 @@ int synx_util_local_map_is_empty(unsigned long *bitmap, unsigned int size)
 		return -SYNX_NOMEM;
 
 	index = find_next_bit((unsigned long *)bitmap,
-			size, index+1);
+			size, index);
 
 	if (index >= size)
 		return SYNX_SUCCESS;
@@ -718,7 +590,7 @@ int synx_alloc_local_handle(u32 *new_synx)
 
 int synx_util_init_handle(struct synx_client *client,
 	struct synx_coredata *synx_obj, u32 *new_h_synx,
-	void *map_entry, bool may_sleep)
+	void *map_entry)
 {
 	int rc = SYNX_SUCCESS;
 	bool found = false;
@@ -728,7 +600,7 @@ int synx_util_init_handle(struct synx_client *client,
 		IS_ERR_OR_NULL(new_h_synx) || IS_ERR_OR_NULL(map_entry))
 		return -SYNX_INVALID;
 
-	synx_data = kzalloc(sizeof(*synx_data), may_sleep ? GFP_KERNEL : GFP_ATOMIC);
+	synx_data = kzalloc(sizeof(*synx_data), GFP_ATOMIC);
 	if (IS_ERR_OR_NULL(synx_data)) {
 		dprintk(SYNX_ERR, "synx data allocation failed\n");
 		return -SYNX_NOMEM;
@@ -1122,16 +994,12 @@ struct synx_handle_coredata *synx_util_acquire_handle(
 struct synx_map_entry *synx_util_insert_to_map(
 	struct synx_coredata *synx_obj,
 	u32 h_synx, u32 flags,
-	bool map_entry_can_exist,
-	bool may_sleep)
+	bool map_entry_can_exist)
 {
 	struct synx_map_entry *map_entry;
 	struct synx_map_entry *curr;
 
-	if (may_sleep)
-		map_entry = kzalloc(sizeof(*map_entry), GFP_KERNEL);
-	else
-		map_entry = kzalloc(sizeof(*map_entry), GFP_ATOMIC);
+	map_entry = kzalloc(sizeof(*map_entry), GFP_KERNEL);
 	if (IS_ERR_OR_NULL(map_entry)) {
 		dprintk(SYNX_ERR, "map_entry allocation failed\n");
 		return ERR_PTR(-SYNX_NOMEM);
@@ -1526,11 +1394,7 @@ void synx_util_callback_dispatch(struct synx_coredata *synx_obj, u32 status)
 			dprintk(SYNX_VERB,
 				"Deleting timer synx_cb %p, timeout 0x%llx\n",
 				synx_cb, synx_cb->timeout);
-#if (KERNEL_VERSION(6, 15, 0) <= LINUX_VERSION_CODE)
-			timer_delete_sync(&synx_cb->synx_timer);
-#else
 			del_timer_sync(&synx_cb->synx_timer);
-#endif
 		}
 		synx_cb->status = status;
 		list_del_init(&synx_cb->node);
@@ -1552,26 +1416,23 @@ void synx_util_cb_dispatch(struct work_struct *cb_dispatch)
 	client = synx_get_client(synx_cb->session);
 	if (IS_ERR_OR_NULL(client)) {
 		dprintk(SYNX_ERR,
-			"invalid session data %pK in cb payload: idx %u, h_synx %u, status %u\n",
-			synx_cb->session, synx_cb->idx, synx_cb->h_synx, synx_cb->status);
+			"invalid session data %pK in cb payload\n",
+			synx_cb->session);
 		goto free;
 	}
 
 	if (synx_cb->idx == 0 ||
 		synx_cb->idx >= SYNX_MAX_OBJS) {
 		dprintk(SYNX_ERR,
-			"[sess :%llu] invalid cb index %u, h_synx %u, status %u\n",
-			client->id, synx_cb->idx, synx_cb->h_synx, synx_cb->status);
+			"[sess :%llu] invalid cb index %u\n",
+			client->id, synx_cb->idx);
 		goto fail;
 	}
 
 	status = synx_cb->status;
 	cb = &client->cb_table[synx_cb->idx];
 	if (!cb->is_valid) {
-		dprintk(SYNX_ERR,
-			"invalid cb payload: session %pK, client_id %llu, idx %u, handle %u, status %u, cb_idx %u, cb_h_synx %u\n",
-			synx_cb->session, client->id, synx_cb->idx, synx_cb->h_synx,
-			synx_cb->status, cb->idx, cb->kernel_cb.h_synx);
+		dprintk(SYNX_ERR, "invalid cb payload\n");
 		goto fail;
 	}
 
@@ -1773,8 +1634,8 @@ static void synx_client_cleanup(struct work_struct *dispatch)
 	struct hlist_node *tmp;
 
 	if (__ratelimit(&synx_ratelimit_state))
-		dprintk(SYNX_INFO, "[sess :%llu] session removed %s addr %pK\n",
-			client->id, client->name, client);
+		dprintk(SYNX_INFO, "[sess :%llu] session removed %s\n",
+			client->id, client->name);
 	/*
 	 * go over all the remaining synx obj handles
 	 * un-released from this session and remove them.

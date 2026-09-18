@@ -49,14 +49,6 @@
 
 #define IS_HW_FENCE(hw_fence) (hw_fence & SYNX_HW_FENCE_HANDLE_FLAG)
 
-enum PLATFORM_SOC_ID {
-	QCOM_ID_RAVELINP = 0x0000025A,
-	QCOM_ID_RAVELIN = 0x00000238,
-	QCOM_ID_BOURTZI = 0x00000308,
-	QCOM_ID_BOURTZIP = 0x00000309,
-
-};
-
 enum synx_queue_mem_type {
 	SYNX_MEM_DEFAULT = 0x00,
 	SYNX_MEM_MAX,
@@ -122,7 +114,9 @@ struct synx_timer_cb_data {
 
 struct synx_fence_enable_data {
 	struct dma_fence *fence;
+//#ifdef OPLUS_FEATURE_CAMERA_COMMON
 	u64 dma_seq_no;
+//#endif
 	struct work_struct cb_dispatch;
 };
 

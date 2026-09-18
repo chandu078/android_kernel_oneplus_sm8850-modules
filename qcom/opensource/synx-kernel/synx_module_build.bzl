@@ -1,4 +1,3 @@
-load(":repo_paths.bzl", "soc_label")
 load(
     "//build/kernel/kleaf:kernel.bzl",
     "ddk_module",
@@ -82,16 +81,16 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
     kernel_build = "{}_{}".format(target, variant)
     headers = select({
         "//build/kernel/kleaf:socrepo_true": [
-            soc_label("all_headers"),
-            soc_label("{}/drivers/remoteproc/rproc_qcom_common".format(kernel_build)),
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}/drivers/remoteproc/rproc_qcom_common".format(kernel_build),
         ],
         "//build/kernel/kleaf:socrepo_false": [
-            "//msm-kernel:all_headers",
+            "//vendor/qcom/kernel:all_headers",
         ],
     })
     kernel_build_label = select({
-        "//build/kernel/kleaf:socrepo_true": soc_label("{}_base_kernel".format(kernel_build)),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build),
     })
 
     modules = [registry.get(module_name) for module_name in modules]
@@ -142,5 +141,3 @@ def define_consolidate_perf_modules(target, registry, modules, config_options = 
     define_target_variant_modules(target, "consolidate", registry, modules, config_options)
     define_target_variant_modules(target, "perf", registry, modules, config_options)
     define_target_variant_modules(target, "gki", registry, modules, config_options)
-    define_target_variant_modules(target, "debug-defconfig", registry, modules, config_options)
-    define_target_variant_modules(target, "defconfig", registry, modules, config_options)

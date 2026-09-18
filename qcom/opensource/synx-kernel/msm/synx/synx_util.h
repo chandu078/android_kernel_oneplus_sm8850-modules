@@ -102,7 +102,7 @@ static inline struct synx_coredata *synx_util_obtain_object(
 
 /* global/local map functions */
 struct synx_map_entry *synx_util_insert_to_map(struct synx_coredata *synx_obj,
-			u32 h_synx, u32 flags, bool map_entry_can_exist, bool may_sleep);
+			u32 h_synx, u32 flags, bool map_entry_can_exist);
 struct synx_map_entry *synx_util_get_map_entry(u32 h_synx);
 void synx_util_release_map_entry(struct synx_map_entry *map_entry);
 void synx_util_destroy_map_entry(struct kref *kref);
@@ -130,7 +130,7 @@ int synx_alloc_local_handle(u32 *new_synx);
 long synx_util_get_free_handle(unsigned long *bitmap, unsigned int size);
 int synx_util_init_handle(struct synx_client *client, struct synx_coredata *obj,
 			u32 *new_h_synx,
-			void *map_entry, bool may_sleep);
+			void *map_entry);
 
 u32 synx_encode_handle(u32 idx, u32 core_id, bool global_idx);
 
@@ -146,7 +146,7 @@ void synx_util_cb_dispatch(struct work_struct *cb_dispatch);
 
 /* external fence functions */
 int synx_util_activate(struct synx_coredata *synx_obj);
-int synx_util_add_callback(struct synx_coredata *synx_obj, u32 h_synx, bool may_sleep);
+int synx_util_add_callback(struct synx_coredata *synx_obj, u32 h_synx);
 int synx_dma_add_cb_no_enable_sig(struct dma_fence *fence,
 	struct dma_fence_cb *cb, dma_fence_func_t func);
 
