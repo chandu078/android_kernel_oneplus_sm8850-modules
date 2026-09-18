@@ -480,7 +480,6 @@ struct tzdbg {
 	bool is_full_encrypted_tz_logs_enabled;
 	int tz_diag_minor_version;
 	int tz_diag_major_version;
-	struct mutex lock;
 };
 
 struct tzbsp_encr_log_t {
@@ -1659,24 +1658,19 @@ static int _disp_qsee_log_stats(struct clients_info_t *clients_info,
 	pr_debug("g_qsee_log: [wrap,offset]:[0x%x, 0x%x], g_qsee_log_v2: [wrap,offset]:[0x%x, 0x%x]\n",
 		g_qsee_log->log_pos.wrap, g_qsee_log->log_pos.offset,
 		g_qsee_log_v2->log_pos.wrap, g_qsee_log_v2->log_pos.offset);
-	int ret = 0;
-	mutex_lock(&(tzdbg.lock));
+
 	if (check_log_state)
-		ret = check_tz_qsee_log_state(g_qsee_log, &clients_info->log_start,
+		return check_tz_qsee_log_state(g_qsee_log, &clients_info->log_start,
 			g_qsee_log_v2, &clients_info->log_start_v2);
 
-	if (!tzdbg.is_enlarged_buf){
-		ret = _disp_log_stats(g_qsee_log, &clients_info->log_start,
+	if (!tzdbg.is_enlarged_buf)
+		return _disp_log_stats(g_qsee_log, &clients_info->log_start,
 			QSEE_LOG_BUF_SIZE - sizeof(struct tzdbg_log_pos_t),
 			count, TZDBG_QSEE_LOG);
-        }else{
 
-	        ret = _disp_log_stats_v2(g_qsee_log_v2, &clients_info->log_start_v2,
+	return _disp_log_stats_v2(g_qsee_log_v2, &clients_info->log_start_v2,
 		QSEE_LOG_BUF_SIZE_V2 - sizeof(struct tzdbg_log_pos_v2_t),
 		count, TZDBG_QSEE_LOG);
-        }
-	mutex_unlock(&(tzdbg.lock));
-	return ret;
 }
 
 static int _disp_hyp_general_stats(size_t count)
@@ -1965,7 +1959,6 @@ static ssize_t tzdbg_fs_read_encrypted(struct clients_info_t *clients_info,
 static ssize_t tzdbg_fs_read(struct file *file, char __user *buf,
 	size_t count, loff_t *offp)
 {
-	struct seq_file *seq = file->private_data;
 	int tz_id = TZDBG_STATS_MAX;
 	ssize_t len = 0;
 	struct clients_info_t *clients_info = NULL;
@@ -1979,12 +1972,10 @@ static ssize_t tzdbg_fs_read(struct file *file, char __user *buf,
 	if (!clients_info)
 		return -ENODATA;
 
-	if (seq)
-		tz_id = *(int *)(seq->private);
-	else {
-		pr_err("%s: Seq data null unable to proceed\n", __func__);
-		return 0;
-	}
+	tz_id = *(int *)((struct seq_file *)file->private_data)->private;
+
+	if (tz_id < 0 || tz_id >= TZDBG_STATS_MAX)
+		return -EINVAL;
 
 	if (!tzdbg.is_encrypted_log_enabled ||
 	    (tz_id == TZDBG_HYP_GENERAL || tz_id == TZDBG_HYP_LOG)
@@ -2000,6 +1991,16 @@ static int tzdbg_procfs_open(struct inode *inode, struct file *file)
 {
 	struct clients_info_t *clients_info = NULL;
 	int ret = 0;
+	void *data = NULL;
+
+#if KERNEL_VERSION(6, 0, 0) >= LINUX_VERSION_CODE
+	data = PDE_DATA(inode);
+#else
+	data = pde_data(inode);
+#endif
+
+	if (!data)
+		return -EINVAL;
 
 	clients_info = kzalloc(sizeof(*clients_info), GFP_KERNEL);
 	if (!clients_info)
@@ -2010,11 +2011,8 @@ static int tzdbg_procfs_open(struct inode *inode, struct file *file)
 	list_add(&clients_info->list, &clients_list);
 	mutex_unlock(&tzdbg_mutex);
 
-#if (LINUX_VERSION_CODE <= KERNEL_VERSION(6,0,0))
-	ret = single_open(file, NULL, PDE_DATA(inode));
-#else
-	ret = single_open(file, NULL, pde_data(inode));
-#endif
+	ret = single_open(file, NULL, data);
+
 	if (ret) {
 		mutex_lock(&tzdbg_mutex);
 		list_del(&clients_info->list);
@@ -2116,15 +2114,50 @@ static int tzdbg_init_tme_log(struct platform_device *pdev, void __iomem *virt_i
 }
 
 /*
- * Allocates log buffer in HLOS and register with QTEE.
+ * Register qsee log buffer with QTEE.
  */
-static int tzdbg_register_qsee_log_buf(struct platform_device *pdev)
+static int tzdbg_register_qsee_log_buf(void)
 {
 	int ret = 0;
-	void *buf = NULL;
 	uint32_t ns_vmids[] = {VMID_HLOS};
 	uint32_t ns_vm_perms[] = {PERM_READ | PERM_WRITE};
 	uint32_t ns_vm_nums = 1;
+
+	if (!tzdbg.is_encrypted_log_enabled) {
+		ret = qtee_shmbridge_register(coh_pmem,
+			qseelog_buf_size, ns_vmids, ns_vm_perms, ns_vm_nums,
+			PERM_READ | PERM_WRITE,
+			&qseelog_shmbridge_handle);
+		if (ret) {
+			pr_err("failed to create bridge for qsee_log buf\n");
+			return ret;
+		}
+	}
+
+	g_qsee_log->log_pos.wrap = g_qsee_log->log_pos.offset = 0;
+	g_qsee_log_v2->log_pos.wrap = g_qsee_log_v2->log_pos.offset = 0;
+
+	/* Always register qsee log buffer */
+	ret = qcom_scm_register_qsee_log_buf(coh_pmem, qseelog_buf_size);
+	if (ret) {
+		pr_err("scm_call to register log buf failed, resp result =%d\n", ret);
+		goto exit;
+	}
+
+	return ret;
+exit:
+	if (!tzdbg.is_encrypted_log_enabled)
+		qtee_shmbridge_deregister(qseelog_shmbridge_handle);
+	return ret;
+}
+
+/*
+ * Allocates log buffer in HLOS and register with QTEE.
+ */
+static int tzdbg_allocate_qsee_log_buf(struct platform_device *pdev)
+{
+	int ret = 0;
+	void *buf = NULL;
 
 	if (tzdbg.is_enlarged_buf) {
 		if (of_property_read_u32((&pdev->dev)->of_node,
@@ -2142,55 +2175,66 @@ static int tzdbg_register_qsee_log_buf(struct platform_device *pdev)
 	if (buf == NULL)
 		return -ENOMEM;
 
-	if (!tzdbg.is_encrypted_log_enabled) {
-		ret = qtee_shmbridge_register(coh_pmem,
-			qseelog_buf_size, ns_vmids, ns_vm_perms, ns_vm_nums,
-			PERM_READ | PERM_WRITE,
-			&qseelog_shmbridge_handle);
-		if (ret) {
-			pr_err("failed to create bridge for qsee_log buf\n");
-			goto exit_free_mem;
-		}
-	}
-
 	g_qsee_log = (struct tzdbg_log_t *)buf;
-	g_qsee_log->log_pos.wrap = g_qsee_log->log_pos.offset = 0;
-
 	g_qsee_log_v2 = (struct tzdbg_log_v2_t *)buf;
-	g_qsee_log_v2->log_pos.wrap = g_qsee_log_v2->log_pos.offset = 0;
 
-	/* Always register qsee log buffer */
-	ret = qcom_scm_register_qsee_log_buf(coh_pmem, qseelog_buf_size);
-	if (ret) {
-		pr_err("scm_call to register log buf failed, resp result =%d\n", ret);
-		goto exit_dereg_bridge;
-	}
+	ret = tzdbg_register_qsee_log_buf();
+	if (ret)
+		goto exit;
 
 	return ret;
 
-exit_dereg_bridge:
-	if (!tzdbg.is_encrypted_log_enabled)
-		qtee_shmbridge_deregister(qseelog_shmbridge_handle);
-exit_free_mem:
+exit:
 	dma_free_coherent(&pdev->dev, qseelog_buf_size,
 			(void *)g_qsee_log, coh_pmem);
 	return ret;
 }
 
-static void tzdbg_free_qsee_log_buf(struct platform_device *pdev)
+static void tzdbg_free_qsee_log_buf(struct device *dev)
 {
 	if (!tzdbg.is_encrypted_log_enabled)
 		qtee_shmbridge_deregister(qseelog_shmbridge_handle);
-	dma_free_coherent(&pdev->dev, qseelog_buf_size,
+	dma_free_coherent(dev, qseelog_buf_size,
 				(void *)g_qsee_log, coh_pmem);
 }
 
-static int tzdbg_allocate_encrypted_log_buf(struct platform_device *pdev)
+static int tzdbg_register_encrypted_log_buf(void)
 {
 	int ret = 0;
 	uint32_t ns_vmids[] = {VMID_HLOS};
 	uint32_t ns_vm_perms[] = {PERM_READ | PERM_WRITE};
 	uint32_t ns_vm_nums = 1;
+
+	if (!tzdbg.is_encrypted_log_enabled)
+		return 0;
+
+	ret = qtee_shmbridge_register(enc_qseelog_info.paddr,
+			enc_qseelog_info.size, ns_vmids,
+			ns_vm_perms, ns_vm_nums,
+			PERM_READ | PERM_WRITE, &enc_qseelog_info.shmb_handle);
+	if (ret) {
+		pr_err("failed to create encr_qsee_log bridge, ret %d\n", ret);
+		return ret;
+	}
+
+	ret = qtee_shmbridge_register(enc_tzlog_info.paddr,
+			enc_tzlog_info.size, ns_vmids, ns_vm_perms, ns_vm_nums,
+			PERM_READ | PERM_WRITE, &enc_tzlog_info.shmb_handle);
+	if (ret) {
+		pr_err("failed to create encr_tz_log bridge, ret = %d\n", ret);
+		goto exit;
+	}
+
+	return ret;
+
+exit:
+	qtee_shmbridge_deregister(enc_qseelog_info.shmb_handle);
+	return ret;
+}
+
+static int tzdbg_allocate_encrypted_log_buf(struct platform_device *pdev)
+{
+	int ret = 0;
 
 	if (!tzdbg.is_encrypted_log_enabled)
 		return 0;
@@ -2205,14 +2249,6 @@ static int tzdbg_allocate_encrypted_log_buf(struct platform_device *pdev)
 	if (enc_qseelog_info.vaddr == NULL)
 		return -ENOMEM;
 
-	ret = qtee_shmbridge_register(enc_qseelog_info.paddr,
-			enc_qseelog_info.size, ns_vmids,
-			ns_vm_perms, ns_vm_nums,
-			PERM_READ | PERM_WRITE, &enc_qseelog_info.shmb_handle);
-	if (ret) {
-		pr_err("failed to create encr_qsee_log bridge, ret %d\n", ret);
-		goto exit_free_qseelog;
-	}
 	pr_debug("Alloc memory for encr_qsee_log, size = %zu\n",
 			enc_qseelog_info.size);
 
@@ -2220,39 +2256,36 @@ static int tzdbg_allocate_encrypted_log_buf(struct platform_device *pdev)
 	enc_tzlog_info.vaddr = dma_alloc_coherent(&pdev->dev,
 					enc_tzlog_info.size,
 					&enc_tzlog_info.paddr, GFP_KERNEL);
-	if (enc_tzlog_info.vaddr == NULL)
-		goto exit_unreg_qseelog;
-
-	ret = qtee_shmbridge_register(enc_tzlog_info.paddr,
-			enc_tzlog_info.size, ns_vmids, ns_vm_perms, ns_vm_nums,
-			PERM_READ | PERM_WRITE, &enc_tzlog_info.shmb_handle);
-	if (ret) {
-		pr_err("failed to create encr_tz_log bridge, ret = %d\n", ret);
-		goto exit_free_tzlog;
+	if (enc_tzlog_info.vaddr == NULL) {
+		ret = -ENOMEM;
+		goto exit_free_qseelog;
 	}
+
 	pr_debug("Alloc memory for encr_tz_log, size %zu\n",
 		enc_qseelog_info.size);
+
+	ret = tzdbg_register_encrypted_log_buf();
+	if (ret)
+		goto exit_free_tzlog;
 
 	return 0;
 
 exit_free_tzlog:
 	dma_free_coherent(&pdev->dev, enc_tzlog_info.size,
 			enc_tzlog_info.vaddr, enc_tzlog_info.paddr);
-exit_unreg_qseelog:
-	qtee_shmbridge_deregister(enc_qseelog_info.shmb_handle);
 exit_free_qseelog:
 	dma_free_coherent(&pdev->dev, enc_qseelog_info.size,
 			enc_qseelog_info.vaddr, enc_qseelog_info.paddr);
-	return -ENOMEM;
+	return ret;
 }
 
-static void tzdbg_free_encrypted_log_buf(struct platform_device *pdev)
+static void tzdbg_free_encrypted_log_buf(struct device *dev)
 {
 	qtee_shmbridge_deregister(enc_tzlog_info.shmb_handle);
-	dma_free_coherent(&pdev->dev, enc_tzlog_info.size,
+	dma_free_coherent(dev, enc_tzlog_info.size,
 			enc_tzlog_info.vaddr, enc_tzlog_info.paddr);
 	qtee_shmbridge_deregister(enc_qseelog_info.shmb_handle);
-	dma_free_coherent(&pdev->dev, enc_qseelog_info.size,
+	dma_free_coherent(dev, enc_qseelog_info.size,
 			enc_qseelog_info.vaddr, enc_qseelog_info.paddr);
 }
 
@@ -2506,6 +2539,16 @@ static bool tzdbg_query_tz_time(void)
 
 	return true;
 }
+
+static void tzdbg_enable_tz_time(void)
+{
+	g_realtime_consolidation_enable = tzdbg_query_tz_time();
+	if (g_realtime_consolidation_enable)
+		pr_info("Timestamp consolidation is enabled. Ticks is %lld, Frequency is %lld, Hlos time is %lld\n",
+			g_tz_ticks_baseline, g_tz_ticks_frequency, g_hlos_uptime_baseline);
+	else
+		pr_info("Timestamp consolidation is not supported!\n");
+}
 #endif
 
 /*
@@ -2635,7 +2678,7 @@ static int tz_log_probe(struct platform_device *pdev)
 	 * The buffer should be registered even if later, HLOS isn't allowed to
 	 * access contents directly.
 	 */
-	ret = tzdbg_register_qsee_log_buf(pdev);
+	ret = tzdbg_allocate_qsee_log_buf(pdev);
 	if (ret) {
 		pr_warn("Failure with plain qsee log buffer, Skipping qsee_log node creation..\n");
 		tzdbg.stat[TZDBG_QSEE_LOG].avail = false;
@@ -2664,16 +2707,8 @@ static int tz_log_probe(struct platform_device *pdev)
 	}
 
 #if (KERNEL_VERSION(6, 12, 0) <= LINUX_VERSION_CODE) && defined(CONFIG_TZLOG_TIME_CONSOLIDATE)
-	g_realtime_consolidation_enable = tzdbg_query_tz_time();
-	if (g_realtime_consolidation_enable)
-		pr_info("Timestamp consolidation is enabled. Ticks is %lld, Frequency is %lld, Hlos time is %lld\n",
-			g_tz_ticks_baseline, g_tz_ticks_frequency, g_hlos_uptime_baseline);
-	else
-		pr_info("Timestamp consolidation is not supported!\n");
+	tzdbg_enable_tz_time();
 #endif
-
-	/* init tzdbg lock */
-	mutex_init(&(tzdbg.lock));
 
 	if (tzdbg_fs_init(pdev))
 		goto exit_free_disp_buf;
@@ -2683,9 +2718,9 @@ exit_free_disp_buf:
 	dma_free_coherent(&pdev->dev, display_buf_size,
 			(void *)tzdbg.disp_buf, disp_buf_paddr);
 exit_free_encr_log_buf:
-	tzdbg_free_encrypted_log_buf(pdev);
+	tzdbg_free_encrypted_log_buf(&pdev->dev);
 exit_free_qsee_log_buf:
-	tzdbg_free_qsee_log_buf(pdev);
+	tzdbg_free_qsee_log_buf(&pdev->dev);
 	if (tzdbg.tz_qsee_plain_log_enabled)
 		kfree(tzdbg.diag_buf);
 	return -ENXIO;
@@ -2700,8 +2735,8 @@ static void tz_log_remove(struct platform_device *pdev)
 	tzdbg_fs_exit(pdev);
 	dma_free_coherent(&pdev->dev, display_buf_size,
 			(void *)tzdbg.disp_buf, disp_buf_paddr);
-	tzdbg_free_encrypted_log_buf(pdev);
-	tzdbg_free_qsee_log_buf(pdev);
+	tzdbg_free_encrypted_log_buf(&pdev->dev);
+	tzdbg_free_qsee_log_buf(&pdev->dev);
 	if (!tzdbg.is_encrypted_log_enabled)
 		kfree(tzdbg.diag_buf);
 
@@ -2709,6 +2744,39 @@ static void tz_log_remove(struct platform_device *pdev)
 	return 0;
 #endif
 }
+
+static int tz_log_pm_freeze(struct device *dev)
+{
+	return 0;
+}
+
+static int tz_log_pm_restore(struct device *dev)
+{
+	int ret = 0;
+
+	ret = tzdbg_register_qsee_log_buf();
+	if (ret)
+		goto exit;
+
+	ret = tzdbg_register_encrypted_log_buf();
+	if (ret)
+		goto exit;
+
+#if (KERNEL_VERSION(6, 12, 0) <= LINUX_VERSION_CODE) && defined(CONFIG_TZLOG_TIME_CONSOLIDATE)
+	tzdbg_enable_tz_time();
+#endif
+	return ret;
+
+exit:
+	tzdbg_free_encrypted_log_buf(dev);
+	tzdbg_free_qsee_log_buf(dev);
+	return ret;
+}
+
+static const struct dev_pm_ops tz_log_pm_ops = {
+	.freeze = tz_log_pm_freeze,
+	.restore = tz_log_pm_restore,
+};
 
 static const struct of_device_id tzlog_match[] = {
 	{.compatible = "qcom,tz-log"},
@@ -2722,6 +2790,7 @@ static struct platform_driver tz_log_driver = {
 		.name = "tz_log",
 		.of_match_table = tzlog_match,
 		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
+		.pm = &tz_log_pm_ops,
 	},
 };
 
