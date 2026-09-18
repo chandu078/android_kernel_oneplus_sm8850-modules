@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -636,23 +636,26 @@ end:
 	return rc;
 }
 
+void cam_actuator_process_workq(struct work_struct *w)
+{
+	cam_req_mgr_process_workq(w);
+}
+
 static int cam_actuator_schedule_park_lens_task(
 	struct cam_actuator_ctrl_t *a_ctrl)
 {
 	int32_t rc = 0;
-	struct cam_worker_wrapper_taskdata_args task;
+	struct crm_workq_task *task;
 
-	rc = cam_worker_wrapper_get(a_ctrl->worker_ctx, &task);
-	if (rc) {
+	task = cam_req_mgr_workq_get_task(a_ctrl->workq);
+	if (!task) {
 		CAM_ERR(CAM_ACTUATOR, "No empty task available");
 		return -ENOMEM;
 	}
 
-	task.task_priority = WORKER_TASK_PRIORITY_0;
-	rc = cam_worker_wrapper_enqueue(a_ctrl->worker_ctx, &task,
-		(void *)a_ctrl, NULL, &cam_actuator_park_lens_cb);
-	if (rc)
-		CAM_ERR(CAM_ACTUATOR, "enqueue work process to worker failed.");
+	task->process_cb = &cam_actuator_park_lens_cb;
+	rc = cam_req_mgr_workq_enqueue_task(task,
+		(void *)a_ctrl, CRM_TASK_PRIORITY_0);
 
 	return rc;
 }
@@ -1008,12 +1011,15 @@ int32_t cam_actuator_i2c_pkt_parse(struct cam_actuator_ctrl_t *a_ctrl,
 			goto end;
 		}
 
+		mutex_lock(&(a_ctrl->read_buf_lock));
 		rc = cam_sensor_util_add_read_buf_to_list(&(a_ctrl->read_buf_list),
 			io_cfg->mem_handle[0]);
 		if (rc < 0) {
 			CAM_ERR(CAM_ACTUATOR, "Add read buf to list failed rc:%d", rc);
+			mutex_unlock(&(a_ctrl->read_buf_lock));
 			goto end;
 		}
+		mutex_unlock(&(a_ctrl->read_buf_lock));
 
 		rc = cam_sensor_i2c_read_data(
 			&i2c_read_settings,
@@ -1404,7 +1410,9 @@ int32_t cam_actuator_driver_cmd(struct cam_actuator_ctrl_t *a_ctrl,
 	}
 
 release_mutex:
+	mutex_lock(&(a_ctrl->read_buf_lock));
 	cam_sensor_util_release_read_buf(&(a_ctrl->read_buf_list));
+	mutex_unlock(&(a_ctrl->read_buf_lock));
 	mutex_unlock(&(a_ctrl->actuator_mutex));
 
 	return rc;

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
 #include "cam_cci_core.h"
 #include "cam_cci_dev.h"
-#include "cam_cci_api.h"
+#include "cam_req_mgr_workq.h"
 #include "cam_common_util.h"
 #include "cam_mem_mgr_api.h"
 #ifdef OPLUS_FEATURE_CAMERA_COMMON
@@ -671,15 +671,9 @@ static int32_t cam_cci_set_clk_param(struct cci_device *cci_dev,
 	enum cci_i2c_master_t master = c_ctrl->cci_info->cci_i2c_master;
 	enum i2c_freq_mode i2c_freq_mode = c_ctrl->cci_info->i2c_freq_mode;
 	void __iomem *base = cci_dev->soc_info.reg_map[0].mem_base;
-	struct cam_cci_master_info *cci_master = NULL;
+	struct cam_cci_master_info *cci_master =
+		&cci_dev->cci_master_info[master];
 
-	if (master >= MASTER_MAX) {
-		CAM_ERR(CAM_CCI, "CCI%d Invalid I2C master: %d",
-			cci_dev->soc_info.index, master);
-		return -EINVAL;
-	}
-
-	cci_master = &cci_dev->cci_master_info[master];
 	if ((i2c_freq_mode >= I2C_MAX_MODES) || (i2c_freq_mode < 0)) {
 		CAM_ERR(CAM_CCI, "CCI%d_I2C_M%d invalid i2c_freq_mode = %d",
 			cci_dev->soc_info.index, master, i2c_freq_mode);
@@ -2098,19 +2092,19 @@ ERROR:
 	return rc;
 }
 
-static int cam_cci_write_async_helper(void *priv, void *data)
+static void cam_cci_write_async_helper(struct work_struct *work)
 {
 	int rc;
 	struct cci_device *cci_dev;
 	struct cci_write_async *write_async =
-		(struct cci_write_async *)priv;
+		container_of(work, struct cci_write_async, work);
 	enum cci_i2c_master_t master;
 	struct cam_cci_master_info *cci_master_info;
 
 	cam_common_util_thread_switch_delay_detect(
-		"cam_cci_worker", "schedule", cam_cci_write_async_helper,
-		write_async->worker_scheduled_ts,
-		CAM_WORKER_SCHEDULE_TIME_THRESHOLD);
+		"cam_cci_workq", "schedule", cam_cci_write_async_helper,
+		write_async->workq_scheduled_ts,
+		CAM_WORKQ_SCHEDULE_TIME_THRESHOLD);
 	cci_dev = write_async->cci_dev;
 	master = write_async->c_ctrl.cci_info->cci_i2c_master;
 	cci_master_info = &cci_dev->cci_master_info[master];
@@ -2125,7 +2119,6 @@ static int cam_cci_write_async_helper(void *priv, void *data)
 
 	CAM_MEM_FREE(write_async->c_ctrl.cfg.cci_i2c_write_cfg.reg_setting);
 	CAM_MEM_FREE(write_async);
-	return rc;
 }
 
 static int32_t cam_cci_i2c_write_async(struct v4l2_subdev *sd,
@@ -2137,7 +2130,6 @@ static int32_t cam_cci_i2c_write_async(struct v4l2_subdev *sd,
 	struct cci_device *cci_dev;
 	struct cam_sensor_i2c_reg_setting *cci_i2c_write_cfg;
 	struct cam_sensor_i2c_reg_setting *cci_i2c_write_cfg_w;
-	struct cam_worker_wrapper_taskdata_args task;
 
 	cci_dev = v4l2_get_subdevdata(sd);
 	if (!cci_dev) {
@@ -2152,6 +2144,8 @@ static int32_t cam_cci_i2c_write_async(struct v4l2_subdev *sd,
 		return -ENOMEM;
 	}
 
+
+	INIT_WORK(&write_async->work, cam_cci_write_async_helper);
 	write_async->cci_dev = cci_dev;
 	write_async->c_ctrl = *c_ctrl;
 	write_async->queue = queue;
@@ -2174,9 +2168,10 @@ static int32_t cam_cci_i2c_write_async(struct v4l2_subdev *sd,
 		CAM_MEM_FREE(write_async);
 		return -ENOMEM;
 	}
-
-	memcpy(cci_i2c_write_cfg_w->reg_setting, cci_i2c_write_cfg->reg_setting,
-		(sizeof(struct cam_sensor_i2c_reg_array) * cci_i2c_write_cfg->size));
+	memcpy(cci_i2c_write_cfg_w->reg_setting,
+		cci_i2c_write_cfg->reg_setting,
+		(sizeof(struct cam_sensor_i2c_reg_array)*
+						cci_i2c_write_cfg->size));
 
 	cci_i2c_write_cfg_w->addr_type = cci_i2c_write_cfg->addr_type;
 	cci_i2c_write_cfg_w->addr_type = cci_i2c_write_cfg->addr_type;
@@ -2184,25 +2179,8 @@ static int32_t cam_cci_i2c_write_async(struct v4l2_subdev *sd,
 	cci_i2c_write_cfg_w->size = cci_i2c_write_cfg->size;
 	cci_i2c_write_cfg_w->delay = cci_i2c_write_cfg->delay;
 
-	write_async->worker_scheduled_ts = ktime_get_boottime();
-	rc = cam_worker_wrapper_get(cci_dev->write_worker_ctx[write_async->queue], &task);
-	if (rc) {
-		CAM_ERR(CAM_CCI, "Failed to get task for cci dev, async idx: %d",
-			write_async->queue);
-		CAM_MEM_FREE(cci_i2c_write_cfg_w->reg_setting);
-		CAM_MEM_FREE(write_async);
-		return -EINVAL;
-	}
-
-	task.task_priority = WORKER_TASK_PRIORITY_0;
-	rc = cam_worker_wrapper_enqueue(cci_dev->write_worker_ctx[write_async->queue],
-		&task, write_async, NULL, cam_cci_write_async_helper);
-	if (rc) {
-		CAM_ERR(CAM_CCI, "Failed to enqueue task for cci dev, async idx: %d",
-			write_async->queue);
-		CAM_MEM_FREE(cci_i2c_write_cfg_w->reg_setting);
-		CAM_MEM_FREE(write_async);
-	}
+	write_async->workq_scheduled_ts = ktime_get_boottime();
+	queue_work(cci_dev->write_wq[write_async->queue], &write_async->work);
 
 	return rc;
 }
@@ -2568,33 +2546,6 @@ int32_t cam_cci_core_cfg(struct v4l2_subdev *sd,
 	}
 
 	cci_ctrl->status = rc;
-
-	return rc;
-}
-
-int32_t cam_cci_client_ops(struct v4l2_subdev *sd, unsigned int cmd,
-	struct cam_cci_ctrl *cci_ctrl)
-{
-	int32_t rc = 0;
-
-	if (!sd) {
-		CAM_ERR(CAM_CCI, "Invalid subdev pointer");
-		return -EINVAL;
-	}
-
-	if (!cci_ctrl) {
-		CAM_ERR(CAM_CCI, "Invalid cci_ctrl pointer");
-		return -EINVAL;
-	}
-
-	switch (cmd) {
-	case VIDIOC_MSM_CCI_CFG:
-		rc = cam_cci_core_cfg(sd, cci_ctrl);
-		break;
-	default:
-		CAM_ERR(CAM_CCI, "Invalid cmd: %u", cmd);
-		rc = -EINVAL;
-	}
 
 	return rc;
 }

@@ -1,9 +1,7 @@
-load(":repo_paths.bzl", "modules_label", "soc_label")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
+load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load(":target_variants.bzl", "get_all_variants")
 load(":project_defconfig.bzl", "get_project_defconfig")
-load("@rules_pkg//pkg:install.bzl", "pkg_install")
-load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 
 def _define_module(target, variant):
     tv = "{}_{}".format(target, variant)
@@ -13,31 +11,30 @@ def _define_module(target, variant):
         "//build/kernel/kleaf:socrepo_true": [
             ":camera_headers",
             ":camera_banner",
-            soc_label("all_headers"),
-            soc_label("{}/drivers/firmware/qcom/qcom-scm".format(tv)),
-            soc_label("{}/drivers/iommu/qcom_iommu_util".format(tv)),
-            soc_label("{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(tv)),
-            soc_label("{}/drivers/soc/qcom/crm-v2".format(tv)),
-            soc_label("{}/drivers/clk/qcom/clk-qcom".format(tv)),
-            soc_label("{}/drivers/soc/qcom/qcom_rpmh".format(tv)),
-            soc_label("{}/drivers/soc/qcom/socinfo".format(tv)),
-            soc_label("{}/drivers/soc/qcom/llcc-qcom".format(tv)),
-            soc_label("{}/drivers/soc/qcom/mdt_loader".format(tv)),
-            soc_label("{}/drivers/leds/flash/leds-qcom-flash".format(tv)),
-            soc_label("{}/drivers/soc/qcom/qcom_va_minidump".format(tv)),
-            soc_label("{}/drivers/leds/leds-qti-flash".format(tv)),
-            soc_label("{}/drivers/video/backlight/qcom-spmi-wled".format(tv)),
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}/drivers/firmware/qcom/qcom-scm".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/iommu/qcom_iommu_util".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/crm-v2".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/clk/qcom/clk-qcom".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_rpmh".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/socinfo".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/llcc-qcom".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/mdt_loader".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/leds/flash/leds-qcom-flash".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/leds/leds-qti-flash".format(tv),
         ],
         "//build/kernel/kleaf:socrepo_false": [
             ":camera_headers",
             ":camera_banner",
-            "//msm-kernel:all_headers",
+            "//vendor/qcom/kernel:all_headers",
         ],
     })
 
     kernel_build = select({
-        "//build/kernel/kleaf:socrepo_true": soc_label("{}_base_kernel".format(tv)),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(tv),
     })
 
     # Generate the defconfig file dynamically
@@ -55,34 +52,34 @@ def _define_module(target, variant):
 
     if target == "pineapple":
         deps.extend([
-            modules_label("qcom/opensource/synx-kernel:synx_headers"),
-            modules_label("qcom/opensource/synx-kernel:{}_modules".format(tv)),
-            modules_label("qcom/opensource/securemsm-kernel:smcinvoke_kernel_headers"),
-            modules_label("qcom/opensource/securemsm-kernel:smmu_proxy_headers"),
-            modules_label("qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv)),
-            modules_label("qcom/opensource/securemsm-kernel:{}_smmu_proxy_dlkm".format(tv)),
-            modules_label("qcom/opensource/mmrm-driver:{}_mmrm_driver".format(tv)),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:synx_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:{}_modules".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:smcinvoke_kernel_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:smmu_proxy_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smmu_proxy_dlkm".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mmrm-driver:{}_mmrm_driver".format(tv),
         ])
     if target == "sun":
         deps.extend([
-            modules_label("qcom/opensource/synx-kernel:synx_headers"),
-            modules_label("qcom/opensource/synx-kernel:{}_modules".format(tv)),
-            modules_label("qcom/opensource/securemsm-kernel:smcinvoke_kernel_headers"),
-            modules_label("qcom/opensource/securemsm-kernel:smmu_proxy_headers"),
-            modules_label("qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv)),
-            modules_label("qcom/opensource/securemsm-kernel:{}_smmu_proxy_dlkm".format(tv)),
-            modules_label("qcom/opensource/mmrm-driver:{}_mmrm_driver".format(tv)),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:synx_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:{}_modules".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:smcinvoke_kernel_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:smmu_proxy_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smmu_proxy_dlkm".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mmrm-driver:{}_mmrm_driver".format(tv),
         ])
     if target == "canoe":
         deps.extend([
-           modules_label("qcom/opensource/synx-kernel:synx_headers"),
-            modules_label("qcom/opensource/synx-kernel:{}_modules".format(tv)),
-            modules_label("qcom/opensource/securemsm-kernel:smcinvoke_kernel_headers"),
-            modules_label("qcom/opensource/securemsm-kernel:smmu_proxy_headers"),
-            modules_label("qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv)),
-            modules_label("qcom/opensource/securemsm-kernel:{}_smmu_proxy_dlkm".format(tv)),
-			modules_label("qcom/opensource/mmrm-driver:{}_mmrm_driver".format(tv)),
-            modules_label("oplus/kernel/dft/bazel:oplus_bsp_dft_kernel_fb"),
+           "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:synx_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:{}_modules".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:smcinvoke_kernel_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:smmu_proxy_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smmu_proxy_dlkm".format(tv),
+			"//vendor/qcom/sm8850-modules/qcom/opensource/mmrm-driver:{}_mmrm_driver".format(tv),
+            "//vendor/qcom/sm8850-modules/oplus/kernel/dft/bazel:oplus_bsp_dft_kernel_fb",
         ])
     ddk_module(
         name = "{}_camera".format(tv),
@@ -92,6 +89,7 @@ def _define_module(target, variant):
             "drivers/cam_req_mgr/cam_req_mgr_dev.c",
             "drivers/cam_req_mgr/cam_req_mgr_util.c",
             "drivers/cam_req_mgr/cam_mem_mgr.c",
+            "drivers/cam_req_mgr/cam_req_mgr_workq.c",
             "drivers/cam_req_mgr/cam_req_mgr_timer.c",
             "drivers/cam_req_mgr/cam_req_mgr_debug.c",
             "drivers/cam_utils/cam_soc_util.c",
@@ -100,11 +98,6 @@ def _define_module(target, variant):
             "drivers/cam_utils/cam_trace.c",
             "drivers/cam_utils/cam_common_util.c",
             "drivers/cam_utils/cam_compat.c",
-            "drivers/cam_utils/cam_worker/cam_tasklet/cam_tasklet_util.c",
-            "drivers/cam_utils/cam_worker/cam_workq/cam_workq_util.c",
-            "drivers/cam_utils/cam_worker/cam_worker_wrapper.c",
-            "drivers/cam_utils/irq_controller/cam_irq_controller.c",
-            "drivers/cam_utils/cam_worker/cam_kthread/cam_kthread_util.c",
             "drivers/cam_core/cam_context.c",
             "drivers/cam_core/cam_context_utils.c",
             "drivers/cam_core/cam_node.c",
@@ -139,7 +132,9 @@ def _define_module(target, variant):
             },
             "CONFIG_SPECTRA_ISP": {
                 True: [
+                    "drivers/cam_isp/isp_hw_mgr/hw_utils/cam_tasklet_util.c",
                     "drivers/cam_isp/isp_hw_mgr/hw_utils/cam_isp_packet_parser.c",
+                    "drivers/cam_isp/isp_hw_mgr/hw_utils/irq_controller/cam_irq_controller.c",
                     "drivers/cam_isp/isp_hw_mgr/isp_hw/ife_csid_hw/cam_ife_csid_dev.c",
                     "drivers/cam_isp/isp_hw_mgr/isp_hw/ife_csid_hw/cam_ife_csid_soc.c",
                     "drivers/cam_isp/isp_hw_mgr/isp_hw/ife_csid_hw/cam_ife_csid_common.c",
@@ -289,19 +284,6 @@ def _define_module(target, variant):
                     "drivers/cam_vmrm/cam_vmrm_interface.c",
                 ],
             },
-            "CONFIG_SPECTRA_CRE": {
-                True: [
-                    "drivers/cam_cre/cam_cre_hw_mgr/cre_hw/cre_core.c",
-                    "drivers/cam_cre/cam_cre_hw_mgr/cre_hw/cre_soc.c",
-                    "drivers/cam_cre/cam_cre_hw_mgr/cre_hw/cre_dev.c",
-                    "drivers/cam_cre/cam_cre_hw_mgr/cre_hw/top/cre_top.c",
-                    "drivers/cam_cre/cam_cre_hw_mgr/cre_hw/bus_rd/cre_bus_rd.c",
-                    "drivers/cam_cre/cam_cre_hw_mgr/cre_hw/bus_wr/cre_bus_wr.c",
-                    "drivers/cam_cre/cam_cre_hw_mgr/cam_cre_hw_mgr.c",
-                    "drivers/cam_cre/cam_cre_dev.c",
-                    "drivers/cam_cre/cam_cre_context.c",
-                ],
-           },
             "CONFIG_SPECTRA_OPLUS": {
                 True: [
                     "drivers/oplus/cam_sensor_module/cam_module_utils/cam_kevent_fb_custom.c",
@@ -321,16 +303,14 @@ def _define_module(target, variant):
         kernel_build = kernel_build,
     )
 
-    pkg_files(
-       name = tv + "_dist_files",
-       srcs = [":{}_camera".format(tv)],
-       strip_prefix = strip_prefix.files_only(),
-    )
-
-    pkg_install(
-       name = "{}_camera_dist".format(tv),
-       srcs = [":{}_dist_files".format(tv)],
-       destdir = "out/target/product/{}/dlkm/lib/modules/".format(target),
+    copy_to_dist_dir(
+        name = "{}_camera_dist".format(tv),
+        data = [":{}_camera".format(tv)],
+        dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
+        flat = True,
+        wipe_dist_dir = False,
+        allow_duplicate_filenames = False,
+        mode_overrides = {"**/*": "644"},
     )
 
 def define_camera_module():

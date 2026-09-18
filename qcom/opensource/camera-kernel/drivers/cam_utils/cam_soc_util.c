@@ -26,10 +26,6 @@
 #include <linux/clk/qcom.h>
 #endif
 
-#if IS_ENABLED(CONFIG_COMMON_CLK_QCOM)
-#include <linux/clk/qcom.h>
-#endif
-
 #define CAM_TO_MASK(bitn)          (1 << (int)(bitn))
 #define CAM_IS_BIT_SET(mask, bit)  ((mask) & CAM_TO_MASK(bit))
 #define CAM_SET_BIT(mask, bit)     ((mask) |= CAM_TO_MASK(bit))
@@ -1098,8 +1094,6 @@ static int cam_soc_util_clk_aggregate_register_entry(
 		aggregate_clk->cmn_src_id = cmn_clk_id;
 		aggregate_clk->curr_clk_rate = 0;
 		aggregate_clk->clk_id = -1;
-		snprintf(aggregate_clk->name, CAM_MAX_CLK_NAME_LEN, "%s", clk_name);
-
 		INIT_LIST_HEAD(&aggregate_clk->list);
 		INIT_LIST_HEAD(&aggregate_clk->client_list);
 		list_add_tail(&aggregate_clk->list, &aggregate_clk_list);
@@ -3235,31 +3229,6 @@ end:
 	return rc;
 };
 
-int cam_soc_util_dump_clk(struct cam_hw_soc_info *soc_info)
-{
-	int i;
-
-	if (!soc_info) {
-		CAM_ERR(CAM_UTIL, "soc_info is NULL");
-		return -EINVAL;
-	}
-
-	for (i = 0; i < soc_info->num_clk; i++) {
-		if (!soc_info->clk[i])
-			continue;
-
-#if IS_ENABLED(CONFIG_COMMON_CLK_QCOM)
-		qcom_clk_dump(soc_info->clk[i], NULL, false);
-#else
-		CAM_INFO(CAM_UTIL, "[%s] idx = %d clk name = %s clk_rate=%lld",
-			soc_info->dev_name, i, soc_info->clk_name[i],
-			cam_wrapper_clk_get_rate(soc_info->clk[i], soc_info->clk_name[i]));
-#endif
-	}
-
-	return 0;
-}
-
 static int cam_soc_util_get_dt_gpio_req_tbl(struct device_node *of_node,
 	struct cam_soc_gpio_data *gconf, uint16_t *gpio_array,
 	uint16_t gpio_array_size)
@@ -3281,7 +3250,7 @@ static int cam_soc_util_get_dt_gpio_req_tbl(struct device_node *of_node,
 	if (!val_array)
 		return -ENOMEM;
 
-	gconf->cam_gpio_req_tbl = CAM_MEM_ZALLOC_ARRAY(count, sizeof(struct cam_soc_gpio),
+	gconf->cam_gpio_req_tbl = CAM_MEM_ZALLOC_ARRAY(count, sizeof(struct gpio),
 		GFP_KERNEL);
 	if (!gconf->cam_gpio_req_tbl) {
 		rc = -ENOMEM;
@@ -3397,7 +3366,7 @@ static int cam_soc_util_get_gpio_info(struct cam_hw_soc_info *soc_info)
 	}
 
 	gconf->cam_gpio_common_tbl = CAM_MEM_ZALLOC_ARRAY(gpio_array_size,
-				sizeof(struct cam_soc_gpio), GFP_KERNEL);
+				sizeof(struct gpio), GFP_KERNEL);
 	if (!gconf->cam_gpio_common_tbl) {
 		rc = -ENOMEM;
 		goto free_gpio_conf;
@@ -3435,7 +3404,7 @@ static int cam_soc_util_request_gpio_table(
 	uint8_t size = 0;
 	struct cam_soc_gpio_data *gpio_conf =
 			soc_info->gpio_data;
-	struct cam_soc_gpio *gpio_tbl = NULL;
+	struct gpio *gpio_tbl = NULL;
 
 
 	if (!gpio_conf) {
@@ -3735,11 +3704,9 @@ int cam_soc_util_get_dt_properties(struct cam_hw_soc_info *soc_info)
 {
 	struct device_node *of_node = NULL;
 	int count = 0, i = 0, rc = 0;
-	int reg_prop_cnt = 0;
 #ifdef CONFIG_SPECTRA_VMRM
 	int num_vmrm_resource_ids = 0;
 #endif
-	const char *mem_block_rw_prop;
 
 	if (!soc_info || !soc_info->dev)
 		return -EINVAL;
@@ -3759,18 +3726,6 @@ int cam_soc_util_get_dt_properties(struct cam_hw_soc_info *soc_info)
 			soc_info->dev_name);
 		count = 0;
 	}
-
-	reg_prop_cnt = of_property_count_strings(of_node, "reg-prop");
-	if (reg_prop_cnt <= 0) {
-		CAM_DBG(CAM_UTIL, "no reg-prop found for: %s",
-			soc_info->dev_name);
-		reg_prop_cnt = 0;
-	} else if (reg_prop_cnt != count) {
-		CAM_ERR(CAM_UTIL, "re name count:%d and prop-count:%d not matched",
-			count, reg_prop_cnt);
-		return -EINVAL;
-	}
-
 	soc_info->num_mem_block = count;
 
 	for (i = 0; i < soc_info->num_mem_block; i++) {
@@ -3779,21 +3734,6 @@ int cam_soc_util_get_dt_properties(struct cam_hw_soc_info *soc_info)
 		if (rc) {
 			CAM_ERR(CAM_UTIL, "failed to read reg-names at %d", i);
 			return rc;
-		}
-
-		if (reg_prop_cnt) {
-			rc = of_property_read_string_index(of_node, "reg-prop", i,
-				&mem_block_rw_prop);
-			if (rc) {
-				CAM_ERR(CAM_UTIL, "failed to read reg-prop at %d", i);
-				return rc;
-			}
-			if (strcmp(mem_block_rw_prop, "rw") == 0)
-				soc_info->mem_block_rw_prop[i] = true;
-			else
-				soc_info->mem_block_rw_prop[i] = false;
-		} else {
-			soc_info->mem_block_rw_prop[i] = true;
 		}
 		soc_info->mem_block[i] =
 			platform_get_resource_byname(soc_info->pdev,
@@ -4282,7 +4222,6 @@ void __iomem * cam_soc_util_get_mem_base(
 	unsigned long mem_block_start,
 	unsigned long mem_block_size,
 	const char *mem_block_name,
-	bool mem_block_rw_prop,
 	uint32_t reserve_mem)
 {
 	void __iomem * mem_base;
@@ -4298,8 +4237,7 @@ void __iomem * cam_soc_util_get_mem_base(
 		}
 	}
 
-	mem_base = cam_compat_ioremap(mem_block_rw_prop,
-			mem_block_start, mem_block_size);
+	mem_base = ioremap(mem_block_start, mem_block_size);
 
 	if (!mem_base) {
 		CAM_ERR(CAM_UTIL, "get mem base failed");
@@ -4339,7 +4277,6 @@ void __iomem * cam_soc_util_get_mem_base(
 	unsigned long mem_block_start,
 	unsigned long mem_block_size,
 	const char *mem_block_name,
-	bool mem_block_rw_prop,
 	uint32_t reserve_mem)
 {
 	void __iomem * mem_base;
@@ -4470,7 +4407,6 @@ int cam_soc_util_request_platform_resource(
 			soc_info->mem_block[i]->start,
 			resource_size(soc_info->mem_block[i]),
 			soc_info->mem_block_name[i],
-			soc_info->mem_block_rw_prop[i],
 			soc_info->reserve_mem);
 
 		if (!soc_info->reg_map[i].mem_base) {
@@ -5166,8 +5102,7 @@ static int cam_soc_util_dump_dmi_ctxt_reg_range_user_buf(
 		goto end;
 	}
 	remain_len = buf_len - dump_args->offset;
-	min_len =  sizeof(struct cam_hw_soc_dump_header) +
-		(reg_read->num_pre_writes * 2 * sizeof(uint32_t)) +
+	min_len = (reg_read->num_pre_writes * 2 * sizeof(uint32_t)) +
 		(reg_read->dmi_data_read.num_values * 2 * sizeof(uint32_t)) +
 		sizeof(uint32_t);
 	if (remain_len < min_len) {
@@ -5275,8 +5210,8 @@ static int cam_soc_util_dump_cont_reg_range_user_buf(
 	int                            rc = 0;
 	size_t                         buf_len;
 	uint8_t                       *dst;
-	size_t                         remain_len, min_len;
-	uint32_t                       reg_map_size = 0;
+	size_t                         remain_len;
+	uint32_t                       min_len, reg_map_size = 0;
 	uint32_t                      *waddr, *start;
 	uintptr_t                      cpu_addr;
 	struct cam_hw_soc_dump_header  *hdr;
@@ -5286,14 +5221,6 @@ static int cam_soc_util_dump_cont_reg_range_user_buf(
 			"Invalid input args soc_info: %pK, dump_out_buffer: %pK reg_read: %pK",
 			soc_info, dump_args, reg_read);
 		return -EINVAL;
-	}
-
-	/* Validate num_values to prevent overflow */
-	if (reg_read->num_values >
-		((SIZE_MAX - sizeof(struct cam_hw_soc_dump_header) - sizeof(uint32_t)) /
-		(2 * sizeof(uint32_t)))) {
-		CAM_ERR(CAM_UTIL, "num_values too large: %u", reg_read->num_values);
-		return -EOVERFLOW;
 	}
 
 	rc = cam_mem_get_cpu_buf(dump_args->buf_handle, &cpu_addr, &buf_len);

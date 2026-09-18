@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef CAM_ICP_HW_MGR_H
@@ -16,6 +16,7 @@
 #include "cam_hw_intf.h"
 #include "hfi_session_defs.h"
 #include "hfi_intf.h"
+#include "cam_req_mgr_workq.h"
 #include "cam_mem_mgr.h"
 #include "cam_smmu_api.h"
 #include "cam_soc_util.h"
@@ -29,9 +30,9 @@
 #define CAM_MAX_OUT_RES         14
 #define CAM_MAX_IN_RES          16
 
-#define ICP_WORKER_NUM_TASK      100
-#define ICP_WORKER_TASK_CMD_TYPE 1
-#define ICP_WORKER_TASK_MSG_TYPE 2
+#define ICP_WORKQ_NUM_TASK      100
+#define ICP_WORKQ_TASK_CMD_TYPE 1
+#define ICP_WORKQ_TASK_MSG_TYPE 2
 
 #define ICP_PACKET_SIZE         0
 #define ICP_PACKET_TYPE         1
@@ -47,6 +48,16 @@
 
 #define ICP_OVER_CLK_THRESHOLD  5
 #define ICP_TWO_DEV_BW_SHARE_RATIO 2
+
+#define CPAS_IPE0_BIT           0x1000
+#define CPAS_IPE1_BIT           0x2000
+#define CPAS_BPS_BIT            0x400
+#define CPAS_ICP_BIT            0x1
+#define CPAS_ICP1_BIT           0x4
+#define CPAS_OFE_BIT            0x10
+
+/* Used for targets >= 480 and its variants */
+#define CPAS_TITAN_IPE0_CAP_BIT 0x800
 
 #define CAM_ICP_CTX_STATE_IN_USE    0x1
 #define CAM_ICP_CTX_STATE_ACQUIRED  0x2
@@ -99,7 +110,6 @@ struct hfi_mini_dump_info;
  * @fw_uncached: Memory info for fw uncached nested region
  * @device: Memory info for the device region
  * @fw_uncached_region: region support for fw uncached
- * @device_mem_region: mem region support for device
  */
 struct icp_hfi_mem_info {
 	struct cam_mem_mgr_memory_desc qtbl;
@@ -121,7 +131,6 @@ struct icp_hfi_mem_info {
 	struct cam_smmu_region_info fw_uncached;
 	struct cam_smmu_region_info device;
 	bool fw_uncached_region;
-	bool device_mem_region;
 };
 
 /**
@@ -428,6 +437,7 @@ struct cam_icp_hw_ctx_data {
 	void *context_priv;
 	void *hw_mgr_priv;
 	struct cam_icp_hw_device_info *device_info;
+	struct mutex ctx_mutex;
 	uint32_t fw_handle;
 	uint32_t scratch_mem_size;
 	struct cam_icp_acquire_dev_info_unified *icp_dev_acquire_info;
@@ -473,9 +483,9 @@ struct cam_icp_hw_ctx_data {
  * @hfi_handle: hfi handle for this ICP hw mgr
  * @synx_core_id: Synx core ID if applicable
  * @hfi_mem: Memory for hfi
- * @cmd_worker_ctx: Worker ctx for hfi commands
- * @mgs_worker_ctx: Worker ctx for hfi messages
- * @timer_worker_ctx: Worker ctx for timer watchdog
+ * @cmd_work: Work queue for hfi commands
+ * @msg_work: Work queue for hfi messages
+ * @timer_work: Work queue for timer watchdog
  * @msg_buf: Drain Buffer for message data from firmware
  *           Buffer is an array of type __u32, total size
  *           would be sizeof(_u32) * queue_size
@@ -521,7 +531,6 @@ struct cam_icp_hw_ctx_data {
  * @num_secure_contexts: Number of the existing secure contexts
  * @enable_panic: debugfs bool to enable kernel panic upon FW fatal errors
  * @debug_llcc: this is to get the LLCC register status information
- * @enable_clock_dump: Flag to enable clock dumps upon FW response timeout
  */
 struct cam_icp_hw_mgr {
 	struct mutex hw_mgr_mutex;
@@ -541,9 +550,9 @@ struct cam_icp_hw_mgr {
 	int32_t hfi_handle;
 	enum cam_sync_synx_supported_cores synx_core_id;
 	struct icp_hfi_mem_info hfi_mem;
-	void *cmd_worker_ctx;
-	void *msg_worker_ctx;
-	void *timer_worker_ctx;
+	struct cam_req_mgr_core_workq *cmd_work;
+	struct cam_req_mgr_core_workq *msg_work;
+	struct cam_req_mgr_core_workq *timer_work;
 	uint32_t msg_buf[ICP_MSG_BUF_SIZE_IN_WORDS];
 	uint32_t dbg_buf[ICP_DBG_BUF_SIZE_IN_WORDS];
 	struct completion icp_complete;
@@ -581,7 +590,6 @@ struct cam_icp_hw_mgr {
 	uint32_t num_secure_contexts[CAM_ICP_MAX_NUM_OF_DEV_TYPES];
 	bool enable_panic;
 	bool debug_llcc;
-	bool enable_clock_dump;
 };
 
 /**

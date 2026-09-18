@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
 #include <clocksource/arm_arch_timer.h>
 #include "cam_common_util.h"
 #include "cam_sensor_util.h"
-#include "cam_packet_util.h"
 #include "cam_mem_mgr.h"
 #include "cam_res_mgr_api.h"
 #include "cam_mem_mgr_api.h"
@@ -638,12 +637,6 @@ int cam_sensor_i2c_command_parser(
 		CAM_DBG(CAM_SENSOR_UTIL, "Total cmd Buf in Bytes: %d",
 			cmd_desc[i].length);
 
-		rc = cam_packet_util_validate_cmd_desc(&cmd_desc[i]);
-		if (rc) {
-			CAM_ERR(CAM_SENSOR_UTIL, "Invalid cmd[%d] buf, rc: %d", i, rc);
-			return rc;
-		}
-
 		if (!cmd_desc[i].length)
 			continue;
 
@@ -1015,7 +1008,7 @@ int32_t cam_sensor_i2c_read_data(
 	struct camera_io_master *io_master_info)
 {
 	int32_t                   rc = 0;
-	struct i2c_settings_list  *i2c_list = NULL;
+	struct i2c_settings_list  *i2c_list;
 	uint32_t                  cnt = 0;
 	uint8_t                   *read_buff = NULL;
 	uint32_t                  buff_length = 0;
@@ -1328,7 +1321,7 @@ int cam_sensor_util_request_gpio_table(
 	uint8_t size = 0;
 	struct cam_soc_gpio_data *gpio_conf =
 			soc_info->gpio_data;
-	struct cam_soc_gpio *gpio_tbl = NULL;
+	struct gpio *gpio_tbl = NULL;
 
 	if (!gpio_conf) {
 		CAM_DBG(CAM_SENSOR_UTIL, "No GPIO data");
@@ -1390,7 +1383,7 @@ bool cam_sensor_util_check_gpio_is_shared(
 	uint8_t size = 0;
 	struct cam_soc_gpio_data *gpio_conf =
 			soc_info->gpio_data;
-	struct cam_soc_gpio *gpio_tbl = NULL;
+	struct gpio *gpio_tbl = NULL;
 
 	if (!gpio_conf) {
 		CAM_DBG(CAM_SENSOR_UTIL, "No GPIO data");
@@ -2953,11 +2946,6 @@ int cam_sensor_util_add_read_buf_to_list(struct list_head *read_buf_list,
 void cam_sensor_util_release_read_buf(struct list_head *read_buf_list)
 {
 	struct cam_sensor_read_buf_list *buf_list = NULL, *buf_next = NULL;
-
-	if (!read_buf_list) {
-		CAM_ERR(CAM_SENSOR_UTIL, "read_buf_list is NULL");
-		return;
-	}
 
 	list_for_each_entry_safe(buf_list, buf_next,
 		read_buf_list, list) {

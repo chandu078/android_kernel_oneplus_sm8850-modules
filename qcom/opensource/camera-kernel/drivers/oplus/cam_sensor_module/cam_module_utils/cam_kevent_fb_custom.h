@@ -90,3 +90,4 @@ extern const unsigned char *acquire_event_field(int excepId);
 			cam_olc_raise_exception(EXCEP_SOF_TIMEOUT, connext);				\
 	} while (0)
 #endif /*__CAM_KEVENT_FB_CUSTOM__*/
+

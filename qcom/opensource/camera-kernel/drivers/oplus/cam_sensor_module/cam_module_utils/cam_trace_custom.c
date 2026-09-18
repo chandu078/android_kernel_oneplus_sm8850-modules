@@ -43,3 +43,4 @@ pid_t get_camera_provider_pid(void)
 	return camera_provider_pid;
 }
 EXPORT_SYMBOL(get_camera_provider_pid);
+

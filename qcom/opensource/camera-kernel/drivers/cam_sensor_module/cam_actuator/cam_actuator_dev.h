@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2019, 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022, 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 
@@ -109,12 +109,13 @@ struct actuator_intf_params {
  * @act_info              : Sensor query cap structure
  * @of_node               : Node ptr
  * @last_flush_req        : Last request to flush
- * @worker_ctx            : worker ctx for actuator
+ * @workq                 : work queue for actuator
  * @actuator_park_mutex   : Mutex for actuator park
  * @cam_act_park_state    : Actuator park state
  * @is_deferred_park_lens : Flag to specify deferred park lens
  * @park_lens_complete    : Indicator for park lens complete
  * @read_buf_list         : Actuator register read cmd buffer handle list
+ * @read_buf_lock         : Actuator register read cmd buffer mutex
  */
 struct cam_actuator_ctrl_t {
 	char device_name[CAM_CTX_DEV_NAME_MAX_LENGTH];
@@ -131,11 +132,12 @@ struct cam_actuator_ctrl_t {
 	struct cam_actuator_query_cap act_info;
 	struct actuator_intf_params bridge_intf;
 	uint32_t last_flush_req;
-	void *worker_ctx;
+	struct cam_req_mgr_core_workq *workq;
 	struct mutex actuator_park_mutex;
 	bool is_deferred_park_lens;
 	struct completion park_lens_complete;
 	struct list_head read_buf_list;
+	struct mutex read_buf_lock;
 #ifdef OPLUS_FEATURE_CAMERA_COMMON
 	bool is_actuator_ready;
 	struct cam_sensor_i2c_reg_array poll_register;

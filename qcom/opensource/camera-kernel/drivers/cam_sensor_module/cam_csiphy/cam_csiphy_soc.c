@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "cam_csiphy_soc.h"
 #include "cam_csiphy_core.h"
-#include "include/cam_csiphy_1_2_3_hwreg.h"
 #include "include/cam_csiphy_2_1_0_hwreg.h"
 #include "include/cam_csiphy_2_1_1_hwreg.h"
 #include "include/cam_csiphy_2_1_2_hwreg.h"
@@ -15,8 +14,6 @@
 #include "include/cam_csiphy_2_2_1_hwreg.h"
 #include "include/cam_csiphy_2_3_0_hwreg.h"
 #include "include/cam_csiphy_2_4_0_hwreg.h"
-#include "include/cam_csiphy_2_4_1_hwreg.h"
-#include "include/cam_csiphy_2_4_2_hwreg.h"
 #include "cam_mem_mgr_api.h"
 #ifdef OPLUS_FEATURE_CAMERA_COMMON
 #include "include/cam_csiphy_2_4_0_hwreg_infiniti_main.h"
@@ -333,12 +330,7 @@ int32_t cam_csiphy_parse_dt_info(struct platform_device *pdev,
 
 	csiphy_dev->prgm_cmn_reg_across_csiphy = (bool) is_regulator_enable_sync;
 
-	if (of_device_is_compatible(soc_info->dev->of_node, "qcom,csiphy-v1.2.3")) {
-		csiphy_dev->ctrl_reg = &ctrl_reg_1_2_3;
-		csiphy_dev->hw_version = CSIPHY_VERSION_V123;
-		csiphy_dev->is_divisor_32_comp = true;
-		csiphy_dev->clk_lane = 0;
-	} else if (of_device_is_compatible(soc_info->dev->of_node, "qcom,csiphy-v2.1.0")) {
+	if (of_device_is_compatible(soc_info->dev->of_node, "qcom,csiphy-v2.1.0")) {
 		csiphy_dev->ctrl_reg = &ctrl_reg_2_1_0;
 		csiphy_dev->hw_version = CSIPHY_VERSION_V210;
 		csiphy_dev->is_divisor_32_comp = true;
@@ -378,17 +370,6 @@ int32_t cam_csiphy_parse_dt_info(struct platform_device *pdev,
 		csiphy_dev->hw_version = CSIPHY_VERSION_V240;
 		csiphy_dev->is_divisor_32_comp = true;
 		csiphy_dev->clk_lane = 0;
-	} else if (of_device_is_compatible(soc_info->dev->of_node, "qcom,csiphy-v2.4.1")) {
-		csiphy_dev->ctrl_reg = &ctrl_reg_2_4_1;
-		csiphy_dev->hw_version = CSIPHY_VERSION_V241;
-		csiphy_dev->is_divisor_32_comp = true;
-		csiphy_dev->clk_lane = 0;
-	} else if (of_device_is_compatible(soc_info->dev->of_node, "qcom,csiphy-v2.4.2")) {
-		csiphy_dev->ctrl_reg = &ctrl_reg_2_4_2;
-		csiphy_dev->hw_version = CSIPHY_VERSION_V242;
-		csiphy_dev->is_divisor_32_comp = true;
-		csiphy_dev->clk_lane = 0;
-
 #ifdef OPLUS_FEATURE_CAMERA_COMMON
 	} else if (of_device_is_compatible(soc_info->dev->of_node, "qcom,csiphy-infinitimain")) {
 		csiphy_dev->ctrl_reg = &ctrl_reg_2_4_0_infiniti_main;
