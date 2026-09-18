@@ -1,6 +1,5 @@
 # TODO
 # Add ddk module definition for frpc-trusted driver
-load(":repo_paths.bzl", "soc_label")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 
 load(
@@ -9,25 +8,24 @@ load(
     "ddk_module",
     "kernel_module",
     "kernel_modules_install",
-    "kernel_unstripped_modules_archive",
 )
 
 def define_modules(target, variant):
     kernel_build_variant = "{}_{}".format(target, variant)
 
     kernel_build = select({
-        "//build/qcom_build_extensions:qtisocrepo_true": soc_label("{}_base_kernel".format(kernel_build_variant)),
-        "//build/qcom_build_extensions:qtisocrepo_false": "//msm-kernel:{}".format(kernel_build_variant),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build_variant),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build_variant),
     })
     ddk_deps = select({
-        "//build/qcom_build_extensions:qtisocrepo_true":[
-            soc_label("all_headers"),
-            soc_label("{}/drivers/firmware/qcom/qcom-scm".format(kernel_build_variant)),
-            soc_label("{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(kernel_build_variant)),
-            soc_label("{}/drivers/soc/qcom/pdr_interface".format(kernel_build_variant)),
-            soc_label("{}/drivers/rpmsg/qcom_glink".format(kernel_build_variant)),
+        "//build/kernel/kleaf:socrepo_true":[
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}/drivers/firmware/qcom/qcom-scm".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/pdr_interface".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/rpmsg/qcom_glink".format(kernel_build_variant),
         ],
-        "//build/qcom_build_extensions:qtisocrepo_false": ["//msm-kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
 
     # Path to dsp folder from soc-repo/include/trace directory
@@ -42,13 +40,13 @@ def define_modules(target, variant):
             "dsp/fastrpc_rpmsg.c",
             "dsp/fastrpc_shared.h",
             "dsp/fastrpc_trace.h",
-            "dsp/fastrpc_sysfs.c",
+            "dsp/fastrpc_sysfs.c"
         ],
         local_defines = ["DSP_TRACE_INCLUDE_PATH={}".format(trace_include_path)],
         out = "frpc-adsprpc.ko",
         hdrs = [
             "include/uapi/misc/fastrpc.h",
-            "include/linux/fastrpc.h",
+            "include/linux/fastrpc.h"
         ],
         includes = [
             "include/linux",
@@ -72,18 +70,18 @@ def define_vm_modules(target, variant):
     kernel_build_variant = "{}_{}".format(target, variant)
 
     kernel_build = select({
-        "//build/qcom_build_extensions:qtisocrepo_true": soc_label("{}_base_kernel".format(kernel_build_variant)),
-        "//build/qcom_build_extensions:qtisocrepo_false": "//msm-kernel:{}".format(kernel_build_variant),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build_variant),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build_variant),
     })
 
     deps = select({
-        "//build/qcom_build_extensions:qtisocrepo_true": [
-            soc_label("all_headers"),
-            soc_label("{}/drivers/firmware/qcom/qcom-scm".format(kernel_build_variant)),
-            soc_label("{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(kernel_build_variant)),
-            soc_label("{}/drivers/dma-buf/heaps/qcom_dma_heaps".format(kernel_build_variant)),
+        "//build/kernel/kleaf:socrepo_true": [
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}/drivers/firmware/qcom/qcom-scm".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(kernel_build_variant),
+            "//vendor/qcom/kernel:{}/drivers/dma-buf/heaps/qcom_dma_heaps".format(kernel_build_variant),
             ] ,
-        "//build/qcom_build_extensions:qtisocrepo_false": ["//msm-kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
 
     # Path to dsp folder from soc-repo/include/trace directory
@@ -98,16 +96,16 @@ def define_vm_modules(target, variant):
             "dsp/fastrpc_socket.c",
             "dsp/fastrpc_shared.h",
             "dsp/fastrpc_trace.h",
-            "dsp/fastrpc_sysfs.c",
+            "dsp/fastrpc_sysfs.c"
         ],
         local_defines = [
             "DSP_TRACE_INCLUDE_PATH={}".format(trace_include_path),
-            "CONFIG_QCOM_FASTRPC_TRUSTED=1",
+            "CONFIG_QCOM_FASTRPC_TRUSTED=1"
         ],
         out = "frpc-trusted-adsprpc.ko",
         hdrs = [
             "include/uapi/misc/fastrpc.h",
-            "include/linux/fastrpc.h",
+            "include/linux/fastrpc.h"
         ],
         includes = [
             "include/linux",
@@ -115,29 +113,14 @@ def define_vm_modules(target, variant):
         ],
     )
 
-    kernel_unstripped_modules_archive(
-        name = "{}_fastrpc_unstripped_modules_tar".format(kernel_build_variant),
-        kernel_build = kernel_build,
-        kernel_modules = [":{}_frpc-trusted-adsprpc".format(kernel_build_variant)],
-    )
-
     copy_to_dist_dir(
         name = "{}_dsp-kernel_dist".format(kernel_build_variant),
         data = [
             ":{}_frpc-trusted-adsprpc".format(kernel_build_variant),
-            ":{}_fastrpc_unstripped_modules_tar".format(kernel_build_variant),
         ],
         dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
         flat = True,
         wipe_dist_dir = False,
         allow_duplicate_filenames = False,
         mode_overrides = {"**/*": "644"},
-    )
-
-def define_target_modules():
-    # Creates a ddk_headers that exposes the FastRPC UAPI header with public visibility
-    ddk_headers(
-        name = "frpc_uapi_headers",
-        hdrs = native.glob(["include/uapi/misc/fastrpc.h"]),
-        visibility = ["//visibility:public"]
     )

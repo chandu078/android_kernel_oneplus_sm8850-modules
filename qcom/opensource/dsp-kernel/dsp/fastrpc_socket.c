@@ -214,7 +214,8 @@ struct fastrpc_channel_ctx* get_current_channel_ctx(struct device *dev)
 
 	if (scctx)
 		return scctx;
-	scctx = kvzalloc(sizeof(*scctx), GFP_KERNEL);
+
+	scctx = kzalloc(sizeof(*scctx), GFP_KERNEL);
 	if (IS_ERR_OR_NULL(scctx)) {
 		dev_err(dev, "failed to get channel ctx\n");
 		return ERR_PTR(-ENOMEM);
@@ -589,8 +590,10 @@ int fastrpc_transport_init(void)
 	struct frpc_transport_session_control *session_control = NULL;
 	struct workqueue_struct *wq = NULL;
 
-	if (!scctx)
-		return -ENOMEM;
+	if (!scctx) {
+		err = -ENOMEM;
+		goto bail;
+	}
 
 	session_control = &scctx->session_control;
 	session_control->remote_server_online = false;
@@ -632,7 +635,7 @@ bail:
 	if (err) {
 		kfree(scctx->domain);
 		scctx->domain = NULL;
-		kvfree(scctx);
+		kfree(scctx);
 		scctx = NULL;
 		pr_err("fastrpc_transport_init failed with err %d\n", err);
 	}

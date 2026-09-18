@@ -29,7 +29,7 @@ int fastrpc_setup_service_locator(struct fastrpc_channel_ctx *cctx, char *client
 					char *service_name, char *service_path, int spd_session);
 void fastrpc_register_wakeup_source(struct device *dev,
 	const char *client_name, struct wakeup_source **device_wake_source);
-int fastrpc_mmap_remove_ssr(struct fastrpc_channel_ctx *cctx);
+int fastrpc_mmap_remove_ssr(struct fastrpc_channel_ctx *cctx, bool is_pdr);
 void fastrpc_queue_pd_status(struct fastrpc_user *fl, int domain, int status, int sessionid);
 void frpc_coredump(struct fastrpc_channel_ctx *cctx,
 	struct list_head *active_users_list);
@@ -139,12 +139,6 @@ void ssr_timer_callback(struct timer_list *timer)
 
 	ssr_handler->domain_id = cctx->domain_id;
 
-	if (ctx->fl && cctx->domain)
-		pr_info("%s: Hang in process caused %s SSR by process %s, pid %d,"
-				"pid_frpc %d, tid %d, handle 0x%x, sc 0x%x\n",
-			__func__, cctx->domain->name, ctx->fl->name, ctx->fl->tgid_app,
-			ctx->fl->tgid_frpc, ctx->pid, ctx->handle, ctx->sc);
-
 	spin_unlock_irqrestore(&cctx->lock, flags);
 	fastrpc_channel_ctx_put(cctx);
 
@@ -157,6 +151,56 @@ void ssr_timer_callback(struct timer_list *timer)
 bail:
 	spin_unlock_irqrestore(&cctx->lock, flags);
 	fastrpc_channel_ctx_put(cctx);
+}
+
+/*
+ * Retrieves legacy information for a given fastrpc_domain.
+ *
+ * This function maps the domain's type to its corresponding legacy name
+ * and ID, based on the following table:
+ *
+ *   Domain Type       | Legacy Name              | Legacy ID
+ *   ------------------|--------------------------|---------------
+ *   SDSP              | domains[SDSP_DOMAIN_ID]  | SDSP_DOMAIN_ID
+ *   LPASS             | domains[ADSP_DOMAIN_ID]  | ADSP_DOMAIN_ID
+ *   NSP(instance 0)   | domains[CDSP_DOMAIN_ID]  | CDSP_DOMAIN_ID
+ *   NSP(instance 1)   | domains[CDSP1_DOMAIN_ID] | CDSP1_DOMAIN_ID
+ *
+ * @param domain Pointer to the fastrpc_domain structure to retrieve
+ * legacy info
+ *
+ * @return 0 on success, or a negative error code on failure
+ *
+ * Error codes:
+ *   -EINVAL: Invalid domain type
+ */
+static int fastrpc_retrieve_legacy_info(struct fastrpc_domain *domain)
+{
+	int err = 0;
+
+	switch (domain->type) {
+	case FASTRPC_SDSP:
+		domain->legacy_name = (char *)legacy_domains[SDSP_DOMAIN_ID];
+		domain->legacy_id = SDSP_DOMAIN_ID;
+		break;
+	case FASTRPC_LPASS:
+		domain->legacy_name = (char *)legacy_domains[ADSP_DOMAIN_ID];
+		domain->legacy_id = ADSP_DOMAIN_ID;
+		break;
+	case FASTRPC_NSP:
+		if (domain->instance_id == 0) {
+			domain->legacy_name = (char *)legacy_domains[CDSP_DOMAIN_ID];
+			domain->legacy_id = CDSP_DOMAIN_ID;
+		} else if (domain->instance_id == 1) {
+			domain->legacy_name = (char *)legacy_domains[CDSP1_DOMAIN_ID];
+			domain->legacy_id = CDSP1_DOMAIN_ID;
+		}
+		break;
+	default:
+		err = -EINVAL;
+		break;
+	}
+	return err;
 }
 
 /*
@@ -251,6 +295,10 @@ static int fastrpc_configure_device_nodes(struct fastrpc_channel_ctx *data,
 		return err;
 
 	if (domain->legacy) {
+		err = fastrpc_retrieve_legacy_info(domain);
+		if (err)
+			return err;
+
 		/* Register a secure device with legacy name */
 		err = fastrpc_device_register(rdev, data, true, true,
 			domain->legacy_name);
@@ -337,7 +385,8 @@ static int fastrpc_rpmsg_probe(struct rpmsg_device *rpdev)
 		vmcount = 0;
 	else if (!qcom_scm_is_available())
 		return -EPROBE_DEFER;
-	data = kvzalloc(sizeof(*data), GFP_KERNEL);
+
+	data = kzalloc(sizeof(*data), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
 
@@ -438,12 +487,12 @@ static int fastrpc_rpmsg_probe(struct rpmsg_device *rpdev)
 fdev_error:
 	if (data->default_user)
 		fastrpc_channel_default_user_delete(data);
+	kfree(data);
 
 populate_error:
 	if (data->fdevice)
 		misc_deregister(&data->fdevice->miscdev);
 
-	kvfree(data);
 	return err;
 }
 
@@ -511,8 +560,6 @@ static void fastrpc_rpmsg_remove(struct rpmsg_device *rpdev)
 			user->sessionid);
 		fastrpc_notify_users(user);
 	}
-	if (cctx->default_user)
-		fastrpc_notify_users(cctx->default_user);
 	spin_unlock_irqrestore(&cctx->lock, flags);
 	fastrpc_remove_device_nodes(cctx);
 	for (i = 0; i < FASTRPC_MAX_SPD; i++) {
@@ -556,7 +603,7 @@ static void fastrpc_rpmsg_remove(struct rpmsg_device *rpdev)
 	dev_info(cctx->dev, "Closing rpmsg channel for %s", cctx->domain->name);
 	kfree(cctx->gidlist.gids);
 	of_platform_depopulate(&rpdev->dev);
-	fastrpc_mmap_remove_ssr(cctx);
+	fastrpc_mmap_remove_ssr(cctx, false);
 	cctx->dev = NULL;
 	cctx->rpdev = NULL;
 	cctx->domain = NULL;

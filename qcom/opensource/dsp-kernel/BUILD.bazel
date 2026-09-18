@@ -7,7 +7,7 @@ package(
     ],
 )
 
-load(":define_modules.bzl", "define_modules", "define_vm_modules", "define_target_modules")
+load(":define_modules.bzl", "define_modules", "define_vm_modules")
 
 define_modules("pineapple", "consolidate")
 
@@ -32,18 +32,6 @@ define_vm_modules("canoe-oemvm", "debug-defconfig")
 
 define_vm_modules("canoe-tuivm", "defconfig")
 define_vm_modules("canoe-oemvm", "defconfig")
-
-define_vm_modules("seraph-tuivm", "debug-defconfig")
-define_vm_modules("seraph-oemvm", "debug-defconfig")
-
-define_vm_modules("seraph-tuivm", "defconfig")
-define_vm_modules("seraph-oemvm", "defconfig")
-
-define_vm_modules("pikachu-tuivm", "debug-defconfig")
-define_vm_modules("pikachu-oemvm", "debug-defconfig")
-
-define_vm_modules("pikachu-tuivm", "defconfig")
-define_vm_modules("pikachu-oemvm", "defconfig")
 
 define_modules("tuna", "consolidate")
 
@@ -73,28 +61,6 @@ define_modules("alor", "perf")
 
 define_modules("alor", "consolidate")
 
-define_modules("hamoa", "perf")
+define_modules("x1p42100", "perf")
 
-define_modules("hamoa", "consolidate")
-
-define_modules("chora", "perf")
-
-define_modules("chora", "consolidate")
-
-define_modules("alor-le", "debug-defconfig")
-
-define_modules("alor-le", "defconfig")
-
-define_modules("malabar", "consolidate")
-
-define_modules("malabar", "perf")
-
-define_modules("hamoa_la", "consolidate")
-
-define_modules("hamoa_la", "perf")
-
-define_modules("mahua", "consolidate")
-
-define_modules("mahua", "perf")
-
-define_target_modules()
+define_modules("x1p42100", "consolidate")

@@ -56,33 +56,6 @@ enum fastrpc_map_flags {
 	FASTRPC_MAP_MAX,
 };
 
-/**
- * @enum fastrpc_map_attrs - attributes for mapping and unmapping
- * memory on DSP user process
- */
-enum fastrpc_map_attrs {
-	/** Default attribute for all map and unmap requests */
-	FASTRPC_MAP_ATTR_DEFAULT = 0,
-
-	/** Attribute for memory protection of buffers */
-	FASTRPC_ATTR_SECUREMAP = 1,
-
-	/** Attributes for buffers with no virtual address */
-	FASTRPC_ATTR_NOVA = 256,
-
-	/**
-	 * When set during buffer mapping, it reserves the IOVA region so it
-	 * remains reserved after unmapping also.
-	 * When set during unmapping, it removes only the IOMMU mapping while
-	 * keeping the IOVA reserved for future reuse during subsequent
-	 * mappings of the same buffer.
-	 */
-	FASTRPC_MAP_ATTR_RETAIN_IOVA = 1024,
-
-	/** Always keep this as the last member */
-	FASTRPC_MAP_ATTR_MAX,
-};
-
 /* Types of DSP available */
 enum fastrpc_dsp_type {
 	FASTRPC_NSP =  1,
@@ -109,6 +82,10 @@ enum fastrpc_proc_attr {
 	/* Macro for system unsigned PD */
 	FASTRPC_MODE_SYSTEM_UNSIGNED_PD	= 1 << 17,
 };
+
+/* Fastrpc attribute for memory protection of buffers */
+#define FASTRPC_ATTR_SECUREMAP	(1)
+#define FASTRPC_ATTR_NOVA		(256)
 
 struct fastrpc_invoke_args {
 	__u64 ptr;
@@ -154,9 +131,6 @@ enum fastrpc_multimode_invoke_type {
 	FASTRPC_INVOKE_REMOTE_PROCESS_STATE_DUMP = 10,
 	FASTRPC_INVOKE_SET_RPC_TIMEOUT = 11,
 	FASTRPC_INVOKE_DISABLE_DSP_RECOVERY = 12,
-#ifdef VERBOSE_LOG
-	FASTRPC_INVOKE_RETRIEVE_KERNEL_LOG = 13,
-#endif
 };
 
 struct fastrpc_init_create {
@@ -209,8 +183,7 @@ struct fastrpc_mem_unmap {
 	__s32 fd;		/* fd */
 	__u64 vaddr;		/* remote process (dsp) virtual address */
 	__u64 length;		/* buffer size */
-	__u32 attr;		/* Attributes for FD */
-	__s32 reserved[4];
+	__s32 reserved[5];
 };
 
 /* Types of context manage requests */
@@ -273,19 +246,6 @@ struct fastrpc_internal_proc_timeout {
 	__u32 reserved[FASTRPC_RPC_TIMEOUT_IOCTL_RSVD];
 };
 
-#ifdef VERBOSE_LOG
-/* Payload for FASTRPC_INVOKE_KERNEL_LOG_RETRIEVE type */
-struct fastrpc_ioctl_kernel_log {
-	/*
-	 * User-space address of buffer where kernel log data
-	 * will be copied to
-	 */
-	__u64 buffer;
-	/* Size of the buffer in bytes */
-	__u32 buffer_size;
-};
-#endif
-
 enum fastrpc_control_type {
 	FASTRPC_CONTROL_LATENCY		=	1,
 	FASTRPC_CONTROL_SMMU		=	2,
@@ -326,13 +286,13 @@ struct fastrpc_ioctl_capability {
 
 enum fastrpc_perfkeys {
 	PERF_COUNT = 0,
-	PERF_FLUSH = 1,
+	PERF_RESERVED1 = 1,
 	PERF_MAP = 2,
 	PERF_COPY = 3,
 	PERF_LINK = 4,
 	PERF_GETARGS = 5,
 	PERF_PUTARGS = 6,
-	PERF_INVARGS = 7,
+	PERF_RESERVED2 = 7,
 	PERF_INVOKE = 8,
 	PERF_RESERVED3 = 9,
 	PERF_KEY_MAX = 10,
