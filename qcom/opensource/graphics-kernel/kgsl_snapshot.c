@@ -4,12 +4,14 @@
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
-#include <linux/devcoredump.h>
 #include <linux/of.h>
 #include <linux/panic_notifier.h>
 #include <linux/slab.h>
 #include <linux/utsname.h>
 #include <linux/vmalloc.h>
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+#include <linux/string.h>
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
 
 #include "adreno_cp_parser.h"
 #include "kgsl_device.h"
@@ -542,10 +544,9 @@ static void kgsl_device_snapshot_atomic(struct kgsl_device *device)
 	if (device->snapshot && device->force_panic)
 		return;
 
-	if (!kgsl_state_is_awake(device)) {
-		dev_err(device->dev, "snapshot: device is powered off\n");
+	if (WARN(!kgsl_state_is_awake(device),
+		"snapshot: device is powered off\n"))
 		return;
-	}
 
 	if (device->snapshot_memory_atomic.ptr)
 		goto snapshot;
@@ -563,8 +564,8 @@ static void kgsl_device_snapshot_atomic(struct kgsl_device *device)
 					device->snapshot_memory_atomic.size, GFP_ATOMIC);
 
 		/* If we fail to allocate more than 1MB fall back to 1MB */
-		if ((!device->snapshot_memory_atomic.ptr) &&
-			device->snapshot_memory_atomic.size > SZ_1M) {
+		if (WARN_ON((!device->snapshot_memory_atomic.ptr) &&
+			device->snapshot_memory_atomic.size > SZ_1M)) {
 			device->snapshot_memory_atomic.size = SZ_1M;
 			device->snapshot_memory_atomic.ptr = devm_kzalloc(&device->pdev->dev,
 					device->snapshot_memory_atomic.size, GFP_ATOMIC);
@@ -620,6 +621,46 @@ snapshot:
 	dev_err(device->dev, "Atomic GPU snapshot created at pa %llx++0x%zx\n",
 			atomic_snapshot_phy_addr(device), snapshot->size);
 }
+
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+/************************************************
+adreno.h
+#define ADRENO_SOFT_FAULT BIT(0)
+#define ADRENO_HARD_FAULT BIT(1)
+#define ADRENO_TIMEOUT_FAULT BIT(2)
+#define ADRENO_IOMMU_PAGE_FAULT BIT(3)
+#define ADRENO_PREEMPT_FAULT BIT(4)
+#define ADRENO_GMU_FAULT BIT(5)
+#define ADRENO_CTX_DETATCH_TIMEOUT_FAULT BIT(6)
+#define ADRENO_GMU_FAULT_SKIP_SNAPSHOT BIT(7)
+*************************************************/
+char* kgsl_get_reason(int faulttype, bool gmu_fault) {
+	if(gmu_fault) {
+		return "GMUFAULT";
+	} else {
+		switch(faulttype) {
+			case 0:
+				return "SOFTFAULT";
+			case 1:
+				return "HANGFAULT";
+			case 2:
+				return "TIMEOUTFAULT";
+			case 3:
+				return "IOMMUPAGEFAULT";
+			case 4:
+				return "PREEMPTFAULT";
+			case 5:
+				return "GMUFAULT";
+			case 6:
+				return "CTXDETATCHFAULT";
+			case 7:
+				return "GMUSKIPFAULT";
+			default:
+				return "UNKNOW";
+		}
+	}
+}
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
 
 /**
  * kgsl_device_snapshot() - construct a device snapshot
@@ -722,6 +763,16 @@ void kgsl_device_snapshot(struct kgsl_device *device,
 	kgsl_add_to_minidump("GPU_SNAPSHOT", (u64) device->snapshot_memory.ptr,
 			snapshot_phy_addr(device), device->snapshot_memory.size);
 
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+	if (context!= NULL) {
+		dev_err(device->dev, "falut=%s, pid=%d, processname=%s\n",
+			kgsl_get_reason(device->snapshotfault, gmu_fault), pid_nr(context->proc_priv->pid), context->proc_priv->comm);
+		memset(snapshot->snapshot_hashid, '\0', sizeof(snapshot->snapshot_hashid));
+		scnprintf(snapshot->snapshot_hashid, sizeof(snapshot->snapshot_hashid), "%d@%s@%s",
+		pid_nr(context->proc_priv->pid), context->proc_priv->comm, kgsl_get_reason(device->snapshotfault, gmu_fault));
+	}
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
+
 	if (device->skip_ib_capture)
 		BUG_ON(device->force_panic);
 
@@ -803,36 +854,57 @@ static int snapshot_release(struct kgsl_device *device,
 	return ret;
 }
 
-static ssize_t kgsl_snapshot_do_read(struct kgsl_snapshot *snapshot,
-	char *buf, loff_t off, size_t count)
-{
-	struct kgsl_snapshot_section_header head;
-	struct snapshot_obj_itr itr;
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+static bool snapshot_control_on = 0;
+
+static ssize_t snapshot_control_show(struct kgsl_device *device, char *buf) {
+	return snprintf(buf, PAGE_SIZE, "%d\n", device->snapshot_control);
+}
+
+static ssize_t snapshot_control_store(struct kgsl_device *device,
+				const char *buf, size_t count) {
+	unsigned int val = 0;
 	int ret;
 
-	obj_itr_init(&itr, buf, off, count);
+	if (device && count > 0)
+		device->snapshot_control = 0;
 
-	ret = obj_itr_out(&itr, snapshot->start, snapshot->size);
-	if (ret == 0)
-		goto out;
-
-	/* Dump the memory pool if it exists */
-	if (snapshot->mempool) {
-		ret = obj_itr_out(&itr, snapshot->mempool,
-				snapshot->mempool_size);
-		if (ret == 0)
-			goto out;
+	ret = kgsl_sysfs_store(buf, &val);
+	if (!ret && device) {
+		device->snapshot_control = (bool)val;
+		snapshot_control_on = device->snapshot_control;
 	}
 
-	head.magic = SNAPSHOT_SECTION_MAGIC;
-	head.id = KGSL_SNAPSHOT_SECTION_END;
-	head.size = sizeof(head);
-
-	obj_itr_out(&itr, &head, sizeof(head));
-
-out:
-	return itr.write;
+	return (ssize_t) ret < 0 ? ret : count;
 }
+
+static ssize_t snapshot_hashid_show(struct kgsl_device *device, char *buf) {
+	if (device->snapshot == NULL)
+		return 0;
+	return strscpy(buf, device->snapshot->snapshot_hashid, PAGE_SIZE);
+}
+
+static ssize_t minidump_test_store(struct kgsl_device *device,
+				const char *buf, size_t count) {
+	unsigned int fault_type = 0;
+	int ret = 0;
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+
+	if (adreno_dev == NULL)
+		return count;
+
+	if (count > 0) {
+		ret = kgsl_sysfs_store(buf, &fault_type);
+		if (!ret) {
+			kgsl_pwrctrl_set_state(device, KGSL_STATE_ACTIVE);
+			adreno_scheduler_fault(adreno_dev, fault_type);
+			dev_err(device->dev, "gpu minidump: gpu minidump trigger, fault_type = %d\n", fault_type);
+		}
+	}
+
+	return (ssize_t) ret < 0 ? ret : count;
+}
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
 
 /* Dump the sysfs binary data to the user */
 static ssize_t snapshot_show(struct file *filep, struct kobject *kobj,
@@ -841,8 +913,16 @@ static ssize_t snapshot_show(struct file *filep, struct kobject *kobj,
 {
 	struct kgsl_device *device = kobj_to_device(kobj);
 	struct kgsl_snapshot *snapshot;
-	ssize_t written;
+	struct kgsl_snapshot_section_header head;
+	struct snapshot_obj_itr itr;
 	int ret = 0;
+
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+	if (snapshot_control_on) {
+		dev_err(device->dev, "snapshot: snapshot_control_on is true, skip snapshot\n");
+		return 0;
+	}
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
 
 	kgsl_mutex_lock(&device->mutex);
 	snapshot = device->snapshot;
@@ -880,15 +960,36 @@ static ssize_t snapshot_show(struct file *filep, struct kobject *kobj,
 		return ret;
 	}
 
-	written = kgsl_snapshot_do_read(snapshot, buf, off, count);
+	obj_itr_init(&itr, buf, off, count);
+
+	ret = obj_itr_out(&itr, snapshot->start, snapshot->size);
+	if (ret == 0)
+		goto done;
+
+	/* Dump the memory pool if it exists */
+	if (snapshot->mempool) {
+		ret = obj_itr_out(&itr, snapshot->mempool,
+				snapshot->mempool_size);
+		if (ret == 0)
+			goto done;
+	}
+
+	{
+		head.magic = SNAPSHOT_SECTION_MAGIC;
+		head.id = KGSL_SNAPSHOT_SECTION_END;
+		head.size = sizeof(head);
+
+		obj_itr_out(&itr, &head, sizeof(head));
+	}
 
 	/*
 	 * Make sure everything has been written out before destroying things.
 	 * The best way to confirm this is to go all the way through without
 	 * writing any bytes - so only release if we get this far and
-	 * written is 0 and there are no concurrent reads pending
+	 * itr->write is 0 and there are no concurrent reads pending
 	 */
-	if (written == 0) {
+
+	if (itr.write == 0) {
 		bool snapshot_free = false;
 
 		kgsl_mutex_lock(&device->mutex);
@@ -904,8 +1005,9 @@ static ssize_t snapshot_show(struct file *filep, struct kobject *kobj,
 		return 0;
 	}
 
+done:
 	ret = snapshot_release(device, snapshot);
-	return (ret < 0) ? ret : written;
+	return (ret < 0) ? ret : itr.write;
 }
 
 /* Show the total number of hangs since device boot */
@@ -969,9 +1071,6 @@ static ssize_t prioritize_unrecoverable_store(
 		struct kgsl_device *device, const char *buf, size_t count)
 {
 	int ret;
-
-	if (IS_ENABLED(CONFIG_QCOM_KGSL_DEVCOREDUMP))
-		return -EOPNOTSUPP;
 
 	ret = kstrtobool(buf, &device->prioritize_unrecoverable);
 	return ret ? ret : count;
@@ -1045,6 +1144,12 @@ static SNAPSHOT_ATTR(snapshot_legacy, 0644, snapshot_legacy_show,
 static SNAPSHOT_ATTR(skip_ib_capture, 0644, skip_ib_capture_show,
 		skip_ib_capture_store);
 
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+static SNAPSHOT_ATTR(snapshot_hashid, 0644, snapshot_hashid_show, NULL);
+static SNAPSHOT_ATTR(snapshot_control, 0644, snapshot_control_show, snapshot_control_store);
+static SNAPSHOT_ATTR(minidump_test, 0644, NULL, minidump_test_store);
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
+
 static ssize_t snapshot_sysfs_show(struct kobject *kobj,
 	struct attribute *attr, char *buf)
 {
@@ -1107,46 +1212,6 @@ static int kgsl_panic_notifier_callback(struct notifier_block *nb,
 	return NOTIFY_OK;
 }
 
-static ssize_t kgsl_devcoredump_read(char *buf, loff_t off,
-	size_t count, void *data, size_t datalen)
-{
-	struct kgsl_device *device = data;
-	struct kgsl_snapshot *snapshot;
-	ssize_t written;
-
-	snapshot = device->snapshot;
-	if (!snapshot)
-		return 0;
-
-	written = kgsl_snapshot_do_read(snapshot, buf, off, count);
-	return written;
-}
-
-/*
- * Note: kgsl_devcoredump_read() and kgsl_devcoredump_free() are not
- * called concurrently. Devcoredump framework maintains a reference count
- * to ensure that free is called only after all readers have finished.
- */
-static void kgsl_devcoredump_free(void *data)
-{
-	struct kgsl_device *device = data;
-	struct kgsl_snapshot *snapshot;
-
-	snapshot = device->snapshot;
-	device->snapshot = NULL;
-
-	if (snapshot)
-		kgsl_free_snapshot(snapshot);
-}
-
-static void kgsl_devcoredump(struct kgsl_device *device)
-{
-	/* Dump the snapshot through coredump when config is enabled */
-	if (IS_ENABLED(CONFIG_QCOM_KGSL_DEVCOREDUMP))
-		dev_coredumpm(device->dev, THIS_MODULE, device, 0, GFP_KERNEL,
-			kgsl_devcoredump_read, kgsl_devcoredump_free);
-}
-
 void kgsl_device_snapshot_probe(struct kgsl_device *device, u32 size)
 {
 	device->snapshot_memory.size = size;
@@ -1176,6 +1241,10 @@ void kgsl_device_snapshot_probe(struct kgsl_device *device, u32 size)
 	device->snapshot_crashdumper = true;
 	device->snapshot_legacy = false;
 
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+	device->snapshot_control = 0;
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
+
 	device->snapshot_atomic = false;
 	device->panic_nb.notifier_call = kgsl_panic_notifier_callback;
 	device->panic_nb.priority = 1;
@@ -1192,14 +1261,13 @@ void kgsl_device_snapshot_probe(struct kgsl_device *device, u32 size)
 		&device->dev->kobj, "snapshot"))
 		return;
 
-	/*
-	 * When using coredump, the snapshot sysfs nodes will not be initialized
-	 * as the snapshot data is handled through the devcoredump framework
-	 * instead of the traditional sysfs interface.
-	 */
-	if (!IS_ENABLED(CONFIG_QCOM_KGSL_DEVCOREDUMP))
-		WARN_ON(sysfs_create_bin_file(&device->snapshot_kobj, &snapshot_attr));
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+	WARN_ON(sysfs_create_file(&device->snapshot_kobj, &attr_snapshot_hashid.attr));
+	WARN_ON(sysfs_create_file(&device->snapshot_kobj, &attr_snapshot_control.attr));
+	WARN_ON(sysfs_create_file(&device->snapshot_kobj, &attr_minidump_test.attr));
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
 
+	WARN_ON(sysfs_create_bin_file(&device->snapshot_kobj, &snapshot_attr));
 	WARN_ON(sysfs_create_files(&device->snapshot_kobj, snapshot_attrs));
 	atomic_notifier_chain_register(&panic_notifier_list,
 			&device->panic_nb);
@@ -1223,12 +1291,14 @@ void kgsl_device_snapshot_close(struct kgsl_device *device)
 	atomic_notifier_chain_unregister(&panic_notifier_list,
 					 &device->panic_nb);
 
-	if (!IS_ENABLED(CONFIG_QCOM_KGSL_DEVCOREDUMP))
-		sysfs_remove_bin_file(&device->snapshot_kobj, &snapshot_attr);
-
+	sysfs_remove_bin_file(&device->snapshot_kobj, &snapshot_attr);
 	sysfs_remove_files(&device->snapshot_kobj, snapshot_attrs);
 
 	kobject_put(&device->snapshot_kobj);
+
+#ifdef CONFIG_OPLUS_GPU_MINIDUMP
+	device->snapshot_control = 0;
+#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
 
 	if (device->snapshot_memory.dma_handle)
 		dma_free_coherent(&device->pdev->dev, device->snapshot_memory.size,
@@ -1375,5 +1445,4 @@ gmu_only:
 	BUG_ON(!snapshot->device->skip_ib_capture &&
 				snapshot->device->force_panic);
 	complete_all(&snapshot->dump_gate);
-	kgsl_devcoredump(snapshot->device);
 }

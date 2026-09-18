@@ -122,11 +122,7 @@ struct adreno_hwsched {
 	/** @mem_alloc_entries: Number of entries in the memory allocation table */
 	u32 mem_alloc_entries;
 	/** @mutex: Mutex needed to run dispatcher function */
-#if IS_ENABLED(CONFIG_QCOM_KGSL_RT_MUTEX)
-	struct rt_mutex mutex;
-#else
 	struct mutex mutex;
-#endif
 	/** @flags: Container for the dispatcher internal flags */
 	unsigned long flags;
 	/** @inflight: Number of active submissions to the dispatch queues */
@@ -481,15 +477,4 @@ void adreno_hwsched_reset_hfi_mem(struct adreno_device *adreno_dev);
  * Return: Zero on success or negative error on failure
  */
 int adreno_hwsched_context_init(struct adreno_context *drawctxt);
-
-/*
- * adreno_hwsched_retire_cmdlist_obj - helper function for cleaning up cmd_list_obj
- * @adreno_dev: Pointer to the adreno device
- * @obj: pointer to cmd_list_obj
- *
- * Helper function to remove node from cmd_list.
- *
- */
-void adreno_hwsched_retire_cmdlist_obj(struct adreno_device *adreno_dev,
-	struct cmd_list_obj *obj);
 #endif

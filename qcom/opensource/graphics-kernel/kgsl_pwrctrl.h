@@ -53,6 +53,8 @@ struct kgsl_pwr_constraint {
 	unsigned long expires;
 	uint32_t owner_id;
 	u32 owner_timestamp;
+	pid_t owner_tid;
+	char owner_comm[TASK_COMM_LEN];
 };
 
 /**
@@ -73,22 +75,6 @@ struct kgsl_pwrlevel {
 	u32 cx_level;
 	/** @voltage_level: Voltage level used by the GMU to vote RPMh */
 	u32 voltage_level;
-};
-
-/**
- * struct kgsl_trans_stats - GPU frequency transition statistics
- */
-struct kgsl_trans_stats {
-	/** @trans_table: Transition count matrix indexed by [from_level][to_level] */
-	u64 trans_table[KGSL_MAX_PWRLEVELS][KGSL_MAX_PWRLEVELS];
-	/** @total_trans: Total number of GPU frequency transitions recorded */
-	u64 total_trans;
-	/** @time_in_pwrlevel: Time spent at each power level in usec for trans_stat */
-	u64 time_in_pwrlevel[KGSL_MAX_PWRLEVELS];
-	/** @last_time_updated: Timestamp of last trans_stat time update */
-	ktime_t last_time_updated;
-	/** @lock: Spinlock to protect transition table updates */
-	spinlock_t lock;
 };
 
 /**
@@ -223,16 +209,10 @@ struct kgsl_pwrctrl {
 	struct kthread_work cooling_work;
 	/** @update_dcvs_table: Set when the dcvs table needs an update for GMU */
 	bool update_dcvs_table;
-	/** @stats_lock: Spinlock for updating pwr stats */
-	spinlock_t stats_lock;
+	/** @mutex: Mutex to protect pwrctrl entities */
+	struct mutex mutex;
 	/** @aggr_max_pwrlevel: Aggregated max allowed gpu pwrlevel **/
 	u32 aggr_max_pwrlevel;
-	/** @accum_busy_stats: Accumulated gpu busy time */
-	u64 accum_busy_stats;
-	/** @accum_total_time: Accumulated gpu total sampling time */
-	u64 accum_total_time;
-	/** @trans_stats: GPU frequency transition statistics */
-	struct kgsl_trans_stats trans_stats;
 };
 
 int kgsl_pwrctrl_init(struct kgsl_device *device);

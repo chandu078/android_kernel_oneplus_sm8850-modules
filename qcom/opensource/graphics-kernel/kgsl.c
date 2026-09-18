@@ -27,8 +27,6 @@
 #include <soc/qcom/of_common.h>
 #include <soc/qcom/secure_buffer.h>
 
-#include "adreno.h"
-
 #include "kgsl_compat.h"
 #include "kgsl_debugfs.h"
 #include "kgsl_device.h"
@@ -41,6 +39,12 @@
 #include "kgsl_sysfs.h"
 #include "kgsl_trace.h"
 #include "kgsl_util.h"
+
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_OSVELTE)
+#include <mm_osvelte/sys-memstat.h>
+#include <mm_osvelte/common.h>
+#endif /* CONFIG_OPLUS_FEATURE_MM_OSVELTE */
+
 /* Instantiate tracepoints */
 #define CREATE_TRACE_POINTS
 #include "kgsl_power_trace.h"
@@ -594,14 +598,6 @@ static void kgsl_mem_entry_detach_process(struct kgsl_mem_entry *entry)
 		atomic_sub(entry->memdesc.page_count,
 					&entry->priv->unpinned_page_count);
 
-	if (TEST_FLAG(KGSL_MEMDESC_MIGRATED, &entry->memdesc.priv)) {
-		atomic_sub(entry->memdesc.page_count,
-					&entry->priv->migrated_page_count);
-
-		if (IS_ENABLED(CONFIG_QCOM_KGSL_HYBRID_ALLOCATION))
-			set_bit(KGSL_PROC_CAN_MIGRATE, &entry->priv->state);
-	}
-
 	kgsl_process_private_put(entry->priv);
 
 	entry->priv = NULL;
@@ -652,6 +648,100 @@ static void kgsl_context_debug_info(struct kgsl_device *device)
 {
 }
 #endif
+
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_OSVELTE)
+
+void dump_kgsl_process_mem_detail(struct kgsl_process_private *priv);
+
+static int kgsl_procinfo_show(struct seq_file *s, void *unused)
+{
+	struct kgsl_process_private *p;
+	int type = KGSL_MEM_ENTRY_KERNEL;
+
+	seq_printf(s, "%-5s %-8s %-8s %-8s\n",
+		   "pid", "size", "mapped", "comm");
+
+	read_lock(&kgsl_driver.proclist_lock);
+	list_for_each_entry(p, &kgsl_driver.process_list, list) {
+		seq_printf(s, "%-5d %-8lld %-8lld %-16s\n", pid_nr(p->pid),
+			   atomic64_read(&p->stats[type].cur) / SZ_1K,
+			   atomic64_read(&p->gpumem_mapped) / SZ_1K, p->comm);
+	}
+	read_unlock(&kgsl_driver.proclist_lock);
+
+	seq_printf(s, "\nTotal %zu kB\n",
+		   atomic_long_read(&kgsl_driver.stats.page_alloc) / SZ_1K);
+	return 0;
+}
+DEFINE_PROC_SHOW_ATTRIBUTE(kgsl_procinfo);
+
+long read_kgsl_mem_usage(enum mtrack_subtype type)
+{
+	if (type == MTRACK_GPU_TOTAL)
+		return atomic_long_read(&kgsl_driver.stats.page_alloc) >> PAGE_SHIFT;
+
+	return 0;
+}
+
+void dump_kgsl_usage_stat(bool verbose)
+{
+	uint64_t sz = 0;
+	uint64_t max_sz = 0;
+	struct kgsl_process_private *p = NULL;
+	struct kgsl_process_private *max_sz_of_proc = NULL;
+	int type = KGSL_MEM_ENTRY_KERNEL;
+	osvelte_info("======= %s\n", __func__);
+	osvelte_info("%-16s %-5s size\n", "comm", "pid");
+	read_lock(&kgsl_driver.proclist_lock);
+	list_for_each_entry(p, &kgsl_driver.process_list, list) {
+		sz = atomic64_read(&p->stats[type].cur);
+		if (sz >= max_sz) {
+			max_sz = sz;
+			max_sz_of_proc = p;
+		}
+		osvelte_info("%-16s %-5d %lld\n", p->comm, pid_nr(p->pid), sz / SZ_1K);
+	}
+	if (kgsl_process_private_get(max_sz_of_proc) == 0) {
+		read_unlock(&kgsl_driver.proclist_lock);
+		return;
+	}
+
+	read_unlock(&kgsl_driver.proclist_lock);
+	if (max_sz >= SZ_2G) {
+		osvelte_info(
+			"%-5d is max usage and over 2G, its memtype detail is blow\n",
+			pid_nr(max_sz_of_proc->pid));
+		dump_kgsl_process_mem_detail(max_sz_of_proc);
+	}
+	kgsl_process_private_put(max_sz_of_proc);
+}
+
+long read_pid_kgsl_mem_usage(enum mtrack_subtype mtype, pid_t pid)
+{
+	struct kgsl_process_private *p;
+	int type = KGSL_MEM_ENTRY_KERNEL;
+	unsigned long sz = 0;
+
+	if (unlikely(mtype != MTRACK_GPU_PROC_KERNEL))
+		return 0;
+
+	read_lock(&kgsl_driver.proclist_lock);
+	list_for_each_entry(p, &kgsl_driver.process_list, list) {
+		if (pid_nr(p->pid) == pid) {
+			sz = atomic64_read(&p->stats[type].cur) >> PAGE_SHIFT;
+			break;
+		}
+	}
+	read_unlock(&kgsl_driver.proclist_lock);
+	return sz;
+}
+
+static struct mtrack_debugger kgsl_mtrack_debugger = {
+	.mem_usage = read_kgsl_mem_usage,
+	.pid_mem_usage = read_pid_kgsl_mem_usage,
+	.dump_usage_stat = dump_kgsl_usage_stat,
+};
+#endif /* CONFIG_OPLUS_FEATURE_MM_OSVELTE */
 
 /**
  * kgsl_context_dump() - dump information about a draw context
@@ -888,7 +978,10 @@ kgsl_context_destroy(struct kref *kref)
 			trace_kgsl_constraint(device,
 				device->pwrctrl.constraint.type,
 				device->pwrctrl.active_pwrlevel,
-				0, 0, device->pwrctrl.constraint.owner_id);
+				0, 0,
+				device->pwrctrl.constraint.owner_id,
+				device->pwrctrl.constraint.owner_tid,
+				device->pwrctrl.constraint.owner_comm);
 			device->pwrctrl.constraint.type = KGSL_CONSTRAINT_NONE;
 		}
 
@@ -985,6 +1078,10 @@ static void kgsl_destroy_process_private(struct kref *kref)
 			struct kgsl_process_private, refcount);
 	struct kgsl_device *device = KGSL_MMU_DEVICE(private->pagetable->mmu);
 
+	if (private->profile.md.gmuaddr)
+		gmu_core_free_block(device, &private->profile.md);
+
+	kgsl_put_work_period(private->period);
 	/*
 	 * While removing sysfs entries, kernfs_mutex is held by sysfs apis. Since
 	 * it is a global fs mutex, sometimes it takes longer for kgsl to get hold
@@ -993,6 +1090,7 @@ static void kgsl_destroy_process_private(struct kref *kref)
 	 * mutex to avoid wasting re-tries when kgsl is waiting for kernfs mutex.
 	 */
 	mutex_lock(&kgsl_driver.process_mutex);
+
 	debugfs_remove_recursive(private->debug_root);
 	kobject_put(&private->kobj_memtype);
 	kobject_put(&private->kobj);
@@ -1007,7 +1105,6 @@ static void kgsl_destroy_process_private(struct kref *kref)
 	write_unlock(&kgsl_driver.proclist_lock);
 	mutex_unlock(&kgsl_driver.process_mutex);
 
-	kgsl_put_work_period(private->period);
 	kfree(private->cmdline);
 	put_pid(private->pid);
 	idr_destroy(&private->mem_idr);
@@ -1016,16 +1113,6 @@ static void kgsl_destroy_process_private(struct kref *kref)
 	/* When using global pagetables, do not put global pagetable */
 	if (private->pagetable->name != KGSL_MMU_GLOBAL_PT)
 		kgsl_mmu_putpagetable(private->pagetable);
-
-
-	if (private->profile.md.gmuaddr) {
-		/*
-		 * This calls iommu_unmap(), which may take variable amount of time to
-		 * complete. So do this at the very end of process private cleanup, so that
-		 * this doesn't delay the clean up of rest of the process private resources.
-		 */
-		gmu_core_free_block(device, &private->profile.md);
-	}
 
 	kfree(private);
 }
@@ -1151,7 +1238,7 @@ static void _log_gpu_work_events(struct work_struct *work)
 
 static void kgsl_work_period_timer(struct timer_list *t)
 {
-	struct kgsl_device *device = kgsl_timer_container_of(device, t, work_period_timer);
+	struct kgsl_device *device = from_timer(device, t, work_period_timer);
 
 	queue_work(kgsl_driver.lockless_workqueue, &device->work_period_ws);
 }
@@ -1355,7 +1442,7 @@ static struct kgsl_process_private *kgsl_process_private_open(
 	 * private destroy is triggered but didn't complete. Retry creating
 	 * process private after sometime to allow previous destroy to complete.
 	 */
-	for (i = 0; (PTR_ERR_OR_ZERO(private) == -EEXIST) && (i < 1000); i++) {
+	for (i = 0; (PTR_ERR_OR_ZERO(private) == -EEXIST) && (i < 50); i++) {
 		usleep_range(10, 100);
 		private = _process_private_open(device);
 	}
@@ -4263,7 +4350,6 @@ struct kgsl_mem_entry *gpumem_alloc_entry(
 	struct kgsl_process_private *private = dev_priv->process_priv;
 	struct kgsl_mem_entry *entry;
 	struct kgsl_device *device = dev_priv->device;
-	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	u32 cachemode;
 
 	/* For 32-bit kernel world nothing to do with this flag */
@@ -4292,14 +4378,6 @@ struct kgsl_mem_entry *gpumem_alloc_entry(
 	/* For now only allow allocations up to 4G */
 	if (size == 0 || size > UINT_MAX)
 		return ERR_PTR(-EINVAL);
-
-	/*
-	 * Apply WB cache policy to prevent data inconsistency for A622.
-	 * A622 requires writeback cache policy to maintain coherency between
-	 * CPU and GPU memory accesses.
-	 */
-	if (adreno_is_a622(adreno_dev))
-		flags |= FIELD_PREP(KGSL_CACHEMODE_MASK, KGSL_CACHEMODE_WRITEBACK);
 
 	flags = kgsl_filter_cachemode(flags);
 
@@ -4334,11 +4412,8 @@ struct kgsl_mem_entry *gpumem_alloc_entry(
 			!(cachemode == KGSL_CACHEMODE_WRITETHROUGH)) ||
 			(!(flags & KGSL_MEMFLAGS_IOCOHERENT) &&
 			 !(cachemode == KGSL_CACHEMODE_WRITEBACK) &&
-			!(cachemode == KGSL_CACHEMODE_WRITETHROUGH)))) {
+			!(cachemode == KGSL_CACHEMODE_WRITETHROUGH))))
 		SET_FLAG(KGSL_MEMDESC_CAN_RECLAIM, &entry->memdesc.priv);
-		if (IS_ENABLED(CONFIG_QCOM_KGSL_HYBRID_ALLOCATION))
-			set_bit(KGSL_PROC_CAN_MIGRATE, &private->state);
-	}
 
 	kgsl_process_add_stats(private,
 			kgsl_memdesc_usermem_type(&entry->memdesc),
@@ -4653,17 +4728,9 @@ kgsl_mmap_memstore(struct file *file, struct kgsl_device *device,
 static void kgsl_gpumem_vm_open(struct vm_area_struct *vma)
 {
 	struct kgsl_mem_entry *entry = vma->vm_private_data;
-	int ret;
 
-	if (!kgsl_mem_entry_get(entry)) {
+	if (!kgsl_mem_entry_get(entry))
 		vma->vm_private_data = NULL;
-		return;
-	}
-
-	/* Protected by the mmap lock */
-	ret = idr_alloc(&entry->memdesc.vma_idr, vma, 1, 0, GFP_KERNEL);
-	if (ret < 0)
-		CLEAR_FLAG(KGSL_MEMDESC_CAN_RECLAIM, &entry->memdesc.priv);
 
 	atomic_inc(&entry->map_count);
 }
@@ -4684,29 +4751,17 @@ kgsl_gpumem_vm_fault(struct vm_fault *vmf)
 static void
 kgsl_gpumem_vm_close(struct vm_area_struct *vma)
 {
-	struct kgsl_mem_entry *entry = vma->vm_private_data;
-	struct kgsl_memdesc *memdesc;
-	struct vm_area_struct *mapped_vma;
-	int vidx = 0;
+	struct kgsl_mem_entry *entry  = vma->vm_private_data;
 
 	if (!entry)
 		return;
 
-	memdesc = &entry->memdesc;
 	/*
 	 * Remove the memdesc from the mapped stat once all the mappings have
 	 * gone away
 	 */
 	if (!atomic_dec_return(&entry->map_count))
-		atomic64_sub(memdesc->size, &entry->priv->gpumem_mapped);
-
-	/* Protected by the mmap lock */
-	idr_for_each_entry(&memdesc->vma_idr, mapped_vma, vidx) {
-		if (mapped_vma == vma) {
-			idr_remove(&memdesc->vma_idr, vidx);
-			break;
-		}
-	}
+		atomic64_sub(entry->memdesc.size, &entry->priv->gpumem_mapped);
 
 	kgsl_mem_entry_put(entry);
 }
@@ -5016,11 +5071,6 @@ static int kgsl_mmap(struct file *file, struct vm_area_struct *vma)
 		vma->vm_file = get_file(entry->memdesc.shmem_filp);
 	}
 
-	/* Protected by the mmap lock */
-	ret = idr_alloc(&entry->memdesc.vma_idr, vma, 1, 0, GFP_KERNEL);
-	if (ret < 0)
-		CLEAR_FLAG(KGSL_MEMDESC_CAN_RECLAIM, &entry->memdesc.priv);
-
 	/*
 	 * kgsl gets the entry id or the gpu address through vm_pgoff.
 	 * It is used during mmap and never needed again. But this vm_pgoff
@@ -5282,14 +5332,10 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 	if (status)
 		return status;
 
-	status = gmu_core_init(device);
-	if (status)
-		goto error_gmu_core;
-
 	/* Can return -EPROBE_DEFER */
 	status = kgsl_pwrctrl_init(device);
 	if (status)
-		goto error_pwrctrl;
+		goto error;
 
 	device->events_worker = kthread_create_worker(0, "kgsl-events");
 
@@ -5333,9 +5379,7 @@ error_pwrctrl_close:
 		kthread_destroy_worker(device->events_worker);
 
 	kgsl_pwrctrl_close(device);
-error_pwrctrl:
-	gmu_core_close(device);
-error_gmu_core:
+error:
 	_unregister_device(device);
 	return status;
 }
@@ -5356,7 +5400,6 @@ void kgsl_device_platform_remove(struct kgsl_device *device)
 	kgsl_free_globals(device);
 
 	kgsl_pwrctrl_close(device);
-	gmu_core_close(device);
 
 	kgsl_device_debugfs_close(device);
 	_unregister_device(device);
@@ -5405,6 +5448,11 @@ void kgsl_core_exit(void)
 		ARRAY_SIZE(kgsl_driver.devp));
 
 	sysstats_unregister_kgsl_stats_cb();
+
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_OSVELTE)
+	unregister_mtrack_debugger(MTRACK_GPU, &kgsl_mtrack_debugger);
+	unregister_mtrack_procfs(MTRACK_GPU, "procinfo");
+#endif /* CONFIG_OPLUS_FEATURE_MM_OSVELTE */
 }
 
 int __init kgsl_core_init(void)
@@ -5529,6 +5577,11 @@ int __init kgsl_core_init(void)
 	sysstats_register_kgsl_stats_cb(kgsl_get_stats);
 
 	KGSL_BOOT_MARKER("KGSL Ready");
+
+#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_OSVELTE)
+	register_mtrack_debugger(MTRACK_GPU, &kgsl_mtrack_debugger);
+	register_mtrack_procfs(MTRACK_GPU, "procinfo", 0444, &kgsl_procinfo_proc_ops, NULL);
+#endif /* CONFIG_OPLUS_FEATURE_MM_OSVELTE */
 
 	return 0;
 

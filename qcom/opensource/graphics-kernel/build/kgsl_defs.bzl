@@ -1,7 +1,6 @@
-load(":repo_paths.bzl", "modules_label", "soc_label")
-load("//build/kernel/kleaf:kernel.bzl", "ddk_module", "ddk_headers")
+load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
-load(":build/target_variants.bzl", "get_all_variants")
+load(":build/target_variants.bzl", "get_all_la_variants")
 
 msm_kgsl_includes = [
     "include/linux/msm_kgsl.h",
@@ -93,35 +92,23 @@ def external_deps(target, variant):
     # Add msm_hw_fence in the dependency and defconfig lists for targets that use it
     if target in [ "pineapple" ]:
         deplist = deplist + [
-            modules_label("qcom/opensource/mm-drivers/hw_fence:{}_msm_hw_fence".format(tv)),
-            modules_label("qcom/opensource/mm-drivers/hw_fence:hw_fence_headers")
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/hw_fence:{}_msm_hw_fence".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/hw_fence:hw_fence_headers"
             ]
         defconfigs = defconfigs + [
-            modules_label("qcom/opensource/mm-drivers/hw_fence:defconfig")
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/hw_fence:defconfig"
             ]
 
     # Add synx-kernel in the dependency list for targets that use it for hardware fences
-    if target in [ "sun", "niobe", "seraph", "canoe", "alor-le" ]:
+    if target in [ "sun", "niobe", "seraph", "canoe" ]:
         deplist = deplist + [
-            modules_label("qcom/opensource/synx-kernel:{}_modules".format(tv)),
-            modules_label("qcom/opensource/synx-kernel:synx_headers")
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:{}_modules".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:synx_headers"
             ]
 
-    if target in [
-        "monaco",
-        "parrot",
-        "vienna",
-        "vienna-le",
-        "lahaina",
-        "art",
-        "bengal",
-        "bengal-le",
-        "chora",
-        "malabar",
-        "shikra"
-        ]:
+    if target in [ "monaco", "parrot", "vienna", "lahaina" ]:
         deplist = deplist + [
-            modules_label("qcom/opensource/mm-drivers/hw_fence:hw_fence_headers")
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/hw_fence:hw_fence_headers"
             ]
 
     native.genrule(
@@ -140,41 +127,42 @@ def define_target_variant_module(target, variant):
     if target in [ "neo-la" ]:
         kernel_build = select({
             "//build/kernel/kleaf:microxr_kernel_build_true": "//:target_kernel_build",
-            "//build/kernel/kleaf:socrepo_true": soc_label("{}_base_kernel".format(tv)),
-            "//conditions:default": "//msm-kernel:{}".format(tv),
+            "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
+            "//conditions:default": "//vendor/qcom/kernel:{}".format(tv),
         })
     else:
         kernel_build = select({
-            "//build/kernel/kleaf:socrepo_true": soc_label("{}_base_kernel".format(tv)),
-            "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+            "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
+            "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(tv),
         })
 
     ext_deps = external_deps(target, variant)
 
     ddk_deps = select({
                 "//build/kernel/kleaf:socrepo_true": [
-                  soc_label("all_headers"),
-                  soc_label("{}/drivers/clk/qcom/clk-qcom".format(tv)),
-                  soc_label("{}/drivers/devfreq/governor_msm_adreno_tz".format(tv)),
-                  soc_label("{}/drivers/firmware/qcom/qcom-scm".format(tv)),
-                  soc_label("{}/drivers/hwtracing/coresight/coresight".format(tv)),
-                  soc_label("{}/drivers/iommu/qcom_iommu_util".format(tv)),
-                  soc_label("{}/drivers/remoteproc/qcom_q6v5_pas".format(tv)),
-                  soc_label("{}/drivers/soc/qcom/cmd-db".format(tv)),
-                  soc_label("{}/drivers/soc/qcom/dcvs/qcom-dcvs".format(tv)),
-                  soc_label("{}/drivers/soc/qcom/llcc-qcom".format(tv)),
-                  soc_label("{}/drivers/soc/qcom/mdt_loader".format(tv)),
-                  soc_label("{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(tv)),
-                  soc_label("{}/drivers/soc/qcom/minidump".format(tv)),
-                  soc_label("{}/drivers/soc/qcom/msm_performance".format(tv)),
-                  soc_label("{}/drivers/soc/qcom/qcom_aoss".format(tv)),
-                  soc_label("{}/drivers/soc/qcom/qcom_va_minidump".format(tv)),
-                  soc_label("{}/drivers/soc/qcom/secure_buffer".format(tv)),
-                  soc_label("{}/drivers/soc/qcom/socinfo".format(tv)),
-                  soc_label("{}/kernel/msm_sysstats".format(tv)),
-                  #"//vendor/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
+                  "//vendor/qcom/kernel:all_headers",
+                  "//vendor/qcom/kernel:{}/drivers/clk/qcom/clk-qcom".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/devfreq/governor_msm_adreno_tz".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/firmware/qcom/qcom-scm".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/hwtracing/coresight/coresight".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/iommu/qcom_iommu_util".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/remoteproc/qcom_q6v5_pas".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/cmd-db".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/dcvs/qcom-dcvs".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/llcc-qcom".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/mdt_loader".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/minidump".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/msm_performance".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_aoss".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/secure_buffer".format(tv),
+                  "//vendor/qcom/kernel:{}/drivers/soc/qcom/socinfo".format(tv),
+                  "//vendor/qcom/kernel:{}/kernel/msm_sysstats".format(tv),
+                  "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
+                  "//vendor/qcom/sm8850-modules/oplus/kernel/mm:oplus_bsp_mm_osvelte".format(tv),
                 ],
-                "//build/kernel/kleaf:socrepo_false": [ "//msm-kernel:all_headers" ],
+                "//build/kernel/kleaf:socrepo_false": [ "//vendor/qcom/kernel:all_headers" ],
         })
 
     ddk_module(
@@ -193,16 +181,17 @@ def define_target_variant_module(target, variant):
                 "adreno_a6xx_coresight.c",
                 "adreno_gen7_coresight.c",
                 "adreno_gen8_coresight.c"] },
-            "CONFIG_QCOM_KGSL_POOL": { True: [ "kgsl_pool.c" ] },
             "CONFIG_QCOM_KGSL_PROCESS_RECLAIM": { True: [ "kgsl_reclaim.c" ] },
+            "CONFIG_QCOM_KGSL_USE_SHMEM": { False: [ "kgsl_pool.c" ] },
             "CONFIG_SYNC_FILE": { True: [ "kgsl_sync.c" ] },
             "CONFIG_DEVFREQ_GOV_QCOM_ADRENO_TZ": { False: [ "governor_msm_adreno_tz.c" ] },
             "CONFIG_DEVFREQ_GOV_QCOM_GPUBW_MON": { False: [ "governor_gpubw_mon.c" ] }
         },
         deps = ddk_deps + ext_deps,
+        copts = ["-DCONFIG_OPLUS_FEATURE_GEAS_GPU"],
         includes = ["include", "."],
         kernel_build = kernel_build,
-        visibility = ["//visibility:private"]
+        visibility = ["//visibility:public"]
     )
 
     copy_to_dist_dir(
@@ -217,11 +206,5 @@ def define_target_variant_module(target, variant):
     )
 
 def define_target_modules():
-        ddk_headers(
-            name = "kgsl_uapi_headers",
-            hdrs = native.glob(["include/uapi/linux/*.h"]),
-            visibility = ["//visibility:public"]
-        )
-
-        for target, variant in get_all_variants():
+        for target, variant in get_all_la_variants():
                 define_target_variant_module(target, variant)

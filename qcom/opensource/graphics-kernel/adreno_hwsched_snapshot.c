@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2024-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "adreno.h"
@@ -286,7 +286,6 @@ void adreno_hwsched_snapshot_preemption_records(struct kgsl_device *device,
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	u64 offset = 0, ctxt_record_size = md->size;
 	u64 rb0_ctxt_record_size = PAGE_ALIGN(adreno_dev->total_ctxt_record_sz);
-	u64 curr_gmem_size = adreno_gmem_size(adreno_dev);
 	int i;
 
 	if (ADRENO_FEATURE(adreno_dev, ADRENO_DEFER_GMEM_ALLOC)) {
@@ -302,7 +301,7 @@ void adreno_hwsched_snapshot_preemption_records(struct kgsl_device *device,
 	if (md->size == (rb0_ctxt_record_size * KGSL_PRIORITY_MAX_RB_LEVELS)) {
 		do_div(ctxt_record_size, KGSL_PRIORITY_MAX_RB_LEVELS);
 	} else {
-		rb0_ctxt_record_size -= PAGE_ALIGN(curr_gmem_size);
+		rb0_ctxt_record_size -= PAGE_ALIGN(adreno_dev->gpucore->gmem_size);
 		ctxt_record_size -= rb0_ctxt_record_size;
 		do_div(ctxt_record_size, KGSL_PRIORITY_MAX_RB_LEVELS - 1);
 	}

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2002,2007-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
-*/
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ */
 
 #include <linux/interconnect.h>
 #include <linux/sched/clock.h>
@@ -14,7 +14,6 @@
 #include "adreno_ringbuffer.h"
 #include "adreno_trace.h"
 #include "kgsl_trace.h"
-#include "kgsl_util.h"
 
 
 #define RB_HOSTPTR(_rb, _pos) \
@@ -155,7 +154,7 @@ int adreno_ringbuffer_setup(struct adreno_device *adreno_dev,
 
 void adreno_preemption_timer(struct timer_list *t)
 {
-	struct adreno_preemption *preempt = kgsl_timer_container_of(preempt, t, timer);
+	struct adreno_preemption *preempt = from_timer(preempt, t, timer);
 	struct adreno_device *adreno_dev = container_of(preempt,
 						struct adreno_device, preempt);
 
@@ -181,9 +180,13 @@ void adreno_drawobj_set_constraint(struct kgsl_device *device,
 	if (device->host_based_dcvs &&
 		context->pwr_constraint.type &&
 		((context->flags & KGSL_CONTEXT_PWR_CONSTRAINT) ||
-			(drawobj->flags & KGSL_CONTEXT_PWR_CONSTRAINT)))
+			(drawobj->flags & KGSL_CONTEXT_PWR_CONSTRAINT))) {
+		context->pwr_constraint.owner_tid = context->tid;
+		strscpy(context->pwr_constraint.owner_comm,
+			_context_comm(context), TASK_COMM_LEN);
 		kgsl_pwrctrl_set_constraint(device, &context->pwr_constraint,
 					context->id, drawobj->timestamp);
+	}
 
 	if (context->l3_pwr_constraint.type &&
 		((context->flags & KGSL_CONTEXT_PWR_CONSTRAINT) ||
@@ -226,7 +229,8 @@ void adreno_drawobj_set_constraint(struct kgsl_device *device,
 			if (!ret) {
 				trace_kgsl_constraint(device,
 					KGSL_CONSTRAINT_L3_PWRLEVEL, new_l3, 1, 0,
-					context->id);
+					context->id, context->tid,
+					_context_comm(context));
 				device->cur_l3_pwrlevel = new_l3;
 			} else {
 				dev_err_ratelimited(device->dev,

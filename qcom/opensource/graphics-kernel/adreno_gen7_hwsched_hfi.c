@@ -761,12 +761,8 @@ static void gen7_process_syncobj_query_work(struct kthread_work *work)
 	struct cmd_list_obj *obj;
 	bool missing = true;
 
-	kgsl_mutex_lock(&hwsched->mutex);
+	mutex_lock(&hwsched->mutex);
 	kgsl_mutex_lock(&device->mutex);
-
-	/* If context is bad, we don't care about the sync object query */
-	if (kgsl_context_is_bad(context))
-		goto unlock;
 
 	list_for_each_entry(obj, &hwsched->cmd_list, node) {
 		struct kgsl_drawobj *drawobj = obj->drawobj;
@@ -800,9 +796,8 @@ static void gen7_process_syncobj_query_work(struct kthread_work *work)
 		}
 	}
 
-unlock:
 	kgsl_mutex_unlock(&device->mutex);
-	kgsl_mutex_unlock(&hwsched->mutex);
+	mutex_unlock(&hwsched->mutex);
 
 	kgsl_context_put(context);
 	kfree(query_work);
@@ -1031,7 +1026,7 @@ static void gen7_defer_hw_fence_work(struct kthread_work *work)
 	 * Grab the dispatcher and device mutex as we don't want to race with concurrent fault
 	 * recovery
 	 */
-	kgsl_mutex_lock(&adreno_dev->hwsched.mutex);
+	mutex_lock(&adreno_dev->hwsched.mutex);
 	kgsl_mutex_lock(&device->mutex);
 
 	spin_lock(&hwf->lock);
@@ -1060,7 +1055,7 @@ static void gen7_defer_hw_fence_work(struct kthread_work *work)
 
 unlock:
 	kgsl_mutex_unlock(&device->mutex);
-	kgsl_mutex_unlock(&adreno_dev->hwsched.mutex);
+	mutex_unlock(&adreno_dev->hwsched.mutex);
 }
 
 static int _check_hw_fence_ack_failure(struct kgsl_device *device, u32 *result)
@@ -2461,7 +2456,7 @@ static void gen7_hwsched_hw_fence_timeout(struct work_struct *work)
 
 static void gen7_hwsched_hw_fence_timer(struct timer_list *t)
 {
-	struct gen7_hwsched_hfi *hfi = kgsl_timer_container_of(hfi, t, hw_fence_timer);
+	struct gen7_hwsched_hfi *hfi = from_timer(hfi, t, hw_fence_timer);
 
 	kgsl_schedule_work(&hfi->hw_fence_ws);
 }
@@ -2872,7 +2867,7 @@ static void move_detached_context_hardware_fences(struct adreno_device *adreno_d
 	struct adreno_hw_fence_entry *entry, *tmp;
 	struct gen7_hwsched_hfi *hfi = to_gen7_hwsched_hfi(adreno_dev);
 
-	spin_lock(&drawctxt->lock);
+	/* We don't need the drawctxt lock here because this context has already been detached */
 	list_for_each_entry_safe(entry, tmp, &drawctxt->hw_fence_inflight_list, node) {
 		struct gmu_context_queue_header *hdr =  drawctxt->gmu_context_queue.hostptr;
 
@@ -2884,8 +2879,6 @@ static void move_detached_context_hardware_fences(struct adreno_device *adreno_d
 
 		adreno_hwsched_remove_hw_fence_entry(adreno_dev, entry);
 	}
-
-	spin_unlock(&drawctxt->lock);
 
 	/* Also grab all the hardware fences which were never sent to GMU */
 	list_for_each_entry_safe(entry, tmp, &drawctxt->hw_fence_list, node) {
@@ -2933,28 +2926,22 @@ static int check_detached_context_hardware_fences(struct adreno_device *adreno_d
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	struct adreno_hw_fence_entry *entry, *tmp;
 	int ret = 0;
-	u32 id, ts, fence_ts;
 
-	spin_lock(&drawctxt->lock);
+	/* We don't need the drawctxt lock because this context has been detached */
 	list_for_each_entry_safe(entry, tmp, &drawctxt->hw_fence_inflight_list, node) {
 		struct gmu_context_queue_header *hdr =  drawctxt->gmu_context_queue.hostptr;
 
 		if ((timestamp_cmp((u32)entry->cmd.ts, hdr->out_fence_ts) > 0)) {
-			id = drawctxt->base.id;
-			ts = (u32)entry->cmd.ts;
-			fence_ts = hdr->out_fence_ts;
-
-			spin_unlock(&drawctxt->lock);
 			dev_err(GMU_PDEV_DEV(device),
 				"detached ctx:%d has unsignaled fence ts:%d retired:%d\n",
-			       id, ts, fence_ts);
+				drawctxt->base.id, (u32)entry->cmd.ts, hdr->out_fence_ts);
 			ret = -EINVAL;
 			goto fault;
 		}
 		adreno_hwsched_remove_hw_fence_entry(adreno_dev, entry);
 	}
 
-	spin_unlock(&drawctxt->lock);
+
 	return drain_context_hw_fence_gmu(adreno_dev, drawctxt);
 
 fault:
@@ -3611,7 +3598,7 @@ static void destroy_detached_context_inflight_hw_fences(struct adreno_device *ad
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	struct adreno_hw_fence_entry *entry, *tmp;
 
-	spin_lock(&drawctxt->lock);
+	/* We don't need the drawctxt lock because this context has been detached */
 	list_for_each_entry_safe(entry, tmp, &drawctxt->hw_fence_inflight_list, node) {
 		struct gmu_context_queue_header *hdr =  drawctxt->gmu_context_queue.hostptr;
 
@@ -3622,7 +3609,6 @@ static void destroy_detached_context_inflight_hw_fences(struct adreno_device *ad
 		}
 		adreno_hwsched_remove_hw_fence_entry(adreno_dev, entry);
 	}
-	spin_unlock(&drawctxt->lock);
 }
 
 /* We don't want to unnecessarily wake the GMU to trigger hardware fences */
@@ -3714,7 +3700,7 @@ static int send_context_unregister_hfi(struct adreno_device *adreno_dev,
 	}
 
 	ret = adreno_hwsched_ctxt_unregister_wait_completion(adreno_dev,
-		GMU_PDEV_DEV(device), context, &pending_ack, gen7_hwsched_process_msgq, &cmd);
+		GMU_PDEV_DEV(device), &pending_ack, gen7_hwsched_process_msgq, &cmd);
 	if (ret) {
 		trigger_context_unregister_fault(adreno_dev, drawctxt);
 		goto done;
@@ -3737,7 +3723,6 @@ void gen7_hwsched_context_detach(struct adreno_context *drawctxt)
 	struct kgsl_device *device = context->device;
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	int ret = 0;
-	struct gmu_context_queue_header *hdr = drawctxt->gmu_context_queue.hostptr;
 
 	kgsl_mutex_lock(&device->mutex);
 
@@ -3755,16 +3740,6 @@ void gen7_hwsched_context_detach(struct adreno_context *drawctxt)
 
 	adreno_profile_process_results(adreno_dev);
 	context->gmu_registered = false;
-
-	/*
-	 * Update the sync object timestamp so that pending sync objects from this context can be
-	 * released
-	 */
-	if (hdr)
-		hdr->sync_obj_ts = drawctxt->syncobj_timestamp;
-
-	/* Trigger scheduler to retire draw objects from this detached context */
-	adreno_scheduler_queue(adreno_dev);
 
 out:
 	WARN_RATELIMIT(!list_empty(&drawctxt->hw_fence_list) ||

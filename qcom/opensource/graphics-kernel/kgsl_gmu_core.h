@@ -49,7 +49,6 @@ enum gmu_platform_capabilities {
 	FAC_RBBM_INTERRUPTS_HANDLE_ALL = 4,
 	FAC_FORCE_RETIRE_COMMAND = 5,
 	FAC_SOFT_RESET = 6,
-	FAC_FAST_CONTEXT_DESTROY = 7,
 };
 
 /*
@@ -231,8 +230,6 @@ enum gmu_vrb_idx {
 	VRB_CTXRECORD_AQE_SZ = 11,
 	/* Contains the size of GMEM inside context record in KB */
 	VRB_CTXRECORD_GMEM_SZ = 12,
-	/* Contains whether to enable fault on DBGC interrupts */
-	VRB_DBGC_FAULT_ENABLE = 17,
 };
 
 /* For GMU Trace */
@@ -330,8 +327,6 @@ enum gmu_trace_id {
 	GMU_TRACE_DCVS_BUSLVL = 6,
 	GMU_TRACE_DCVS_PWRSTATS = 7,
 	GMU_TRACE_PWR_CONSTRAINT = 8,
-	GMU_TRACE_DCVS_PROFILE = 9,
-	GMU_TRACE_PREEMPT_INFO = 10,
 	GMU_TRACE_MAX,
 };
 
@@ -402,18 +397,6 @@ struct trace_pwr_constraint {
 	u32 status;
 	u32 owner_ctx_id;
 } __packed;
-
-struct trace_dcvs_profile {
-	u32 action;
-	u32 profile;
-	struct kgsl_dcvs_attrs attrs;
-} __packed;
-
-struct trace_preempt_info {
-	u32 level_info;
-	u32 reason;
-} __packed;
-
 /**
  * struct kgsl_gmu_trace  - wrapper for gmu trace memory object
  */
@@ -573,14 +556,10 @@ struct gmu_core_device {
 	u32 global_entries;
 	/** @vma: VMA entry for GMU */
 	struct gmu_vma_entry *vma;
-	/** @num_vmas: Number of entries in the @vma array */
-	u32 num_vmas;
 	/** @common_caps: GMU firmware common capabilities */
 	struct firmware_capabilities common_caps;
 	/** @platform_caps: GMU firmware platform capabilities */
 	struct firmware_capabilities platform_caps;
-	/** @gmu_debugfs_dir: Debugfs directory node for GMU related nodes */
-	struct dentry *gmu_debugfs_dir;
 	/* @ver: GMU Version information */
 	struct {
 		u32 core;
@@ -609,17 +588,13 @@ struct gmu_core_device {
 	int num_freqs;
 	/** @vlvls: Array of GMU voltage levels */
 	u32 vlvls[MAX_CX_LEVELS];
-	/** @min_pwrlevels: Minimum power level for GMU */
-	u32 min_pwrlevel;
-	/** @max_pwrlevel: Maximum power level for GMU */
-	u32 max_pwrlevel;
 	/*
 	 * @perf_ddr_bw: The lowest ddr bandwidth that puts CX at a corner at
 	 * which GMU can run at higher frequency.
 	 */
 	u32 perf_ddr_bw[MAX_CX_LEVELS];
-	/** @cur_pwrlevel: Current power level for GMU */
-	u32 cur_pwrlevel;
+	/** @cur_level: Tracks current frequency level for GMU */
+	u32 cur_level;
 	/** @hub_freqs: Array of GMU hub frequencies */
 	u32 hub_freqs[MAX_CX_LEVELS];
 	/** @hub_vlvls: Array of GMU hub voltage levels */
@@ -634,8 +609,6 @@ struct gmu_core_device {
 	struct kgsl_memdesc *vrb;
 	/** @trace: gmu trace container */
 	struct kgsl_gmu_trace trace;
-	/** @pwrlevel_mutex: Mutex protects the min/max/cur power level */
-	struct mutex pwrlevel_mutex;
 };
 
 extern struct platform_driver a6xx_gmu_driver;
@@ -647,9 +620,6 @@ extern struct platform_driver gen8_gmu_driver;
 
 void __init gmu_core_register(void);
 void gmu_core_unregister(void);
-
-int gmu_core_init(struct kgsl_device *device);
-void gmu_core_close(struct kgsl_device *device);
 
 bool gmu_core_gpmu_isenabled(struct kgsl_device *device);
 bool gmu_core_scales_bandwidth(struct kgsl_device *device);
@@ -986,20 +956,20 @@ int gmu_core_clk_probe(struct kgsl_device *device);
 /**
  * gmu_core_clock_set_rate - Set the gmu clock rate
  * @device: Pointer to KGSL device
- * @pwrlevel: Requested gmu power level
+ * @gmu_level: Requested gmu power level
  *
  * Returns 0 on success or error on clock set rate failure
  */
-int gmu_core_clock_set_rate(struct kgsl_device *device, u32 pwrlevel);
+int gmu_core_clock_set_rate(struct kgsl_device *device, u32 gmu_level);
 
 /**
  * gmu_core_enable_clks - Enable gmu clocks
  * @device: Pointer to KGSL device
- * @pwrlevel: Requested gmu power level
+ * @level: GMU frequency level
  *
  * Return: 0 on success or negative error on failure
  */
-int gmu_core_enable_clks(struct kgsl_device *device, u32 pwrlevel);
+int gmu_core_enable_clks(struct kgsl_device *device, u32 level);
 
 /**
  * gmu_core_disable_clks - Disable gmu clocks
@@ -1024,62 +994,5 @@ void gmu_core_scale_gmu_frequency(struct kgsl_device *device, int buslevel);
  * Return: 0 on success or negative error on failure.
  */
 int gmu_core_hwsched_memory_init(struct kgsl_device *device);
-
-/**
- * gmu_core_get_active_frequency - Get active GMU frequency
- * @device: Pointer to KGSL device
-
- * Return: Negative error on failure and zero on success.
- */
-int gmu_core_get_active_frequency(struct kgsl_device *device);
-
-/**
- * gmu_core_get_num_pwrlevels - Get number of available power levels for GMU
- * @device: Pointer to KGSL device
-
- * Return: Negative error on failure and zero on success.
- */
-int gmu_core_get_num_pwrlevels(struct kgsl_device *device);
-
-/**
- * gmu_core_get_min_pwrlevel - Get the minimum power level for GMU
- * @device: Pointer to KGSL device
-
- * Return: Negative error on failure and zero on success.
- */
-int gmu_core_get_min_pwrlevel(struct kgsl_device *device);
-
-/**
- * gmu_core_set_min_pwrlevel - Set the minimum power level for GMU
- * @device: Pointer to KGSL device
-
- * Return: Negative error on failure and zero on success.
- */
-int gmu_core_set_min_pwrlevel(struct kgsl_device *device, u64 val);
-
-/**
- * gmu_core_get_max_pwrlevel - Get the maximum power level for GMU
- * @device: Pointer to KGSL device
-
- * Return: Negative error on failure and zero on success.
- */
-int gmu_core_get_max_pwrlevel(struct kgsl_device *device);
-
-/**
- * gmu_core_set_max_pwrlevel - Set the maximum power level for GMU
- * @device: Pointer to KGSL device
-
- * Return: Negative error on failure and zero on success.
- */
-int gmu_core_set_max_pwrlevel(struct kgsl_device *device, u64 val);
-
-/**
- * gmu_core_list_frequencies - List available GMU frequencies
- * @device: Pointer to the kgsl device
- * @s: seq_file pointer
-
- * Return: Negative error on failure and zero on success.
- */
-int gmu_core_list_frequencies(struct kgsl_device *device, struct seq_file *s);
 
 #endif /* __KGSL_GMU_CORE_H */

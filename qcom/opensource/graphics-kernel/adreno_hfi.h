@@ -10,7 +10,7 @@
 
 #define HW_FENCE_QUEUE_SIZE		SZ_4K
 #define HFI_QUEUE_SIZE			SZ_4K /* bytes, must be base 4dw */
-#define MAX_RCVD_PAYLOAD_SIZE		32 /* dwords */
+#define MAX_RCVD_PAYLOAD_SIZE		16 /* dwords */
 #define MAX_RCVD_SIZE			(MAX_RCVD_PAYLOAD_SIZE + 3) /* dwords */
 #define HFI_MAX_MSG_SIZE		(SZ_1K)
 
@@ -84,7 +84,6 @@
 #define HFI_FEATURE_IFF_PCLX		32
 #define HFI_FEATURE_SOFT_RESET		0x10000001
 #define HFI_FEATURE_DCVS_PROFILE	0x10000002
-#define HFI_FEATURE_FAST_CONTEXT_DESTROY	0x10000003
 
 /*
  * MINBW_HYST_MASK = 0xffff
@@ -272,16 +271,6 @@ enum hfi_mem_kind {
 	 * related to GMU based DCVS.
 	 */
 	HFI_MEMKIND_FREQMGR_SCRATCH,
-	/**
-	 * @HFI_MEMKIND_DUMMY_CSW_PRIV_NON_SECURE: Used for requesting privileged non
-	 * secure preemption records for the internal dummy buffer
-	 */
-	HFI_MEMKIND_DUMMY_CSW_PRIV_NON_SECURE,
-	/**
-	 * @HFI_MEMKIND_DUMMY_CSW_COUNTER: Used for requesting preemption performance
-	 * counter save/restore buffer for the internal dummy buffer
-	 */
-	HFI_MEMKIND_DUMMY_CSW_COUNTER,
 	HFI_MEMKIND_MAX,
 };
 
@@ -314,8 +303,6 @@ static const char * const hfi_memkind_strings[] = {
 	[HFI_MEMKIND_AQE_BUFFER] = "GMU AQE BUFFER",
 	[HFI_MEMKIND_HW_FENCE_SHADOW] = "GMU HW FENCE SHADOW",
 	[HFI_MEMKIND_FREQMGR_SCRATCH] = "GMU FREQMGR SCRATCH",
-	[HFI_MEMKIND_DUMMY_CSW_PRIV_NON_SECURE] = "GMU DUMMY CSW PRIV NON SECURE",
-	[HFI_MEMKIND_DUMMY_CSW_COUNTER] = "GMU DUMMY CSW COUNTER",
 	[HFI_MEMKIND_MAX] = "GMU UNKNOWN",
 };
 
@@ -1399,12 +1386,9 @@ struct payload_section {
 #define GMU_CP_AHB_ERROR 650
 #define GMU_ATB_ASYNC_FIFO_OVERFLOW 651
 #define GMU_RBBM_ATB_BUF_OVERFLOW 652
+#define GMU_UCHE_OOB_ACCESS 653
 #define GMU_UCHE_TRAP_INTR  654
 #define GMU_TSB_WRITE_ERROR 655
-/* GPU encountered a Uche OOB Access fault error */
-#define GMU_UCHE_OOB_ACCESS 653
-/* DBGC interrupt */
-#define GMU_DBGC_INTR_ERROR 656
 
 /* GPU encountered an unknown CP error */
 #define GMU_CP_UNKNOWN_ERROR 700
@@ -1432,21 +1416,14 @@ enum gpu_tuning_attr {
 	GPU_TUNING_KEY_MOD_PERCENT = 12,
 	GPU_TUNING_KEY_BUS_MIN_FREQUENCY = 13,
 	GPU_TUNING_KEY_BUS_MAX_FREQUENCY = 14,
-	GPU_TUNING_KEY_MIN_AB_MBPS = 15,
-	GPU_TUNING_KEY_MAX_AB_MBPS = 16,
+	GPU_TUNING_KEY_BUS_MIN_AB_MBPS = 15,
+	GPU_TUNING_KEY_BUS_MAX_AB_MBPS = 16,
 	GPU_TUNING_KEY_MAX,
 };
 
 /* Macro for subtype of the HFI_VALUE_DCVS_TUNING_PARAM property */
 #define HFI_DCVS_ATTRS_DEFAULT 0
 #define HFI_DCVS_ATTRS_AGGREGATED 1
-
-enum gpu_dcvs_profile_action {
-	GMU_DCVS_PROFILE_REGISTER = 1,
-	GMU_DCVS_PROFILE_ACTIVATE = 2,
-	GMU_DCVS_PROFILE_DEACTIVATE = 3,
-};
-
 /**
  * hfi_update_read_idx - Update the read index of an hfi queue
  * hdr: Pointer to the hfi queue header
@@ -1568,7 +1545,6 @@ int adreno_hwsched_wait_ack_completion(struct adreno_device *adreno_dev,
  * adreno_hwsched_ctxt_unregister_wait_completion - Wait for HFI ack for context unregister
  * adreno_dev: Pointer to the adreno device
  * dev: Pointer to the device structure
- * context: Pointer to the context structure
  * ack: Pointer to the pending ack
  * process_msgq: Function pointer to the msgq processing function
  * cmd: Pointer to the hfi packet header and data
@@ -1582,7 +1558,7 @@ int adreno_hwsched_wait_ack_completion(struct adreno_device *adreno_dev,
  */
 int adreno_hwsched_ctxt_unregister_wait_completion(
 	struct adreno_device *adreno_dev,
-	struct device *dev, struct kgsl_context *context, struct pending_cmd *ack,
+	struct device *dev, struct pending_cmd *ack,
 	void (*process_msgq)(struct adreno_device *adreno_dev),
 	struct hfi_unregister_ctxt_cmd *cmd);
 
@@ -1615,9 +1591,6 @@ static inline int hfi_get_minidump_string(u32 mem_kind, char *hfi_minidump_str,
 		break;
 	case HFI_MEMKIND_CMD_BUFFER:
 		snprintf(hfi_minidump_str, size, KGSL_GMU_CMD_BUFFER_ENTRY);
-		break;
-	case HFI_MEMKIND_MEMSTORE:
-		snprintf(hfi_minidump_str, size, KGSL_MEMSTORE_ENTRY);
 		break;
 	default:
 		return -EINVAL;

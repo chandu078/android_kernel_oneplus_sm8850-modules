@@ -48,7 +48,7 @@ static void _wakeup_hw_fence_waiters(struct adreno_device *adreno_dev, u32 fault
 
 	wake_up_all(&hwf->unack_wq);
 
-	kgsl_delete_timer(&hfi->hw_fence_timer);
+	kgsl_delete_timer_sync(&hfi->hw_fence_timer);
 }
 
 void gen7_hwsched_fault(struct adreno_device *adreno_dev, u32 fault)
@@ -249,14 +249,11 @@ static int gen7_hwsched_gmu_first_boot(struct adreno_device *adreno_dev)
 		goto err;
 	}
 
-	if (adreno_dev->gmu_ab &&
-		gen7_hwsched_hfi_get_value(adreno_dev, HFI_VALUE_GMU_AB_VOTE) == 1 &&
+	if (gen7_hwsched_hfi_get_value(adreno_dev, HFI_VALUE_GMU_AB_VOTE) == 1 &&
 		!WARN_ONCE(!adreno_dev->gpucore->num_ddr_channels,
 			"Number of DDR channel is not specified in gpu core")) {
+		adreno_dev->gmu_ab = true;
 		set_bit(ADRENO_DEVICE_GMU_AB, &adreno_dev->priv);
-	} else {
-		/* If gmu_ab feature flag is enabled but GMU doesn't support it, set it to false */
-		adreno_dev->gmu_ab = false;
 	}
 
 	icc_set_bw(pwr->icc_path, 0, 0);
@@ -855,6 +852,7 @@ static int gen7_hwsched_power_off(struct adreno_device *adreno_dev)
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
 	int ret = 0;
+	bool drain_cpu = false;
 
 	if (!test_bit(GMU_PRIV_GPU_STARTED, &gmu->flags))
 		return 0;
@@ -879,12 +877,14 @@ static int gen7_hwsched_power_off(struct adreno_device *adreno_dev)
 no_gx_power:
 	kgsl_pwrctrl_irq(device, false);
 
+	/* Make sure GMU has sent all hardware fences to TxQueue */
+	if (check_inflight_hw_fences(adreno_dev))
+		drain_cpu = true;
+
 	gen7_hwsched_gmu_power_off(adreno_dev);
 
-	/*
-	 *  Check if GMU has sent all hw fences to TxQueue and drain any un-sent hw fences via cpu
-	 */
-	if (check_inflight_hw_fences(adreno_dev))
+	/* Now that we are sure that GMU is powered off, drain pending fences */
+	if (drain_cpu)
 		drain_hw_fences_cpu(adreno_dev);
 
 	adreno_hwsched_unregister_contexts(adreno_dev);
@@ -1130,7 +1130,7 @@ static int gen7_hwsched_pm_suspend(struct adreno_device *adreno_dev)
 {
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
-	int ret, active_count;
+	int ret;
 
 	if (test_bit(GMU_PRIV_PM_SUSPEND, &gmu->flags))
 		return 0;
@@ -1140,16 +1140,6 @@ static int gen7_hwsched_pm_suspend(struct adreno_device *adreno_dev)
 	ret = adreno_hwsched_drain_and_idle(adreno_dev);
 	if (ret)
 		goto err;
-
-	active_count = atomic_read(&device->active_cnt);
-
-	if (active_count > 0) {
-		ret = -ETIMEDOUT;
-		dev_err_ratelimited(GMU_PDEV_DEV(device),
-			"Aborting suspend because of active count:%d\n",
-			active_count);
-		goto err;
-	}
 
 	gen7_hwsched_power_off(adreno_dev);
 
@@ -1655,15 +1645,13 @@ int gen7_hwsched_add_to_minidump(struct adreno_device *adreno_dev)
 	for (i = 0; i < hwsched->mem_alloc_entries; i++) {
 		struct hfi_mem_alloc_entry *entry = &hwsched->mem_alloc_table[i];
 		char hfi_minidump_str[MAX_VA_MINIDUMP_STR_LEN] = {0};
-		char name[MAX_VA_MINIDUMP_STR_LEN];
 		u32 rb_id = 0;
 
 		if (!hfi_get_minidump_string(entry->desc.mem_kind,
 					     &hfi_minidump_str[0],
 					     sizeof(hfi_minidump_str), &rb_id)) {
-			snprintf(name, sizeof(name), "kgsl_global_%s", hfi_minidump_str);
 			ret = kgsl_add_va_to_minidump(adreno_dev->dev.dev,
-						      name,
+						      hfi_minidump_str,
 						      entry->md->hostptr,
 						      entry->md->size);
 			if (ret)
