@@ -1,9 +1,7 @@
-load(":repo_paths.bzl", "modules_path", "soc_label")
 load("//build/kernel/kleaf:kernel.bzl", "kernel_module",
                                         "kernel_modules_install",
                                         "ddk_module")
-load("@rules_pkg//pkg:install.bzl", "pkg_install")
-load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
+load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 
 def _register_module_to_map(module_map, name, path, config_option, srcs, config_srcs, deps):
     processed_config_srcs = {}
@@ -60,21 +58,21 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
     kernel_build = "{}_{}".format(target, variant)
 
     headers = select({
-        "//build/qcom_build_extensions:qtisocrepo_true": [soc_label("all_headers")],
-        "//build/qcom_build_extensions:qtisocrepo_false": ["//msm-kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_true": ["//vendor/qcom/kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
     kernel_build_label = select({
-        "//build/qcom_build_extensions:qtisocrepo_true": soc_label("{}_base_kernel".format(kernel_build)),
-        "//build/qcom_build_extensions:qtisocrepo_false": "//msm-kernel:{}".format(kernel_build),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build),
     })
 
     deps = select({
-        "//build/qcom_build_extensions:qtisocrepo_true": [
-            soc_label("{}/kernel/trace/qcom_ipc_logging".format(kernel_build)),
-            soc_label("{}/drivers/remoteproc/rproc_qcom_common".format(kernel_build)),
-            soc_label("{}/drivers/remoteproc/qcom_spss".format(kernel_build)),
+        "//build/kernel/kleaf:socrepo_true": [
+            "//vendor/qcom/kernel:{}/kernel/trace/qcom_ipc_logging".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/remoteproc/rproc_qcom_common".format(kernel_build),
+            "//vendor/qcom/kernel:{}/drivers/remoteproc/qcom_spss".format(kernel_build),
         ],
-        "//build/qcom_build_extensions:qtisocrepo_false": ["//msm-kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
 
     modules = [registry.get(module_name) for module_name in modules]
@@ -97,17 +95,15 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
 
         all_module_rules.append(rule_name)
 
-    pkg_files(
-        name = kernel_build + "_dist_files",
-        srcs = all_module_rules,
-        visibility = ["//visibility:private"],
-        strip_prefix = strip_prefix.files_only(),
-    )
-
-    pkg_install(
+    copy_to_dist_dir(
         name = "{}_spu-drivers_dist".format(kernel_build),
-        srcs = [":{}_dist_files".format(kernel_build)],
-        destdir = "../{}".format(modules_path("qcom/opensource/spu-drivers/out")),
+        data = all_module_rules,
+        dist_dir = "../vendor/qcom/opensource/spu-drivers/out", ## TODO
+        flat = True,
+        wipe_dist_dir = False,
+        allow_duplicate_filenames = False,
+        mode_overrides = {"**/*": "644"},
+        #define_target_variant_modules = "info",
     )
 
 def define_consolidate_gki_modules(target, registry, modules, config_options = []):
