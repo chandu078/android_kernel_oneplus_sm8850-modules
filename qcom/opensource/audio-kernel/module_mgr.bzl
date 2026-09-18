@@ -1,4 +1,3 @@
-load(":repo_paths.bzl", "modules_label", "soc_label")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module", "kernel_module_group")
 
@@ -57,38 +56,31 @@ def _define_target_modules(target, variant, registry, modules, product = None, c
     enabled_modules = _get_enabled_module_objs(registry, modules)
     options = _combine_target_module_options(enabled_modules, config_options)
     headers = select({
-        "//build/qcom_build_extensions:qtisocrepo_true": [
-            soc_label("all_headers"),
-            soc_label("{}_{}/drivers/firmware/qcom/qcom-scm".format(target, variant)),
-            soc_label("{}_{}/drivers/pinctrl/qcom/pinctrl-msm".format(target, variant)),
-            soc_label("{}_{}/drivers/soc/qcom/pdr_interface".format(target, variant)),
-            soc_label("{}_{}/drivers/remoteproc/rproc_qcom_common".format(target, variant)),
-            soc_label("{}_{}/drivers/base/regmap/qti-regmap-debugfs".format(target, variant)),
-            modules_label("oplus/kernel/charger/bazel:{}_{}_oplus_chg_v2".format(target, variant)),
-            soc_label("{}_{}/drivers/soc/qcom/wcd_usbss_i2c".format(target, variant)),
-	    soc_label("{}_{}/drivers/soc/qcom/fsa4480_i2c".format(target, variant)),
-            soc_label("{}_{}/kernel/trace/qcom_ipc_logging".format(target, variant)),
-            soc_label("{}_{}/drivers/soc/qcom/socinfo".format(target, variant)),
+        "//build/kernel/kleaf:socrepo_true": [
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}_{}/drivers/firmware/qcom/qcom-scm".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/pinctrl/qcom/pinctrl-msm".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/soc/qcom/pdr_interface".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/remoteproc/rproc_qcom_common".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/base/regmap/qti-regmap-debugfs".format(target, variant),
+            "//vendor/qcom/sm8850-modules/oplus/kernel/charger/bazel:{}_{}_oplus_chg_v2".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/soc/qcom/wcd_usbss_i2c".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/kernel/trace/qcom_ipc_logging".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/soc/qcom/socinfo".format(target, variant),
+            "//vendor/qcom/sm8850-modules/oplus/kernel/multimedia/feedback/bazel:oplus_mm_kevent_fb",
         ] + registry.hdrs,
-        "//build/qcom_build_extensions:qtisocrepo_false": ["//msm-kernel:all_headers"] + registry.hdrs,
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"] + registry.hdrs,
     })
     kernel_build = select({
-        "//build/qcom_build_extensions:qtisocrepo_true": soc_label("{}_{}_base_kernel".format(target, variant)),
-        "//build/qcom_build_extensions:qtisocrepo_false": "//msm-kernel:{}_{}".format(target, variant),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_{}_base_kernel".format(target, variant),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}_{}".format(target, variant),
     })
-
-    if "CONFIG_OPLUS_FEATURE_MM_FEEDBACK" in options:
-        headers = headers + [modules_label("oplus/kernel/multimedia/feedback/bazel:oplus_mm_kevent_fb")]
 
     submodule_rules = []
     for module in enabled_modules:
         rule_name = "{}_{}".format(rule_prefix, module.name)
         srcs = _get_module_srcs(module, options)
-        deps = headers + [
-            dep_formatter(dep)
-            for dep in module.deps
-            if "OPLUS_ARCH_EXTENDS" in options or not dep.startswith(":%b_oplus_")
-        ]
+        deps = headers + [dep_formatter(dep) for dep in module.deps]
 
         if not srcs:
             continue

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _SWR_WCD_CTRL_H
@@ -11,7 +11,6 @@
 #include <linux/pm_qos.h>
 #include <linux/pm.h>
 #include <soc/swr-common.h>
-#include <bindings/audio-codec-port-types.h>
 
 #ifdef CONFIG_DEBUG_FS
 #include <linux/debugfs.h>
@@ -35,7 +34,6 @@
 #define SWR_NAME	"swr-mgr"
 
 #define SWR_MSTR_PORT_LEN	13 /* Number of master ports */
-#define SWR_MSTR_PORT_LEN_LEGACY	8 /* Number of master ports */
 
 #define SWRM_VERSION_1_0 0x01010000
 #define SWRM_VERSION_1_2 0x01030000
@@ -45,9 +43,6 @@
 #define SWRM_VERSION_1_6   0x01060000
 #define SWRM_VERSION_1_7   0x01070000
 #define SWRM_VERSION_2_0   0x02000000
-#define SWRM_VERSION_2_1   0x02010000
-#define SWRM_VERSION_2_2   0x02020000
-#define SWRM_VERSION_4_0   0x04000000
 
 #define SWR_MAX_CH_PER_PORT 8
 
@@ -157,7 +152,6 @@ struct swr_mstr_ctrl {
 	int irq;
 	int wake_irq;
 	int version;
-	int version_index;
 	int mclk_freq;
 	int bus_clk;
 	u32 num_dev;
@@ -174,8 +168,6 @@ struct swr_mstr_ctrl {
 	struct notifier_block event_notifier;
 	struct work_struct dc_presence_work;
 	u8 num_ports;
-	u8 ports_cnt;
-	u32 legacy_ports_en;
 	struct swrm_port_type
 			port_mapping[SWR_MSTR_PORT_LEN + 1][SWR_MAX_CH_PER_PORT];
 	int swr_irq;
@@ -185,7 +177,6 @@ struct swr_mstr_ctrl {
 	bool dev_up;
 	bool ipc_wakeup_triggered;
 	bool req_clk_switch;
-	bool mstr_init_required;
 	struct pm_qos_request pm_qos_req;
 	enum swrm_pm_state pm_state;
 	wait_queue_head_t pm_wq;
@@ -199,7 +190,6 @@ struct swr_mstr_ctrl {
 	int hw_core_clk_en;
 	int aud_core_clk_en;
 	int clk_src;
-	u32 pcm_enable_count;
 	u32 disable_div2_clk_switch;
 	u32 rd_fifo_depth;
 	u32 wr_fifo_depth;
@@ -219,7 +209,6 @@ struct swr_mstr_ctrl {
 	struct delayed_work adsp_ssr_work;
 #endif /* OPLUS_ARCH_EXTENDS */
 	struct proc_dir_entry *swr_mstr_ctrl_proc_entry;
-	u32 port_wordlength[SWR_MSTR_PORT_LEN + 1];
 };
 
 #endif /* _SWR_WCD_CTRL_H */

@@ -33,7 +33,6 @@
 #include "wcd939x-reg-shifts.h"
 #include <linux/proc_fs.h>
 #include <linux/version.h>
-#include <linux/vmalloc.h>
 
 #if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
 #include <linux/soc/qcom/wcd939x-i2c.h>
@@ -61,7 +60,6 @@
 #define WCD939X_VARIANT_ENTRY_SIZE 32
 
 #define WCD939X_VERSION_ENTRY_SIZE 32
-#define WCD939X_ECID_ENTRY_SIZE 36
 
 #define ADC_MODE_VAL_HIFI     0x01
 #define ADC_MODE_VAL_LO_HIF   0x02
@@ -4516,36 +4514,6 @@ static struct snd_info_entry_ops wcd939x_variant_ops = {
 	.read = wcd939x_variant_read,
 };
 
-static ssize_t wcd939x_ecid_read(struct snd_info_entry *entry,
-				    void *file_private_data,
-				    struct file *file,
-				    char __user *buf, size_t count,
-				    loff_t pos)
-{
-	struct wcd939x_priv *priv;
-	char buffer[WCD939X_ECID_ENTRY_SIZE];
-	int len = 0;
-	u8 *reg_value;
-
-	priv = (struct wcd939x_priv *) entry->private_data;
-	if (!priv) {
-		pr_err_ratelimited("%s: wcd939x priv is null\n", __func__);
-		return -EINVAL;
-	}
-
-	reg_value = &priv->ecid_val[0];
-	len = scnprintf(buffer, sizeof(buffer), "0x%016llx%016llx",
-			cpu_to_be64(*(u64 *)reg_value), cpu_to_be64(*(u64 *)(reg_value + 8)));
-
-	if (len <= 0)
-		return -EINVAL;
-	return simple_read_from_buffer(buf, count, &pos, buffer, len);
-}
-
-static struct snd_info_entry_ops wcd939x_ecid_ops = {
-	.read = wcd939x_ecid_read,
-};
-
 /*
  * wcd939x_get_codec_variant
  * @component: component instance
@@ -4585,7 +4553,6 @@ int wcd939x_info_create_codec_entry(struct snd_info_entry *codec_root,
 {
 	struct snd_info_entry *version_entry;
 	struct snd_info_entry *variant_entry;
-	struct snd_info_entry *ecid_entry;
 	struct wcd939x_priv *priv;
 	struct snd_soc_card *card;
 
@@ -4658,28 +4625,6 @@ int wcd939x_info_create_codec_entry(struct snd_info_entry *codec_root,
 	}
 	priv->variant_entry = variant_entry;
 
-	ecid_entry = snd_info_create_card_entry(card->snd_card, "ecid", priv->entry);
-	if (!ecid_entry) {
-		dev_dbg(component->dev, "%s: failed to create wcd939x ecid entry\n",
-			__func__);
-		snd_info_free_entry(variant_entry);
-		snd_info_free_entry(version_entry);
-		snd_info_free_entry(priv->entry);
-		return -ENOMEM;
-	}
-	ecid_entry->private_data = priv;
-	ecid_entry->size = WCD939X_ECID_ENTRY_SIZE;
-	ecid_entry->content = SNDRV_INFO_CONTENT_DATA;
-	ecid_entry->c.ops = &wcd939x_ecid_ops;
-
-	if (snd_info_register(ecid_entry) < 0) {
-		snd_info_free_entry(ecid_entry);
-		snd_info_free_entry(variant_entry);
-		snd_info_free_entry(version_entry);
-		snd_info_free_entry(priv->entry);
-		return -ENOMEM;
-	}
-	priv->ecid_entry = ecid_entry;
 	return 0;
 }
 EXPORT_SYMBOL(wcd939x_info_create_codec_entry);
@@ -4729,7 +4674,7 @@ static int regdump_read(struct regmap *map, int baseReg, int endReg,
 
 	i  = ((int) *ppos + baseReg);
 
-	buf = vzalloc(count);
+	buf = kzalloc(count, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
@@ -4769,7 +4714,7 @@ static int regdump_read(struct regmap *map, int baseReg, int endReg,
 	if (copy_to_user(user_buf, buf, pos))
 		ret = -EFAULT;
 
-	vfree(buf);
+	kfree(buf);
 	return ret;
 }
 
@@ -4800,7 +4745,6 @@ static int wcd939x_soc_codec_probe(struct snd_soc_component *component)
 	struct snd_soc_dapm_context *dapm =
 			snd_soc_component_get_dapm(component);
 	int ret = -EINVAL;
-	u32 val;
 
 	dev_info(component->dev, "%s()\n", __func__);
 	wcd939x = snd_soc_component_get_drvdata(component);
@@ -4830,13 +4774,6 @@ static int wcd939x_soc_codec_probe(struct snd_soc_component *component)
 
 	/*Harmonium contains only one variant i.e wcd9395*/
 	wcd939x->variant = WCD9395;
-
-	/* read ecid data */
-	for (int i = 0; i < WCD939X_ECID_REGS; ++i) {
-		ret = regmap_read(wcd939x->regmap, WCD939X_EFUSE_REG_1 + i, &val);
-		if (ret == 0)
-			wcd939x->ecid_val[i] = val;
-	}
 
 	/* Check device tree to see if 2Vpk flag is enabled, this value should not be changed */
 	wcd939x->in_2Vpk_mode = of_find_property(wcd939x->dev->of_node,
@@ -5882,7 +5819,7 @@ static int wcd939x_probe(struct platform_device *pdev)
 		if (ret) {
 			dev_err(dev, "%s: vdd px supply enable failed!\n",
 				__func__);
-			goto err_static_supplies;
+			return ret;
 		}
 	}
 
@@ -5893,13 +5830,13 @@ static int wcd939x_probe(struct platform_device *pdev)
 
 	if (ret) {
 		dev_err(dev, "Failed to read port mapping\n");
-		goto err_supplies;
+		goto err;
 	}
 	ret = wcd939x_parse_port_params(dev, "qcom,swr-tx-port-params",
 					CODEC_TX);
 	if (ret) {
 		dev_err(dev, "Failed to read port params\n");
-		goto err_supplies;
+		goto err;
 	}
 
 	mutex_init(&wcd939x->wakeup_lock);
@@ -5930,19 +5867,7 @@ static int wcd939x_probe(struct platform_device *pdev)
 err_lock_init:
 	mutex_destroy(&wcd939x->micb_lock);
 	mutex_destroy(&wcd939x->wakeup_lock);
-err_supplies:
-	if (msm_cdc_is_ondemand_supply(wcd939x->dev, wcd939x->supplies,
-			pdata->regulator, pdata->num_supplies, "cdc-vdd-px")) {
-		msm_cdc_disable_ondemand_supply(wcd939x->dev,
-				wcd939x->supplies, pdata->regulator,
-				pdata->num_supplies, "cdc-vdd-px");
-	}
-err_static_supplies:
-	msm_cdc_release_supplies(&pdev->dev, wcd939x->supplies,
-				     pdata->regulator,
-				     pdata->num_supplies);
-	pdata->regulator = NULL;
-	pdata->num_supplies = 0;
+err:
 	return ret;
 }
 

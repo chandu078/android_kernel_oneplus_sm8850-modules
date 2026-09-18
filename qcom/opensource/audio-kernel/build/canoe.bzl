@@ -35,20 +35,16 @@ def define_canoe():
             "lpass_cdc_va_macro_dlkm",
             "lpass_cdc_rx_macro_dlkm",
             "lpass_cdc_tx_macro_dlkm",
-            "wsa881x_dlkm",
             "wsa883x_dlkm",
             "wsa884x_dlkm",
             "wcd938x_dlkm",
             "wcd938x_slave_dlkm",
             "wcd939x_dlkm",
             "wcd939x_slave_dlkm",
-            "wcd937x_dlkm",
-            "wcd937x_slave_dlkm",
             "wcd9378_dlkm",
             "wcd9378_slave_dlkm",
             "lpass_bt_swr_dlkm",
             "qmp_dlkm",
-            "wsa885x_i2c_dlkm",
             "simple_amp_dlkm",
 #ifdef OPLUS_ARCH_EXTENDS
 #add for oplus audio extends driver
@@ -83,8 +79,6 @@ def define_canoe():
             "CONFIG_AUDIO_BTFM_PROXY",
             "CONFIG_MSM_EXT_DISPLAY",
             "CONFIG_SND_SOC_QMP",
-            "CONFIG_SND_SOC_WSA881X",
-            "CONFIG_SND_SOC_WSA885X_I2C",
             "CONFIG_SND_SOC_SIMPLE_AMP",
 #ifdef OPLUS_ARCH_EXTENDS
 #add for oplus audio extends driver

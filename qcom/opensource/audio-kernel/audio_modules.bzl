@@ -1,4 +1,3 @@
-load(":repo_paths.bzl", "modules_label")
 load(":module_mgr.bzl", "create_module_registry")
 
 DSP_PATH = "dsp"
@@ -121,7 +120,6 @@ audio_modules.register(
     deps = [":%b_spf_core_dlkm",
             ":%b_q6_notifier_dlkm",
             ":%b_snd_event_dlkm",
-            ":%b_machine_dlkm",
 	   ],
 )
 audio_modules.register(
@@ -159,7 +157,6 @@ audio_modules.register(
     config_option = "CONFIG_SND_EVENT",
     srcs = ["snd_event.c"]
 )
-
 # >>>> ASOC MODULES <<<<
 audio_modules.register(
     name = "machine_dlkm",
@@ -220,12 +217,6 @@ audio_modules.register(
         ],
 	"CONFIG_SND_SOC_ALOR": [
             "audio_machine.c"
-        ],
-        "CONFIG_SND_SOC_CHORA": [
-            "audio_machine.c"
-        ],
-        "CONFIG_SND_SOC_MALABAR": [
-            "audio_machine.c"
         ]
     },
     deps = [":%b_spf_core_dlkm",
@@ -238,8 +229,6 @@ audio_modules.register(
             ":%b_wsa884x_dlkm",
             ":%b_snd_event_dlkm",
             ":%b_wcd9378_dlkm",
-            ":%b_wcd937x_dlkm",
-            ":%b_wsa881x_dlkm",
 # Add for extend_codec_i2s_be_dailinks dependency
             ":%b_oplus_audio_extend",
             ":%b_oplus_audio_daemon",
@@ -352,8 +341,8 @@ audio_modules.register(
     path = ASOC_CODECS_PATH,
     config_option = "CONFIG_SND_SOC_MSM_HDMI_CODEC_RX",
     srcs = ["msm_hdmi_codec_rx.c"],
-    deps = [modules_label("qcom/opensource/mm-drivers/msm_ext_display:%b_msm_ext_display"),
-            modules_label("qcom/opensource/mm-drivers/msm_ext_display:msm_ext_display_headers"),
+    deps = ["//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/msm_ext_display:%b_msm_ext_display",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/msm_ext_display:msm_ext_display_headers",
 	   ],
 )
 audio_modules.register(
@@ -478,23 +467,7 @@ audio_modules.register(
                 "wsa881x-temp-sensor.c"
             ]
         }
-    },
-    deps = [":%b_wcd_core_dlkm"]
-)
-# >>>> WSA881X-SOUNDWIRE MODULE <<<<
-audio_modules.register(
-    name = "wsa881x_dlkm",
-    path = ASOC_CODECS_PATH,
-    config_option = "CONFIG_SND_SOC_WSA881X",
-    srcs = [
-        "wsa881x.c",
-        "wsa881x-regmap.c",
-        "wsa881x-tables.c",
-        "wsa881x-temp-sensor.c",
-    ],
-    deps = [":%b_wcd_core_dlkm",
-            ":%b_swr_dlkm",
-	   ],
+    }
 )
 # >>>> WSA883X MODULE <<<<
 audio_modules.register(
@@ -535,21 +508,12 @@ audio_modules.register(
         "wcd937x-tables.c",
         "wcd937x-mbhc.c",
     ],
-    deps = [":%b_wcd_core_dlkm",
-            ":%b_swr_dlkm",
-            ":%b_wcd937x_slave_dlkm",
-            ":%b_wcd9xxx_dlkm",
-            ":%b_mbhc_dlkm",
-           ],
 )
 audio_modules.register(
     name = "wcd937x_slave_dlkm",
     path = ASOC_CODECS_PATH + "/wcd937x",
     config_option = "CONFIG_SND_SOC_WCD937X_SLAVE",
-    srcs = ["wcd937x_slave.c"],
-    deps = [":%b_swr_dlkm",
-	],
-
+    srcs = ["wcd937x_slave.c"]
 )
 # >>>> WCD938X MODULES <<<<
 audio_modules.register(
@@ -655,16 +619,6 @@ audio_modules.register(
     deps = [":%b_swr_dlkm"],
 )
 
-# >>>> WSA885X I2C MODULES <<<<
-audio_modules.register(
-    name = "wsa885x_i2c_dlkm",
-    path = ASOC_CODECS_PATH,
-    config_option = "CONFIG_SND_SOC_WSA885X_I2C",
-    srcs = [
-        "wsa885x-i2c.c",
-    ],
-    deps = [":%b_gpr_dlkm"],
-)
 #ifdef OPLUS_ARCH_EXTENDS
 #add for oplus audio driver
 # >>>>  oplus audio extend MODULES <<<<

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/gpio.h>
@@ -293,34 +293,9 @@ static bool is_fractional_sample_rate(unsigned int sample_rate)
 	return false;
 }
 
-static int get_lpaif_intf_index(const char *stream_name)
-{
-	if (strnstr(stream_name, "LPAIF_RXTX", strlen(stream_name)))
-		return LPAIF_RXTX;
-	else if (strnstr(stream_name, "LPAIF_AUD", strlen(stream_name))) {
-		if (strnstr(stream_name, "PRIMARY", strlen(stream_name)))
-			return LPAIF_AUD_PRI;
-		else if (strnstr(stream_name, "SECONDARY", strlen(stream_name)))
-			return LPAIF_AUD_SEC;
-	} else if (strnstr(stream_name, "LPAIF_VA", strlen(stream_name)))
-		return LPAIF_VA;
-	else if (strnstr(stream_name, "LPAIF_WSA", strlen(stream_name)))
-		return LPAIF_WSA;
-	return -EINVAL;
-}
-
-static int get_mi2s_clk_id(int index, const char *stream_name,
-			    struct msm_common_pdata *pdata)
+static int get_mi2s_clk_id(int index)
 {
 	int clk_id = -EINVAL;
-	int lpaif_idx = get_lpaif_intf_index(stream_name);
-
-	/* Use DT-provided clock ID if set (non-zero) for this LPAIF interface */
-	if (pdata && lpaif_idx >= 0 && pdata->clk_id[lpaif_idx]) {
-		pr_debug("%s: using DT clk id: %d for stream %s\n",
-			 __func__, pdata->clk_id[lpaif_idx], stream_name);
-		return pdata->clk_id[lpaif_idx];
-	}
 
 	switch(index) {
 	case PRI_MI2S_TDM_AUXPCM:
@@ -351,18 +326,9 @@ static int get_mi2s_clk_id(int index, const char *stream_name,
 	return clk_id;
 }
 
-static int get_tdm_clk_id(int index, const char *stream_name,
-			   struct msm_common_pdata *pdata)
+static int get_tdm_clk_id(int index)
 {
 	int clk_id = -EINVAL;
-	int lpaif_idx = get_lpaif_intf_index(stream_name);
-
-	/* Use DT-provided clock ID if set (non-zero) for this LPAIF interface */
-	if (pdata && lpaif_idx >= 0 && pdata->clk_id[lpaif_idx]) {
-		pr_debug("%s: using DT clk id: %d for stream %s\n",
-			 __func__, pdata->clk_id[lpaif_idx], stream_name);
-		return pdata->clk_id[lpaif_idx];
-	}
 
 	switch(index) {
 	case PRI_MI2S_TDM_AUXPCM:
@@ -372,7 +338,7 @@ static int get_tdm_clk_id(int index, const char *stream_name,
 		clk_id = CLOCK_ID_SEC_TDM_IBIT;
 		break;
 	case TER_MI2S_TDM_AUXPCM:
-		clk_id = CLOCK_ID_SEN_TDM_IBIT;
+		clk_id = CLOCK_ID_TER_TDM_IBIT;
 		break;
 	case QUAT_MI2S_TDM_AUXPCM:
 		clk_id = CLOCK_ID_QUAD_TDM_IBIT;
@@ -430,16 +396,15 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 {
 	int ret = 0;
 	int slot_width = TDM_SLOT_WIDTH_BITS;
-	int slots = 0;
-	int sample_width = 0;
-	unsigned int rate = params_rate(params);
+	int slots;
+	int sample_width;
+	unsigned int rate;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	const char *stream_name = rtd->dai_link->stream_name;
 	struct snd_soc_card *card = rtd->card;
 	struct msm_common_pdata *pdata = msm_common_get_pdata(card);
 	int index = get_mi2s_tdm_auxpcm_intf_index(stream_name);
 	struct clk_cfg intf_clk_cfg;
-	struct snd_soc_dai *codec_dai = snd_soc_rtd_to_codec(rtd, 0);
 
 	dev_dbg(rtd->card->dev,
 		"%s: substream = %s  stream = %d\n",
@@ -457,13 +422,9 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 				slots = pdata->tdm_max_slots;
 				rate = params_rate(params);
 
-				ret = get_tdm_clk_id(index, stream_name, pdata);
+				ret = get_tdm_clk_id(index);
 				if ( ret < 0)
 					goto done;
-
-				if (index == SEN_MI2S_TDM_AUXPCM ||
-					index == TER_MI2S_TDM_AUXPCM)
-					slots = 0x04;
 
 				intf_clk_cfg.clk_id = ret;
 				intf_clk_cfg.clk_freq_in_hz = rate * slot_width * slots;
@@ -490,7 +451,7 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 				}
 			} else if ((strnstr(stream_name, "MI2S", strlen(stream_name)))) {
 
-				ret =  get_mi2s_clk_id(index, stream_name, pdata);
+				ret =  get_mi2s_clk_id(index);
 				if (ret < 0)
 					goto done;
 
@@ -541,10 +502,6 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 		atomic_inc(&pdata->lpass_intf_clk_ref_cnt[index]);
 done:
 		mutex_unlock(&pdata->lock[index]);
-		if (strnstr(codec_dai->name, "wsa885x", strlen(stream_name))) {
-			snd_soc_dai_set_tdm_slot(codec_dai, 0x0f, 0b11, 0x04, slot_width);
-			snd_soc_dai_set_sysclk(codec_dai, 0, rate * 0X04 * slot_width, 0);
-		}
 	}
 	return ret;
 }
@@ -558,7 +515,7 @@ int msm_common_snd_startup(struct snd_pcm_substream *substream)
 	const char *stream_name = rtd->dai_link->stream_name;
 	int index = get_mi2s_tdm_auxpcm_intf_index(stream_name);
 
-	dev_err(rtd->card->dev,
+	dev_dbg(rtd->card->dev,
 		"%s: substream = %s  stream = %d\n",
 		__func__, substream->name, substream->stream);
 
@@ -603,7 +560,7 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 	unsigned int rate = runtime->rate;
 
 	memset(&intf_clk_cfg, 0, sizeof(struct clk_cfg));
-	pr_err("%s(): substream = %s  stream = %d\n", __func__,
+	pr_debug("%s(): substream = %s  stream = %d\n", __func__,
 			substream->name, substream->stream);
 
 	if (!pdata) {
@@ -613,24 +570,10 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 
 	if (index >= 0) {
 		mutex_lock(&pdata->lock[index]);
-		if (pdata->mi2s_gpio_p[index]) {
-			atomic_dec(&pdata->mi2s_gpio_ref_cnt[index]);
-			if (atomic_read(&pdata->mi2s_gpio_ref_cnt[index]) == 0)  {
-				ret = msm_cdc_pinctrl_select_sleep_state(
-					pdata->mi2s_gpio_p[index]);
-				if (ret)
-					dev_err(card->dev,
-					"%s: pinctrl set actv fail %d\n",
-					__func__, ret);
-			} else if (atomic_read(&pdata->mi2s_gpio_ref_cnt[index]) < 0) {
-				atomic_set(&pdata->mi2s_gpio_ref_cnt[index], 0);
-			}
-		}
-
 		atomic_dec(&pdata->lpass_intf_clk_ref_cnt[index]);
 		if (atomic_read(&pdata->lpass_intf_clk_ref_cnt[index]) == 0) {
 			if ((strnstr(stream_name, "TDM", strlen(stream_name)))) {
-				ret = get_tdm_clk_id(index, stream_name, pdata);
+				ret = get_tdm_clk_id(index);
 				if (ret > 0) {
 					intf_clk_cfg.clk_id = ret;
 					ret = audio_prm_set_lpass_clk_cfg(&intf_clk_cfg, 0);
@@ -639,7 +582,7 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 						__func__, ret);
 				}
 			} else if((strnstr(stream_name, "MI2S", strlen(stream_name)))) {
-				ret = get_mi2s_clk_id(index, stream_name, pdata);
+				ret = get_mi2s_clk_id(index);
 				if (ret > 0) {
 					intf_clk_cfg.clk_id = ret;
 					ret = audio_prm_set_lpass_clk_cfg(&intf_clk_cfg, 0);
@@ -659,6 +602,20 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 			}
 		} else if (atomic_read(&pdata->lpass_intf_clk_ref_cnt[index]) < 0) {
 			atomic_set(&pdata->lpass_intf_clk_ref_cnt[index], 0);
+		}
+
+		if (pdata->mi2s_gpio_p[index]) {
+			atomic_dec(&pdata->mi2s_gpio_ref_cnt[index]);
+			if (atomic_read(&pdata->mi2s_gpio_ref_cnt[index]) == 0)  {
+				ret = msm_cdc_pinctrl_select_sleep_state(
+					pdata->mi2s_gpio_p[index]);
+				if (ret)
+					dev_err(card->dev,
+					"%s: pinctrl set actv fail %d\n",
+					__func__, ret);
+			} else if (atomic_read(&pdata->mi2s_gpio_ref_cnt[index]) < 0) {
+				atomic_set(&pdata->mi2s_gpio_ref_cnt[index], 0);
+			}
 		}
 		mutex_unlock(&pdata->lock[index]);
 	}
@@ -740,7 +697,6 @@ int msm_common_snd_init(struct platform_device *pdev, struct snd_soc_card *card)
 	struct msm_common_pdata *common_pdata = NULL;
 	int count, ret = 0;
 	uint32_t val_array[MI2S_TDM_AUXPCM_MAX] = {0};
-	uint32_t val = 0;
 	struct clk *lpass_audio_hw_vote = NULL;
 	common_pdata = kcalloc(1, sizeof(struct msm_common_pdata), GFP_KERNEL);
 	if (!common_pdata)
@@ -820,49 +776,12 @@ int msm_common_snd_init(struct platform_device *pdev, struct snd_soc_card *card)
 		}
 	}
 
-	/*
-	 * Read optional DT clock ID overrides for specific LPAIF interfaces.
-	 * A single clock ID is used for both MI2S and TDM on the same interface.
-	 * If a property is absent the hardcoded default clock ID is used.
-	 *
-	 */
-	if (!of_property_read_u32(pdev->dev.of_node,
-				  "qcom,lpaif-rxtx-clk-id", &val)) {
-		common_pdata->clk_id[LPAIF_RXTX] = val;
-		dev_info(&pdev->dev, "%s: LPAIF_RXTX clk id = %d\n",
-			 __func__, common_pdata->clk_id[LPAIF_RXTX]);
-	}
-	if (!of_property_read_u32(pdev->dev.of_node,
-				  "qcom,lpaif-aud-pri-clk-id", &val)) {
-		common_pdata->clk_id[LPAIF_AUD_PRI] = val;
-		dev_info(&pdev->dev, "%s: LPAIF_AUD-PRIMARY clk id = %d\n",
-			 __func__, common_pdata->clk_id[LPAIF_AUD_PRI]);
-	}
-	if (!of_property_read_u32(pdev->dev.of_node,
-				  "qcom,lpaif-aud-sec-clk-id", &val)) {
-		common_pdata->clk_id[LPAIF_AUD_SEC] = val;
-		dev_info(&pdev->dev, "%s: LPAIF_AUD-SECONDARY clk id = %d\n",
-			 __func__, common_pdata->clk_id[LPAIF_AUD_SEC]);
-	}
-	if (!of_property_read_u32(pdev->dev.of_node,
-				  "qcom,lpaif-va-clk-id", &val)) {
-		common_pdata->clk_id[LPAIF_VA] = val;
-		dev_info(&pdev->dev, "%s: LPAIF_VA clk id = %d\n",
-			 __func__, common_pdata->clk_id[LPAIF_VA]);
-	}
-	if (!of_property_read_u32(pdev->dev.of_node,
-				  "qcom,lpaif-wsa-clk-id", &val)) {
-		common_pdata->clk_id[LPAIF_WSA] = val;
-		dev_info(&pdev->dev, "%s: LPAIF_WSA clk id = %d\n",
-			 __func__, common_pdata->clk_id[LPAIF_WSA]);
-	}
-
 	common_pdata->mi2s_gpio_p[PRI_MI2S_TDM_AUXPCM] = of_parse_phandle(pdev->dev.of_node,
 			"qcom,pri-mi2s-gpios", 0);
 	common_pdata->mi2s_gpio_p[SEC_MI2S_TDM_AUXPCM] = of_parse_phandle(pdev->dev.of_node,
 			"qcom,sec-mi2s-gpios", 0);
 	common_pdata->mi2s_gpio_p[TER_MI2S_TDM_AUXPCM] = of_parse_phandle(pdev->dev.of_node,
-			"qcom,sen-mi2s-gpios", 0);
+			"qcom,tert-mi2s-gpios", 0);
 	common_pdata->mi2s_gpio_p[QUAT_MI2S_TDM_AUXPCM] = of_parse_phandle(pdev->dev.of_node,
 			"qcom,quat-mi2s-gpios", 0);
 	common_pdata->mi2s_gpio_p[QUIN_MI2S_TDM_AUXPCM] = of_parse_phandle(pdev->dev.of_node,
@@ -971,8 +890,7 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 		break;
 	}
 	case CODEC_DMA: {
-		uint32_t cur_rx_ch[MAX_PORT] = {0};
-		uint32_t cur_tx_ch[MAX_PORT] = {0};
+		uint32_t cur_rx_ch = 0, cur_tx_ch = 0;
 		uint32_t cur_rx_ch_cnt = 0, cur_tx_ch_cnt = 0;
 
 		for (i = 0; i < kctl_pdata->num_codec_dai; ++i) {
@@ -982,11 +900,11 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 			}
 			cur_rx_ch_cnt = 0;
 			cur_tx_ch_cnt = 0;
-			memset(cur_rx_ch, 0, sizeof(cur_rx_ch));
-			memset(cur_tx_ch, 0, sizeof(cur_tx_ch));
+			cur_tx_ch = 0;
+			cur_rx_ch = 0;
 			ret = snd_soc_dai_get_channel_map(codec_dai,
-					&cur_tx_ch_cnt, cur_tx_ch,
-					&cur_rx_ch_cnt, cur_rx_ch);
+					&cur_tx_ch_cnt, &cur_tx_ch,
+					&cur_rx_ch_cnt, &cur_rx_ch);
 
 			/* DAIs that not supports get_channel_map should pass */
 			if (ret && (ret != -ENOTSUPP)) {
@@ -998,8 +916,8 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 
 			rx_ch_cnt += cur_rx_ch_cnt;
 			tx_ch_cnt += cur_tx_ch_cnt;
-			rx_ch[0] |= cur_rx_ch[0];
-			tx_ch[0] |= cur_tx_ch[0];
+			rx_ch[0] |= cur_rx_ch;
+			tx_ch[0] |= cur_tx_ch;
 		}
 
 		/* reset return value from the loop above */
@@ -1196,15 +1114,17 @@ static int msm_lpi_logging_enable_get(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-int msm_common_vote_against_sleep(bool enable)
+static int msm_vote_against_sleep_ctl_put(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
 {
 	int ret = 0;
 
 	mutex_lock(&vote_against_sleep_lock);
-	pr_err("%s: vote against sleep enable: %d sleep cnt: %d", __func__,
-			enable, vote_against_sleep_cnt);
+	vote_against_sleep_enable = ucontrol->value.integer.value[0];
+	pr_debug("%s: vote against sleep enable: %d sleep cnt: %d", __func__,
+			vote_against_sleep_enable, vote_against_sleep_cnt);
 
-	if (enable) {
+	if (vote_against_sleep_enable) {
 		vote_against_sleep_cnt++;
 		if (vote_against_sleep_cnt ==  1) {
 			ret = audio_prm_set_vote_against_sleep(1);
@@ -1221,24 +1141,16 @@ int msm_common_vote_against_sleep(bool enable)
 			vote_against_sleep_cnt--;
 	}
 
-	pr_err("%s: vote against sleep vote ret: %d\n", __func__, ret);
+	pr_debug("%s: vote against sleep vote ret: %d\n", __func__, ret);
 	mutex_unlock(&vote_against_sleep_lock);
 	return ret;
-}
-EXPORT_SYMBOL_GPL(msm_common_vote_against_sleep);
-
-static int msm_vote_against_sleep_ctl_put(struct snd_kcontrol *kcontrol,
-		struct snd_ctl_elem_value *ucontrol)
-{
-	vote_against_sleep_enable = ucontrol->value.integer.value[0];
-	return msm_common_vote_against_sleep(vote_against_sleep_enable);
 }
 
 static int msm_vote_against_sleep_ctl_get(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
 	ucontrol->value.integer.value[0] = vote_against_sleep_enable;
-	pr_err("%s: vote against sleep enable: %d", __func__,
+	pr_debug("%s: vote against sleep enable: %d", __func__,
 			vote_against_sleep_enable);
 	return 0;
 }
@@ -1247,17 +1159,14 @@ static const char *const qos_text[] = {"Disable", "Enable"};
 static const char *const against_sleep_text[] = {"Disable", "Enable"};
 
 static SOC_ENUM_SINGLE_EXT_DECL(qos_vote, qos_text);
-
-static const struct soc_enum vote_enum =
-	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(against_sleep_text),
-			    against_sleep_text);
+static SOC_ENUM_SINGLE_EXT_DECL(sleep_against, against_sleep_text);
 
 static const struct snd_kcontrol_new card_mixer_controls[] = {
 	SOC_ENUM_EXT("PM_QOS Vote", qos_vote,
 			msm_qos_ctl_get, msm_qos_ctl_put),
 	SOC_SINGLE_EXT("LPI PCM Logging Enable", 0, 0, 1, 0,
 			msm_lpi_logging_enable_get, msm_lpi_logging_enable_put),
-	SOC_ENUM_EXT("VOTE Against Sleep", vote_enum,
+	SOC_ENUM_EXT("VOTE Against Sleep", sleep_against,
 			msm_vote_against_sleep_ctl_get, msm_vote_against_sleep_ctl_put),
 };
 

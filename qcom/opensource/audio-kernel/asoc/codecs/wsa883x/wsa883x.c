@@ -34,7 +34,6 @@
 #include "asoc/bolero-slave-internal.h"
 #include <linux/qti-regmap-debugfs.h>
 #include <linux/proc_fs.h>
-#include <linux/vmalloc.h>
 
 #define REGDUMP_PRINT_LEN 8
 #define T1_TEMP -10
@@ -1708,7 +1707,7 @@ static int regdump_read(struct regmap *map, int baseReg, int endReg,
 	i  = ((int) *ppos + baseReg);
 
 
-	buf = vzalloc(count);
+	buf = kzalloc(count, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
@@ -1749,7 +1748,7 @@ static int regdump_read(struct regmap *map, int baseReg, int endReg,
 	if (copy_to_user(user_buf, buf, pos))
 		ret = -EFAULT;
 
-	vfree(buf);
+	kfree(buf);
 	return ret;
 }
 

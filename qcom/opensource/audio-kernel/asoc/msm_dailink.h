@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <sound/soc.h>
@@ -23,26 +23,14 @@ SND_SOC_DAILINK_DEFS(pcm_dummy_tx0,
 
 SND_SOC_DAILINK_DEFS(slimbus_7_rx,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("btfmslim",
+	DAILINK_COMP_ARRAY(COMP_CODEC("btfmslim_slave",
 			"btfm_bt_sco_a2dp_slim_rx")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(slimbus_7_tx,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("btfmslim",
+	DAILINK_COMP_ARRAY(COMP_CODEC("btfmslim_slave",
 			"btfm_bt_sco_slim_tx")),
-	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
-
-SND_SOC_DAILINK_DEFS(slimbus_8_fmtx,
-	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("btfmcodec_dev",
-			"btaudio_fm_tx")),
-	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
-
-SND_SOC_DAILINK_DEFS(slimbus_8_tx,
-	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("btfmslim",
-			"btfm_fm_slim_tx")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(btfm_0_rx,
@@ -55,12 +43,6 @@ SND_SOC_DAILINK_DEFS(btfm_0_tx,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("btfmcodec_dev",
 			"btaudio_tx")),
-	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
-
-SND_SOC_DAILINK_DEFS(fm_0_tx,
-	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("btfmcodec_dev",
-			"btaudio_fm_tx")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(btfm_1_rx,
@@ -179,26 +161,21 @@ SND_SOC_DAILINK_DEFS(wsa_wsa2_dma_tx1,
 SND_SOC_DAILINK_DEFS(rx_dma_rx0,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("lpass-cdc", "rx_macro_rx1"),
-			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
-			   COMP_CODEC("wcd9378_codec", "wcd9378_cdc"),
 			   COMP_CODEC("wcd939x_codec", "wcd939x_cdc"),
-			   COMP_CODEC("wsa-codec0", "wsa_rx0")),
+			   COMP_CODEC("wcd9378_codec", "wcd9378_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(rx_dma_rx1,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("lpass-cdc", "rx_macro_rx2"),
-			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
-			   COMP_CODEC("wcd9378_codec", "wcd9378_cdc"),
 			   COMP_CODEC("wcd939x_codec", "wcd939x_cdc"),
-			   COMP_CODEC("wsa-codec0", "wsa_rx0")),
+			   COMP_CODEC("wcd9378_codec", "wcd9378_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(rx_dma_rx2,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("lpass-cdc", "rx_macro_rx3"),
 			   COMP_CODEC("wcd939x_codec", "wcd939x_cdc"),
-			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
 			   COMP_CODEC("wcd9378_codec", "wcd9378_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
@@ -206,7 +183,6 @@ SND_SOC_DAILINK_DEFS(rx_dma_rx3,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("lpass-cdc", "rx_macro_rx4"),
 			   COMP_CODEC("wcd939x_codec", "wcd939x_cdc"),
-			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
 			   COMP_CODEC("wcd9378_codec", "wcd9378_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
@@ -214,7 +190,6 @@ SND_SOC_DAILINK_DEFS(rx_dma_rx5,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("lpass-cdc", "rx_macro_rx5"),
 			   COMP_CODEC("wcd939x_codec", "wcd939x_cdc"),
-			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
 			   COMP_CODEC("wcd9378_codec", "wcd9378_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
@@ -228,7 +203,6 @@ SND_SOC_DAILINK_DEFS(tx_dma_tx3,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("lpass-cdc", "tx_macro_tx1"),
 			   COMP_CODEC("wcd939x_codec", "wcd939x_cdc"),
-			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
 			   COMP_CODEC("wcd9378_codec", "wcd9378_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
@@ -237,7 +211,6 @@ SND_SOC_DAILINK_DEFS(tx_dma_tx4,
 	DAILINK_COMP_ARRAY(COMP_CODEC("lpass-cdc", "tx_macro_tx2"),
 			COMP_CODEC("wcd939x_codec", "wcd939x_cdc"),
 			COMP_CODEC("wcd9378_codec", "wcd9378_cdc"),
-			COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
 			COMP_CODEC("swr-dmic.01", "swr_dmic_tx0"),
 			COMP_CODEC("swr-dmic.02", "swr_dmic_tx1"),
 			COMP_CODEC("swr-dmic.03", "swr_dmic_tx2"),
@@ -648,22 +621,3 @@ SND_SOC_DAILINK_DEFS(hs_if4_tdm_tx_0_dummy,
 	DAILINK_COMP_ARRAY(COMP_CODEC("msm-stub-codec.1", "msm-stub-tx")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
-SND_SOC_DAILINK_DEFS(sen_tdm_wsa885x_i2c_rx,
-	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("wsa885x_i2c", "wsa885x_dai_drv")),
-	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
-
-SND_SOC_DAILINK_DEFS(sen_tdm_wsa885x_i2c_tx,
-	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
-	DAILINK_COMP_ARRAY(COMP_DUMMY()),
-	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
-
-SND_SOC_DAILINK_DEFS(sen_tdm_wsa885x_i2c_rx_virt_c1,
-	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("wsa885x_i2c", "wsa885x_dai_drv_virt_c1")),
-	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
-
-SND_SOC_DAILINK_DEFS(sen_tdm_wsa885x_i2c_rx_virt_c2,
-	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("wsa885x_i2c", "wsa885x_dai_drv_virt_c2")),
-	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2019-2022, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef _MSM_AUDIO_DEFS_H
 #define _MSM_AUDIO_DEFS_H
@@ -68,8 +68,6 @@
 #define LPASS_BE_TERT_TDM_RX_0 "TDM-LPAIF_AUD-RX-SECONDARY"
 #define LPASS_BE_TERT_TDM_TX_0 "TDM-LPAIF_AUD-TX-SECONDARY"
 #define LPASS_BE_SEN_TDM_RX_0 "TDM-LPAIF_WSA-RX-PRIMARY"
-#define LPASS_BE_SEN_TDM_RX_1 "TDM-LPAIF_WSA-RX-PRI-VIRT-1-C1"
-#define LPASS_BE_SEN_TDM_RX_2 "TDM-LPAIF_WSA-RX-PRI-VIRT-1-C2"
 #define LPASS_BE_SEN_TDM_TX_0 "TDM-LPAIF_WSA-TX-PRIMARY"
 #define LPASS_BE_QUAT_TDM_RX_0 "TDM-LPAIF_RXTX-RX-PRIMARY"
 #define LPASS_BE_QUAT_TDM_TX_0 "TDM-LPAIF_RXTX-TX-PRIMARY"
@@ -130,6 +128,5 @@
 #define LPASS_BE_BTFM_PROXY_TX_0 "BTFM_PROXY-TX-0"
 #define LPASS_BE_BTFM_PROXY_RX_1 "BTFM_PROXY-RX-1"
 #define LPASS_BE_BTFM_PROXY_TX_1 "BTFM_PROXY-TX-1"
-#define LPASS_BE_BTFM_AUD_TX_3 "CODEC_DMA-LPAIF_AUD-TX-3"
 
 #endif /*_MSM_AUDIO_DEFS_H*/

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -98,7 +98,6 @@ struct qmp_sdca_dmic_priv {
 	struct snd_soc_dai_driver *dai_driver;
 	struct regulator *slave_vdd;
 	u8 tx_master_port_map[QMP_MAX_DAIS];
-	u8 client_ref_count[QMP_MAX_DAIS];
 	struct swr_port_params tx_port_params[SWR_UC_MAX][QMP_SDCA_DMIC_MAX_PORTS];
 	struct swr_dev_frame_config swr_tx_port_params[SWR_UC_MAX];
 	int fu1_usage_mode;
@@ -475,7 +474,6 @@ static int qmp_sdca_dmic_startup(struct snd_pcm_substream *substream,
 			qmp->swr_tx_port_params);
 	 /* status mask indicate if this dai opened */
 	qmp->dai_status_mask |= BIT(dai->id);
-	qmp->client_ref_count[dai->id]++;
 	qmp->master_port_map_cached[dai->id] = qmp->tx_master_port_map[dai->id];
 	update_ch_per_substream(qmp->dai_status_mask, substream);
 
@@ -600,29 +598,25 @@ static void qmp_sdca_dmic_shutdown(struct snd_pcm_substream *substream,
 	if (!qmp->swr_slave)
 		return;
 
-	if (!(qmp->dai_status_mask & BIT(dai->id)) ||
-	    (qmp->client_ref_count[dai->id] == 0)) {
-		dev_dbg(qmp->dev, "dai %d(%s) not opened, skip", dai->id,
-			dai->name);
+	if (!(qmp->dai_status_mask & BIT(dai->id))) {
+		dev_dbg(qmp->dev, "dai %d(%s) not opened, skip", dai->id, dai->name);
 		return;
 	}
 
 	dev_dbg(qmp->dev, "%s(): dai_name = %s, stream = %d\n", __func__,
 		 dai->name, substream->stream);
 
+
 	/* Disable QMP power supply */
 	qmp_disable_regulator(qmp);
-	if (qmp->client_ref_count[dai->id] == 1) {
-		qmp->dai_status_mask &= ~BIT(dai->id);
-		if (!qmp->dai_status_mask) {
-			qmp->swr_slave->dev_num = 0; /* Both dais are disabled */
-			qmp->swr_slave->clk_scale_initialized = 0;
-			dev_dbg(qmp->dev, "Set dev_num to 0\n");
-			qmp->master_port_map_cached[dai->id] = 0;
-			qmp->initialized = 0;
-		}
+	qmp->dai_status_mask &= ~BIT(dai->id);
+	if (!qmp->dai_status_mask) {
+		qmp->swr_slave->dev_num = 0; /* Both dais are disabled */
+		qmp->swr_slave->clk_scale_initialized = 0;
+		dev_dbg(qmp->dev, "Set dev_num to 0\n");
+		qmp->master_port_map_cached[dai->id] = 0;
+		qmp->initialized = 0;
 	}
-	qmp->client_ref_count[dai->id]--;
 }
 
 static int qmp_sdca_dmic_hw_free(struct snd_pcm_substream *substream,
@@ -639,10 +633,8 @@ static int qmp_sdca_dmic_hw_free(struct snd_pcm_substream *substream,
 	if (!qmp->swr_slave)
 		return -EINVAL;
 
-	if (!(qmp->dai_status_mask & BIT(dai->id)) ||
-	    !qmp->fu1_pde11_en_ref_count) {
-		dev_dbg(qmp->dev, "dai %d(%s) not opened, skip", dai->id,
-			dai->name);
+	if (!(qmp->dai_status_mask & BIT(dai->id))) {
+		dev_dbg(qmp->dev, "dai %d(%s) not opened, skip", dai->id, dai->name);
 		return 0;
 	}
 
