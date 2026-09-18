@@ -414,30 +414,22 @@ QDF_STATUS wlan_mgmt_rx_srng_pdev_create_notification(
 	pdev_priv->hal_soc = hif_get_hal_handle(hif_ctx);
 
 	status = wlan_mgmt_rx_srng_setup(pdev_priv);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mgmt_rx_srng_err("SRNG setup failed");
+	if (QDF_IS_STATUS_ERROR(status))
 		goto free_pdev_priv;
-	}
 
 	status = wlan_mgmt_rx_srng_attach_buffers(pdev_priv);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mgmt_rx_srng_err("SRNG attach buff failed");
+	if (QDF_IS_STATUS_ERROR(status))
 		goto free_mgmt_rx_srng;
-	}
 
 	status = tgt_mgmt_rx_srng_register_ev_handler(psoc);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mgmt_rx_srng_err("SRNG register failed");
+	if (QDF_IS_STATUS_ERROR(status))
 		goto free_srng_buffers;
-	}
 
 	tgt_mgmt_rx_srng_send_reap_threshold(psoc, thres);
 
 	status = wlan_mgmt_rx_srng_htt_setup_send(pdev);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mgmt_rx_srng_err("SRNG setup sned failed");
+	if (QDF_IS_STATUS_ERROR(status))
 		goto unregister_ev_handlers;
-	}
 
 	return status;
 
@@ -456,7 +448,7 @@ free_pdev_priv:
 
 	qdf_mem_free(pdev_priv);
 	psoc_priv->mgmt_rx_srng_is_enable = false;
-	return status;
+	return QDF_STATUS_E_FAILURE;
 }
 
 QDF_STATUS wlan_mgmt_rx_srng_pdev_destroy_notification(

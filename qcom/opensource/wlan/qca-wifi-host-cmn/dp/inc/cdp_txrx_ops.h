@@ -997,9 +997,6 @@ struct cdp_ctrl_ops {
 	QDF_STATUS (*txrx_get_uplink_delay)(struct cdp_soc_t *soc,
 					    uint8_t vdev_id,
 					    uint32_t *val);
-	QDF_STATUS (*txrx_enable_ul_delay)(struct cdp_soc_t *soc,
-					   uint8_t vdev_id,
-					   bool enable);
 #endif
 #ifdef WLAN_FEATURE_UL_JITTER
 	QDF_STATUS (*txrx_nss_request)(struct cdp_soc_t *soc_handle,
@@ -1300,7 +1297,6 @@ struct cdp_mon_ops {
  * mac address
  * @tx_latency_stats_register_cb: register tx latency stats callback
  * @txrx_process_ul_delay: Process UL delay
- * @txrx_dump_custom_stats: dump custom stats
  */
 struct cdp_host_stats_ops {
 	int (*txrx_host_stats_get)(struct cdp_soc_t *soc, uint8_t vdev_id,
@@ -1548,8 +1544,6 @@ struct cdp_host_stats_ops {
 #ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
 	QDF_STATUS (*txrx_process_ul_delay)(struct cdp_soc_t *soc,
 					    uint8_t vdev_id);
-	QDF_STATUS (*txrx_dump_custom_stats)(struct cdp_soc_t *soc,
-					     uint8_t vdev_id);
 #endif
 };
 
@@ -1802,8 +1796,7 @@ struct ol_if_ops {
 				   struct qdf_mem_multi_page_t *pages);
 #if defined(DP_FEATURE_TX_PAGE_POOL) || defined(DP_FEATURE_RX_BUFFER_RECYCLE)
 	struct dp_page_pool_t* (*dp_get_page_pool)(enum qdf_dp_tx_pp_type type,
-						   uint32_t pool_size,
-						   int *pp_track_id);
+						   uint32_t pool_size);
 	void (*dp_put_page_pool)(qdf_page_pool_t pp,
 				 enum qdf_dp_tx_pp_type type);
 	void (*dp_page_pool_init)(struct cdp_ctrl_objmgr_psoc *ctrl_psoc);
@@ -2359,7 +2352,6 @@ struct cdp_throttle_ops {
  * @ipa_uc_set_quota:
  * @ipa_pcie_link_up: Hold PCIe link in L0
  * @ipa_pcie_link_down: Release PCIe link L0 hold
- * @ipa_dump_ring_hp_tp: Dump HP-TP of rings facing IPA
  * @ipa_enable_autonomy:
  * @ipa_disable_autonomy:
  * @ipa_setup:
@@ -2380,7 +2372,6 @@ struct cdp_throttle_ops {
  * @ipa_rx_super_rule_setup: Setup cce super rules based on filter tuple
  * @ipa_tx_super_rule_setup: Setup tx super rules based on filter tuple
  * @ipa_tx_opt_dp_ctrl_pkt: handle opt_dp_ctrl tx pkt
- * @ipa_print_opt_dp_log: opt_dp logging during filter operations
  * @ipa_opt_dp_ctrl_debug_enable: get opt_dp_ctrl debug ini value
  * @ipa_ast_create: Create/Update ast entry
  * @ipa_get_wdi_version: Get WDI version
@@ -2424,7 +2415,6 @@ struct cdp_ipa_ops {
 #ifdef IPA_OPT_WIFI_DP
 	int (*ipa_pcie_link_up)(struct cdp_soc_t *soc_hdl);
 	void (*ipa_pcie_link_down)(struct cdp_soc_t *soc_hdl);
-	void (*ipa_dump_ring_hp_tp)(struct cdp_soc_t *soc_hdl);
 #endif
 	QDF_STATUS (*ipa_enable_autonomy)(struct cdp_soc_t *soc_hdl,
 					  uint8_t pdev_id);
@@ -2503,9 +2493,6 @@ struct cdp_ipa_ops {
 	QDF_STATUS (*ipa_tx_opt_dp_ctrl_pkt)(struct cdp_soc_t *soc_hdl,
 					     uint8_t vdev_id,
 					     qdf_nbuf_t nbuf);
-	void (*ipa_print_opt_dp_log)(struct cdp_soc_t *soc_hdl,
-				     bool is_opt_dp_filter_active,
-				     void *dp_flt_params);
 #ifdef IPA_OPT_WIFI_DP_CTRL
 	bool (*ipa_opt_dp_ctrl_debug_enable)(struct cdp_soc_t *soc_hdl);
 #endif
@@ -2797,8 +2784,7 @@ struct cdp_fse_ops {
 #ifdef WLAN_HAPS_ENABLE
 struct cdp_haps_ops {
 	void
-	(*haps_handle_ind)(ol_osif_vdev_handle osif_vdev,
-			   enum cdp_haps_state new_state,
+	(*haps_handle_ind)(ol_osif_vdev_handle osif_vdev, uint32_t new_state,
 			   qdf_ktime_t time_rcvd, bool is_one_shot,
 			   bool is_direct_reg_write);
 };

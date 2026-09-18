@@ -514,13 +514,6 @@ bool tgt_p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc)
 }
 #endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 
-#ifdef FEATURE_WLAN_SUPPORT_PCC
-bool tgt_p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc)
-{
-	return target_if_p2p_is_fw_support_pcc(psoc);
-}
-#endif /* FEATURE_WLAN_SUPPORT_PCC */
-
 QDF_STATUS
 tgt_p2p_ap_assist_dfs_group_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc,
 					     uint8_t vdev_id)
@@ -558,9 +551,4 @@ tgt_p2p_ap_assist_dfs_group_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc,
 	}
 
 	return status;
-}
-
-bool tgt_p2p_is_fw_cancel_one_shot_noa_supported(struct wlan_objmgr_psoc *psoc)
-{
-	return target_if_p2p_is_fw_cancel_one_shot_noa_supported(psoc);
 }

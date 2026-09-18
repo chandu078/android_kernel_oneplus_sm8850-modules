@@ -970,16 +970,6 @@ static inline bool hdd_netdev_queue_is_locked(struct netdev_queue *txq)
 }
 #endif
 
-static void
-hdd_txq_trans_update(struct net_device *dev, struct netdev_queue *txq)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0))
-	txq_trans_update(dev, txq);
-#else
-	txq_trans_update(txq);
-#endif
-}
-
 /**
  * wlan_hdd_update_txq_timestamp() - update txq timestamp
  * @dev: net device
@@ -1003,7 +993,7 @@ static void wlan_hdd_update_txq_timestamp(struct net_device *dev)
 		 */
 		if (!hdd_netdev_queue_is_locked(txq)) {
 			if (__netif_tx_trylock(txq)) {
-				hdd_txq_trans_update(dev, txq);
+				txq_trans_update(txq);
 				__netif_tx_unlock(txq);
 			}
 		}

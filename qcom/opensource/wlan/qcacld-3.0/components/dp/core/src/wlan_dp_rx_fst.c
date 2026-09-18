@@ -155,9 +155,8 @@ static QDF_STATUS dp_rx_dump_fisa_stats(struct wlan_dp_psoc_context *dp_ctx)
 			sw_ft_entry->aggr_count,
 			sw_ft_entry->flush_count,
 			sw_ft_entry->bytes_aggregated,
-			sw_ft_entry->flush_count ?
-				qdf_do_div(sw_ft_entry->bytes_aggregated,
-					   sw_ft_entry->flush_count) : 0,
+			qdf_do_div(sw_ft_entry->bytes_aggregated,
+				   sw_ft_entry->flush_count),
 			sw_ft_entry->same_mld_vdev_mismatch);
 	}
 	return QDF_STATUS_SUCCESS;
@@ -357,9 +356,6 @@ static QDF_STATUS dp_rx_fst_cmem_init(struct dp_rx_fst *fst)
 		dp_err("failed to allocate fst update wq");
 		return QDF_STATUS_E_FAILURE;
 	}
-
-	fst->last_update_time_ns = 0;
-	fst->update_count = 0;
 
 	qdf_create_work(0, &fst->fst_update_work,
 			dp_fisa_rx_fst_update_work, fst);

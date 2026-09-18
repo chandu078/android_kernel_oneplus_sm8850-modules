@@ -203,10 +203,6 @@ static void action_oui_load_config(struct action_oui_psoc_priv *psoc_priv)
 		      cfg_get(psoc, CFG_ACTION_OUI_RESTRICT_MAX_MLO_LINKS),
 		      ACTION_OUI_MAX_STR_LEN);
 	qdf_str_lcopy(psoc_priv->action_oui_str
-			[ACTION_OUI_RESTRICT_SLO],
-		      cfg_get(psoc, CFG_ACTION_OUI_RESTRICT_SLO),
-		      ACTION_OUI_MAX_STR_LEN);
-	qdf_str_lcopy(psoc_priv->action_oui_str
 			[ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ],
 		      cfg_get(psoc, CFG_ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ),
 		      ACTION_OUI_MAX_STR_LEN);
@@ -222,10 +218,6 @@ static void action_oui_load_config(struct action_oui_psoc_priv *psoc_priv)
 	qdf_str_lcopy(psoc_priv->action_oui_str
 		      [ACTION_OUI_EXT_MLD_CAP_OP],
 		      cfg_get(psoc, CFG_ACTION_OUI_EXT_MLD_CAP_OP),
-		      ACTION_OUI_MAX_STR_LEN);
-	qdf_str_lcopy(psoc_priv->action_oui_str
-		      [ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P],
-		      cfg_get(psoc, CFG_ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P),
 		      ACTION_OUI_MAX_STR_LEN);
 	qdf_str_lcopy(psoc_priv->action_oui_str
 		      [ACTION_OUI_SKIP_BCN_CH_MISMATCH_CHK],
@@ -610,7 +602,7 @@ wlan_action_oui_add_token_opt(enum action_oui_token_type action_token,
 			      uint32_t value_len,
 			      struct action_oui_extension *ext)
 {
-	uint8_t byte_mask_value[ACTION_OUI_MAX_DATA_MASK_LENGTH_HOST_ONLY] = {0};
+	uint8_t byte_mask_value[ACTION_OUI_MAX_DATA_MASK_LENGTH] = {0};
 	uint32_t byte_mask_len = 0;
 
 	switch (action_token) {
@@ -715,16 +707,13 @@ wlan_action_oui_add_token(enum action_oui_token_type action_token,
 			  uint32_t value_len,
 			  struct action_oui_extension *ext)
 {
-	uint8_t byte_mask_value[ACTION_OUI_MAX_DATA_MASK_LENGTH_HOST_ONLY] = {0};
+	uint8_t byte_mask_value[ACTION_OUI_MAX_DATA_MASK_LENGTH] = {0};
 	uint32_t byte_mask_len = 0;
 
 	switch (action_token) {
 	case ACTION_OUI_TOKEN:
 		if (value_len != 3 && value_len != 5) {
 			action_oui_err("Invalid oui len %u", value_len);
-			QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_ACTION_OUI,
-					   QDF_TRACE_LEVEL_DEBUG,
-					   value, value_len);
 			return QDF_STATUS_E_INVAL;
 		}
 		qdf_mem_copy(ext->oui, value, value_len);
@@ -732,18 +721,15 @@ wlan_action_oui_add_token(enum action_oui_token_type action_token,
 		ext->info_mask = ext->info_mask | ACTION_OUI_INFO_OUI;
 		break;
 	case ACTION_OUI_DATA_TOKEN:
-		if (value_len > ACTION_OUI_MAX_DATA_LENGTH_HOST_ONLY) {
+		if (value_len > ACTION_OUI_MAX_DATA_LENGTH) {
 			action_oui_err("Invalid data len %u", value_len);
-			QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_ACTION_OUI,
-					   QDF_TRACE_LEVEL_DEBUG,
-					   value, value_len);
 			return QDF_STATUS_E_INVAL;
 		}
 		qdf_mem_copy(ext->data, value, value_len);
 		ext->data_length = value_len;
 		break;
 	case ACTION_OUI_DATA_MASK_TOKEN:
-		if (value_len > ACTION_OUI_MAX_DATA_MASK_LENGTH_HOST_ONLY) {
+		if (value_len > ACTION_OUI_MAX_DATA_MASK_LENGTH) {
 			action_oui_err("Invalid data mask len %u", value_len);
 			return QDF_STATUS_E_INVAL;
 		}
@@ -751,11 +737,8 @@ wlan_action_oui_add_token(enum action_oui_token_type action_token,
 		ext->data_mask_length = value_len;
 		break;
 	case ACTION_OUI_DATA_BIT_MASK_TOKEN:
-		if (value_len > ACTION_OUI_MAX_DATA_LENGTH_HOST_ONLY) {
+		if (value_len > ACTION_OUI_MAX_DATA_LENGTH) {
 			action_oui_err("Invalid data mask len %u", value_len);
-			QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_ACTION_OUI,
-					   QDF_TRACE_LEVEL_DEBUG,
-					   value, value_len);
 			return QDF_STATUS_E_INVAL;
 		}
 		wlan_action_oui_convert_bit_to_byte_mask(value,
@@ -773,16 +756,18 @@ wlan_action_oui_add_token(enum action_oui_token_type action_token,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef ACTION_OUI_OP_ATTR
+QDF_STATUS
+
+#endif
+
 QDF_STATUS
 wlan_action_oui_extension_store(struct wlan_objmgr_psoc *psoc,
 				enum action_oui_id action_id,
-				struct action_oui_extension *oui_ext,
-				uint8_t oui_ext_num)
+				struct action_oui_extension *oui_ext)
 {
 	struct action_oui_psoc_priv *psoc_priv;
 	struct action_oui_priv *oui_priv;
-	QDF_STATUS status;
-
 
 	if (!psoc) {
 		action_oui_err("Invalid psoc");
@@ -805,11 +790,9 @@ wlan_action_oui_extension_store(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	wlan_action_oui_extension_dump(oui_ext);
 
-	status = action_oui_extension_store(psoc_priv, oui_priv, oui_ext,
-					    oui_ext_num);
-
-	return status;
+	return action_oui_extension_store(psoc_priv, oui_priv, oui_ext);
 }
 
 void wlan_action_oui_extension_dump(struct action_oui_extension *oui_ext)

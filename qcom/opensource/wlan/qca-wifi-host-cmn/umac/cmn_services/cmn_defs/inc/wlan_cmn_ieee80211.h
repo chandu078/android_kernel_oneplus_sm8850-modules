@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -225,7 +225,6 @@
  * @QCN_ATTRIB_EDCA_PIFS_PARAM: EDCA PIFS param
  * @QCN_ATTRIB_ECSA_TARGET_TSF_INFO: ECSA Target TSF information
  * @QCN_ATTRIB_MAX: Maximum attribute
- * @QCN_ATTRIB_5G_CCK_RX_TX_SUPP: 5 GHz CCK RX/TX support
  */
 enum qcn_attribute_id {
 	QCN_ATTRIB_VERSION                  = 0x01,
@@ -242,8 +241,7 @@ enum qcn_attribute_id {
 	QCN_ATTRIB_ECSA_SUPP                = 0X0C,
 	QCN_ATTRIB_EDCA_PIFS_PARAM          = 0X0D,
 	QCN_ATTRIB_ECSA_TARGET_TSF_INFO     = 0x0E,
-	QCN_ATTRIB_5G_CCK_RX_TX_SUPP	    = 0x0F,
-	QCN_ATTRIB_MAX,
+	QCN_ATTRIB_MAX                      = 0x0F
 };
 
 /* Extender vendor specific IE */
@@ -251,6 +249,11 @@ enum qcn_attribute_id {
 
 #define ADAPTIVE_11R_OUI      0x964000
 #define ADAPTIVE_11R_OUI_TYPE 0x2C
+
+#ifdef OPLUS_FEATURE_WIFI_VENDOR_FT
+#define VENDOR_FT_OUI 0x000fe2c8
+#define VENDOR_FT_OUI_SUBTYPE 0x04
+#endif /* OPLUS_FEATURE_WIFI_VENDOR_FT */
 
 #define OUI_LENGTH              4
 #define OUI_TYPE_BITS           24
@@ -3031,19 +3034,6 @@ struct wlan_ml_rv_linfo_perstaprof_stainfo_opparams {
  * Info field.
  */
 
-/* Max length of element info and common info in Reconfiguration variant
- * Multi-Link IE
- */
-#define WLAN_ML_RV_ELEM_COMMON_MAX_LEN \
-	(sizeof(struct wlan_ie_multilink) + \
-	 WLAN_ML_RV_CINFO_LENGTH_MAX)
-
-/* Max link info length of Reconfiguration variant Multi-Link IE */
-#define WLAN_ML_RV_LINK_INFO_MAX_LEN \
-	(sizeof(struct wlan_ml_rv_linfo_perstaprof) + \
-	  WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_MAX + \
-	  WLAN_STA_PROFILE_MAX_LEN)
-
 /* End of definitions related to Reconfiguration variant Multi-Link element. */
 
 /*
@@ -4178,6 +4168,15 @@ is_vendor_wifi7_rsno_oui(uint8_t *frm)
 	return (frm[1] > 4) && (LE_READ_4(frm + 2) ==
 		((RSNO_SUBTYPE_WIFI7_RSN << OUI_TYPE_BITS) | RSN_OVERRIDE_OUI));
 }
+
+#ifdef OPLUS_FEATURE_WIFI_VENDOR_FT
+static inline bool
+is_vendor_ft_oui(uint8_t *frm)
+{
+	return (frm[1] > 4) && (BE_READ_4(frm + 2) == VENDOR_FT_OUI) &&
+		(*(frm + 6) == VENDOR_FT_OUI_SUBTYPE);
+}
+#endif /* OPLUS_FEATURE_WIFI_VENDOR_FT */
 
 #define WLAN_VENDOR_WME_IE_LEN 24
 /**

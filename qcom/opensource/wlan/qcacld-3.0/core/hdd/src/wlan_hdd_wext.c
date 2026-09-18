@@ -360,6 +360,7 @@
  * </ioctl>
  */
 #define WE_SET_CHWIDTH       17
+#define WE_SET_ANI_EN_DIS    18
 #define WE_SET_ANI_POLL_PERIOD    19
 #define WE_SET_ANI_LISTEN_PERIOD  20
 #define WE_SET_ANI_OFDM_LEVEL     21
@@ -4137,6 +4138,14 @@ static int hdd_we_set_pdev(struct hdd_adapter *adapter,
 #define hdd_we_set_pdev(adapter, id, value) \
 			hdd_we_set_pdev(adapter, id, #id, value)
 
+static int hdd_we_set_ani_en_dis(struct wlan_hdd_link_info *link_info,
+				 int value)
+{
+	return hdd_we_set_pdev(link_info->adapter,
+			       wmi_pdev_param_ani_enable,
+			       value);
+}
+
 static int hdd_we_set_ani_poll_period(struct wlan_hdd_link_info *link_info,
 				      int value)
 {
@@ -4762,6 +4771,7 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_SHORT_GI] = hdd_we_set_short_gi,
 	[WE_SET_RTSCTS] = hdd_we_set_rtscts,
 	[WE_SET_CHWIDTH] = hdd_we_set_ch_width,
+	[WE_SET_ANI_EN_DIS] = hdd_we_set_ani_en_dis,
 	[WE_SET_ANI_POLL_PERIOD] = hdd_we_set_ani_poll_period,
 	[WE_SET_ANI_LISTEN_PERIOD] = hdd_we_set_ani_listen_period,
 	[WE_SET_ANI_OFDM_LEVEL] = hdd_we_set_ani_ofdm_level,
@@ -8794,6 +8804,11 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
 	 "chwidth"},
+
+	{WE_SET_ANI_EN_DIS,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "anienable"},
 
 	{WE_SET_ANI_POLL_PERIOD,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,

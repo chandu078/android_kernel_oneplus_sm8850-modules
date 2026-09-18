@@ -412,11 +412,6 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 
 	init_deinit_update_roam_stats_cap(wmi_handle, psoc);
 
-	if (wmi_service_enabled(wmi_handle,
-				wmi_service_handle_roaming_without_rso_stop_for_4way_hs_offload_disable))
-		wlan_psoc_nif_fw_ext2_cap_set(psoc,
-					      WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE);
-
 	init_deinit_update_wifi_pos_caps(wmi_handle, psoc);
 	init_deinit_update_tdls_caps(wmi_handle, psoc);
 
@@ -537,8 +532,6 @@ static int init_deinit_service_ext2_ready_event_handler(ol_scn_t scn_handle,
 	cdp_config_param_type val;
 	QDF_STATUS status;
 	bool opt_power = false;
-	int num_aux_dev_caps = 0;
-	int idx = 0;
 
 	if (!scn_handle) {
 		target_if_err("scn handle NULL in service ready ext2 handler");
@@ -658,18 +651,9 @@ static int init_deinit_service_ext2_ready_event_handler(ol_scn_t scn_handle,
 		if (err_code) {
 			target_if_debug("failed to populate aux_dev cap ext2");
 		} else {
-			num_aux_dev_caps =
-				info->service_ext2_param.num_aux_dev_caps;
 			/* Intersect FW optimize power caps with the INI val */
-			for (idx = 0; idx < num_aux_dev_caps; idx++) {
-				if (info->aux_dev_caps[idx].hw_mode_id <=
-				     WMI_HW_MODE_AUX_EMLSR_SPLIT) {
-					opt_power |= WLAN_OPTIMIZE_POWER &
-						info->aux_dev_caps[idx].supported_modes_bitmap;
-					if (opt_power)
-						break;
-				}
-			}
+			opt_power = WLAN_OPTIMIZE_POWER &
+				info->aux_dev_caps[0].supported_modes_bitmap;
 			target_if_debug("FW optimize power: %d", opt_power);
 			info->wlan_res_cfg.enable_optimize_power &= opt_power;
 		}

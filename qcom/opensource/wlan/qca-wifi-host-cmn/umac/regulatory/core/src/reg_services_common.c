@@ -1417,7 +1417,6 @@ uint16_t reg_get_bw_value(enum phy_ch_width bw)
 		return 0;
 	}
 }
-
 #else
 uint16_t reg_get_bw_value(enum phy_ch_width bw)
 {
@@ -2567,19 +2566,6 @@ bool reg_is_24ghz_ch_freq(uint32_t freq)
 bool reg_is_5ghz_ch_freq(uint32_t freq)
 {
 	return REG_IS_5GHZ_FREQ(freq);
-}
-
-#define MIN_UNII_3_BAND_CHANNEL 5725
-#define MAX_UNII_3_BAND_CHANNEL 5850
-bool reg_is_5ghz_unii3_chan_freq(qdf_freq_t freq)
-{
-	if (!REG_IS_5GHZ_FREQ(freq))
-		return false;
-
-	if (freq >= MIN_UNII_3_BAND_CHANNEL && freq <= MAX_UNII_3_BAND_CHANNEL)
-		return true;
-
-	return false;
 }
 
 /**
@@ -4032,7 +4018,11 @@ reg_update_list_for_dfs_channel(struct wlan_objmgr_pdev *pdev,
 		return;
 	}
 
-	if (!wlan_reg_is_dfs_for_freq(pdev, res_msg[chan_enum].freq))
+	if (!WLAN_REG_IS_5GHZ_CH_FREQ(res_msg[chan_enum].freq))
+		return;
+
+	if (!wlan_reg_is_dfs_for_freq(pdev, res_msg[chan_enum].freq) &&
+	    !wlan_reg_is_freq_indoor(pdev, res_msg[chan_enum].freq))
 		return;
 
 	if (!dfs_master_capable ||
@@ -4205,12 +4195,6 @@ reg_skip_invalid_chan_freq(struct wlan_objmgr_pdev *pdev,
 								res_msg,
 								chan_enum);
 					}
-				} else if (!reg_is_state_allowed(chan_state)) {
-					res_msg[chan_enum].iface_mode_mask &=
-							~(iface_mode);
-					if (!res_msg[chan_enum].iface_mode_mask)
-						reg_remove_freq(res_msg,
-								chan_enum);
 				}
 srd_check:
 				if (!(enable_srd_chan & srd_mask) &&
@@ -7309,7 +7293,7 @@ reg_get_num_rules_of_ap_pwr_type(struct wlan_objmgr_pdev *pdev,
 
 #ifdef CONFIG_AFC_SUPPORT
 /**
- * reg_is_empty_range() - If both left, right frequency edges in the input range
+ * reg_is_empty_range() - If both left, right frquency edges in the input range
  * are zero then the range is empty, else not.
  * @in_range: Pointer to input range
  *
@@ -7854,7 +7838,7 @@ reg_free_afc_opclass_list(struct wlan_afc_opclass_obj_list *opclass_obj_lst)
 
 /**
  * reg_fill_freq_lst() - Allocate and fill the frange buffer and return
- * the buffer. Also return the number of frequency ranges
+ * the buffer. Also return the number of frequence ranges
  * @pdev: Pointer to pdev
  * @pdev_priv_obj: Pointer to pdev private object
  *

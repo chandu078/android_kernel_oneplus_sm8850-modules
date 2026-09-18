@@ -272,9 +272,6 @@ void lim_process_mlm_req_messages(struct mac_context *mac_ctx,
 	case SIR_LIM_ASSOC_FAIL_TIMEOUT:
 		lim_process_assoc_failure_timeout(mac_ctx, msg->bodyval);
 		break;
-	case SIR_LIM_DEAUTH_ACK_TIMEOUT:
-		lim_send_deauth_cnf(mac_ctx, msg->bodyval);
-		break;
 	case SIR_LIM_FT_PREAUTH_RSP_TIMEOUT:
 		lim_process_ft_preauth_rsp_timeout(mac_ctx);
 		break;
@@ -302,12 +299,7 @@ void lim_process_mlm_req_messages(struct mac_context *mac_ctx,
 static void update_rmfEnabled(struct bss_params *addbss_param,
 			      struct pe_session *session)
 {
-	if (wlan_crypto_vdev_is_pmf_enabled(session->vdev, 0) ||
-	    wlan_crypto_vdev_is_pmf_enabled(session->vdev, RSNO_GEN_WIFI6) ||
-	    wlan_crypto_vdev_is_pmf_enabled(session->vdev, RSNO_GEN_WIFI7)) {
-		pe_debug("Enable rmf");
-		addbss_param->rmfEnabled = true;
-	}
+	addbss_param->rmfEnabled = session->limRmfEnabled;
 }
 
 /**
@@ -1301,7 +1293,6 @@ void lim_clean_up_disassoc_deauth_req(struct mac_context *mac_ctx,
 {
 	tLimMlmDisassocReq *mlm_disassoc_req;
 	tLimMlmDeauthReq *mlm_deauth_req;
-	struct pe_session *session;
 
 	mlm_disassoc_req = mac_ctx->lim.limDisassocDeauthCnfReq.pMlmDisassocReq;
 	if (mlm_disassoc_req &&
@@ -1328,13 +1319,8 @@ void lim_clean_up_disassoc_deauth_req(struct mac_context *mac_ctx,
 			     (uint8_t *) &mlm_deauth_req->peer_macaddr.bytes,
 			     QDF_MAC_ADDR_SIZE))) {
 		if (clean_rx_path) {
-			session = pe_find_session_by_session_id
-						(mac_ctx,
-						 mlm_deauth_req->sessionId);
-			if (!session)
-				return;
-
-			lim_send_deauth_cnf(mac_ctx, session->vdev_id);
+			lim_process_deauth_ack_timeout(mac_ctx,
+						       mlm_deauth_req->sessionId);
 		} else {
 			if (tx_timer_running(
 				&mac_ctx->lim.lim_timers.gLimDeauthAckTimer)) {
@@ -1645,28 +1631,22 @@ end:
 }
 
 /*
- * lim_process_deauth_ack_timeout() - This function posts request for
- * processing deauth Ack timeout to the serializer
+ * lim_process_deauth_ack_timeout() - wrapper function around
+ * lim_send_deauth_cnf
  *
  * @pMacGlobal:     mac_ctx
  * @vdev_id:        vdev id
  *
- * Posts message to the Serializer in PE queue for processing deauth ack
- * timeout of type SIR_LIM_DEAUTH_ACK_TIMEOUT
+ * wrapper function around lim_send_deauth_cnf
  *
  * Return: void
  */
 void lim_process_deauth_ack_timeout(void *pMacGlobal, uint32_t vdev_id)
 {
 	struct mac_context *mac_ctx = (struct mac_context *)pMacGlobal;
-	struct scheduler_msg msg = {0};
 
 	pe_debug("Deauth Ack timeout for vdev id %d", vdev_id);
-
-	msg.type = SIR_LIM_DEAUTH_ACK_TIMEOUT;
-	msg.bodyval = (uint32_t)vdev_id;
-	msg.bodyptr = NULL;
-	lim_post_msg_api(mac_ctx, &msg);
+	lim_send_deauth_cnf(mac_ctx, vdev_id);
 }
 
 /*

@@ -76,8 +76,6 @@ static int __wlan_hdd_cfg80211_nan_ext_request(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct net_device *dev = wdev->netdev;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	enum scan_reject_states out_reason = SCAN_REJECT_DEFAULT;
-	uint8_t conc_vdev_id;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -95,11 +93,9 @@ static int __wlan_hdd_cfg80211_nan_ext_request(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	if (hdd_is_connection_in_progress(&conc_vdev_id, &out_reason)) {
-		if (out_reason != EAPOL_IN_PROGRESS) {
-			hdd_err("NAN command refused, reason %d", out_reason);
-			return -EAGAIN;
-		}
+	if (hdd_is_connection_in_progress(NULL, NULL)) {
+		hdd_err("Connection refused: conn in progress");
+		return -EAGAIN;
 	}
 
 	return os_if_process_nan_req(hdd_ctx->pdev, adapter->deflink->vdev_id,

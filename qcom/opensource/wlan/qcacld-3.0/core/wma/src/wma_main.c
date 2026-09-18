@@ -744,7 +744,6 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 		policy_mgr_get_max_conc_cxns(wma_handle->psoc);
 	tgt_cfg->num_max_mlo_link_per_ml_bss =
 		wlan_mlme_get_sta_mlo_conn_max_num(wma_handle->psoc);
-	tgt_cfg->haps_feature_flags = ucfg_dp_get_haps_config(wma_handle->psoc);
 	cfg_nan_get_max_ndi(wma_handle->psoc,
 			    &tgt_cfg->max_ndi);
 	tgt_cfg->apfv6_offload_disabled = cfg_get(wma_handle->psoc,
@@ -3538,6 +3537,28 @@ wma_get_service_cap_per_link_mlo_stats(struct wmi_unified *wmi_handle,
 }
 #endif
 
+/**
+ * wma_set_exclude_selftx_from_cca_busy_time() - Set exclude self tx time from
+ * cca busy time bool
+ * @exclude_selftx_from_cca_busy: Bool to update in in wma ini config
+ * @wma_handle: WMA handle
+ *
+ * Return: None
+ */
+static void
+wma_set_exclude_selftx_from_cca_busy_time(bool exclude_selftx_from_cca_busy,
+					  tp_wma_handle wma_handle)
+{
+	struct wma_ini_config *cfg = wma_get_ini_handle(wma_handle);
+
+	if (!cfg) {
+		wma_err("NULL WMA ini handle");
+		return;
+	}
+
+	cfg->exclude_selftx_from_cca_busy = exclude_selftx_from_cca_busy;
+}
+
 static void wma_deinit_pagefault_wakeup_history(tp_wma_handle wma)
 {
 	struct wma_pf_sym *pf_sym_entry;
@@ -4128,6 +4149,9 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	wma_register_wlm_latency_level_event(wma_handle);
 	wma_register_mws_coex_events(wma_handle);
 	wma_trace_init();
+	wma_set_exclude_selftx_from_cca_busy_time(
+			cds_cfg->exclude_selftx_from_cca_busy,
+			wma_handle);
 	return QDF_STATUS_SUCCESS;
 
 err_dbglog_init:
@@ -4949,7 +4973,10 @@ QDF_STATUS wma_start(void)
 		goto end;
 	}
 	wma_register_spectral_cmds(wma_handle);
-
+#ifdef OPLUS_FEATURE_CONN_POWER_MONITOR
+//add for  connectivity power monitor
+	oplusLpmUeventInit();
+#endif /* OPLUS_FEATURE_CONN_POWER_MONITOR */
 end:
 	wma_debug("Exit");
 	return qdf_status;
@@ -4992,7 +5019,10 @@ QDF_STATUS wma_stop(void)
 		qdf_mem_free(wma_handle->ack_work_ctx);
 		wma_handle->ack_work_ctx = NULL;
 	}
-
+#ifdef OPLUS_FEATURE_CONN_POWER_MONITOR
+//add for  connectivity power monitor
+	oplusConnUeventDeinit();
+#endif /* OPLUS_FEATURE_CONN_POWER_MONITOR */
 	/* Destroy the timer for log completion */
 	qdf_status = qdf_mc_timer_destroy(&wma_handle->log_completion_timer);
 	if (qdf_status != QDF_STATUS_SUCCESS)
@@ -6623,15 +6653,9 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	/*
 	 * Copy engine buffer is limited to 2K and maximum APF data send in a
 	 * WMI command depends on max bus size.
-	 * So, WMI MAX bus size is hardcoded to 2K if max bus size is more
-	 * than 2K.
+	 * So, WMI MAX bus size is hardcoded to 2K.
 	 */
-	if (WMI_MAX_BUS_SIZE <= wmi_get_max_msg_len(wma_handle->wmi_handle))
-		tgt_cfg.wmi_max_len = WMI_MAX_BUS_SIZE - WMI_TLV_HEADROOM;
-	else
-		tgt_cfg.wmi_max_len =
-			wmi_get_max_msg_len(wma_handle->wmi_handle) -
-			WMI_TLV_HEADROOM;
+	tgt_cfg.wmi_max_len = WMI_MAX_BUS_SIZE - WMI_TLV_HEADROOM;
 	tgt_cfg.tx_bfee_8ss_enabled = wma_handle->tx_bfee_8ss_enabled;
 	tgt_cfg.dynamic_nss_chains_support =
 				wma_handle->dynamic_nss_chains_support;
@@ -9536,9 +9560,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 #ifdef FEATURE_WLAN_TDLS
 	case WMA_UPDATE_TDLS_PEER_STATE:
 		wma_update_tdls_peer_state(wma_handle, msg->bodyptr);
-		break;
-	case WMA_UPDATE_TDLS_OFF_CHAN:
-		wma_update_tdls_off_chan_mode(wma_handle, msg->bodyptr);
 		break;
 #endif /* FEATURE_WLAN_TDLS */
 	case WMA_ADD_PERIODIC_TX_PTRN_IND:

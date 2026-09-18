@@ -941,6 +941,9 @@ QDF_STATUS dp_soc_interrupt_attach(struct cdp_soc_t *txrx_soc)
 		int umac_reset_intr_mask =
 			wlan_cfg_get_umac_reset_intr_mask(soc->wlan_cfg_ctx, i);
 
+		if (dp_skip_rx_mon_ring_mask_set(soc))
+			rx_mon_mask = 0;
+
 		soc->intr_ctx[i].dp_intr_id = i;
 		soc->intr_ctx[i].tx_ring_mask = tx_mask;
 		soc->intr_ctx[i].rx_ring_mask = rx_mask;
@@ -1001,12 +1004,8 @@ QDF_STATUS dp_soc_interrupt_attach(struct cdp_soc_t *txrx_soc)
 			rx_err_ring_intr_ctxt_id = i;
 
 		if (dp_is_mon_mask_valid(soc, &soc->intr_ctx[i])) {
-			for (lmac_id = 0; lmac_id < MAX_NUM_LMAC_HW;
-			     lmac_id++) {
-				if (rx_mon_mask & BIT(lmac_id))
-					soc->mon_intr_id_lmac_map[lmac_id] = i;
-			}
-
+			soc->mon_intr_id_lmac_map[lmac_id] = i;
+			lmac_id++;
 		}
 	}
 
@@ -3082,8 +3081,6 @@ static void dp_display_li_be_only_srng_info(struct cdp_soc_t *soc_hdl)
 }
 #endif
 
-#define DP_SW2WBM_RING_IDLE_WAIT_CNT 5
-
 /**
  * dp_display_srng_info() - Dump the srng HP TP info
  * @soc_hdl: CDP Soc handle
@@ -3131,19 +3128,8 @@ bool dp_display_srng_info(struct cdp_soc_t *soc_hdl)
 
 	dp_display_li_be_only_srng_info(soc_hdl);
 
-	for (i = 0; i < DP_SW2WBM_RING_IDLE_WAIT_CNT; i++) {
-		hal_get_sw_hptp(hal_soc, soc->wbm_desc_rel_ring.hal_srng,
-				&tp, &hp);
-		if (hp == tp)
-			break;
-
-		msleep(10);
-	}
-
+	hal_get_sw_hptp(hal_soc, soc->wbm_desc_rel_ring.hal_srng, &tp, &hp);
 	dp_info("WBM desc release ring: hp=0x%x, tp=0x%x", hp, tp);
-
-	if (hp != tp)
-		ret = false;
 
 	return ret;
 }
@@ -3572,6 +3558,7 @@ static void dp_soc_cfg_init(struct dp_soc *soc)
 				soc->wlan_cfg_ctx->int_rxdma2host_ring_mask[int_ctx] = 0;
 			}
 		}
+		soc->wlan_cfg_ctx->rxdma1_enable = 0;
 		break;
 	case TARGET_TYPE_KIWI:
 	case TARGET_TYPE_MANGO:
@@ -3593,6 +3580,8 @@ static void dp_soc_cfg_init(struct dp_soc *soc)
 					soc->wlan_cfg_ctx->int_rxdma2host_ring_mask[int_ctx] = 0;
 			}
 		}
+
+		soc->wlan_cfg_ctx->rxdma1_enable = 0;
 		dp_set_num_rxdma_dst_ring(soc);
 		break;
 	case TARGET_TYPE_FIG:
@@ -3609,6 +3598,8 @@ static void dp_soc_cfg_init(struct dp_soc *soc)
 				soc->wlan_cfg_ctx->int_rx_ring_mask[int_ctx] = 0;
 			}
 		}
+
+		soc->wlan_cfg_ctx->rxdma1_enable = 0;
 		dp_set_num_rxdma_dst_ring(soc);
 		soc->rxdma2sw_rings_not_supported = 1;
 		break;
@@ -3885,7 +3876,6 @@ void *dp_soc_init(struct dp_soc *soc, HTC_HANDLE htc_handle,
 			   cfg_get(soc->ctrl_psoc, CFG_DP_RX_RR));
 #endif
 	soc->cce_disable = false;
-	soc->is_opt_dp_filter_active = false;
 	soc->max_ast_ageout_count = MAX_AST_AGEOUT_COUNT;
 
 	soc->sta_mode_search_policy = DP_TX_ADDR_SEARCH_ADDR_POLICY;
@@ -4674,6 +4664,7 @@ void dp_soc_cfg_attach(struct dp_soc *soc)
 	case TARGET_TYPE_QCA6750:
 		wlan_cfg_set_reo_dst_ring_size(soc->wlan_cfg_ctx,
 					       REO_DST_RING_SIZE_QCA6290);
+		soc->wlan_cfg_ctx->rxdma1_enable = 0;
 		break;
 	case TARGET_TYPE_KIWI:
 	case TARGET_TYPE_MANGO:
@@ -4681,6 +4672,7 @@ void dp_soc_cfg_attach(struct dp_soc *soc)
 	case TARGET_TYPE_WCN7750:
 	case TARGET_TYPE_QCC2072:
 	case TARGET_TYPE_FIG:
+		soc->wlan_cfg_ctx->rxdma1_enable = 0;
 		break;
 	case TARGET_TYPE_QCA8074:
 		wlan_cfg_set_tso_desc_attach_defer(soc->wlan_cfg_ctx, 1);
@@ -4691,18 +4683,22 @@ void dp_soc_cfg_attach(struct dp_soc *soc)
 	case TARGET_TYPE_QCN6122:
 	case TARGET_TYPE_QCA5018:
 		wlan_cfg_set_tso_desc_attach_defer(soc->wlan_cfg_ctx, 1);
+		wlan_cfg_set_rxdma1_enable(soc->wlan_cfg_ctx);
 		break;
 	case TARGET_TYPE_QCN9160:
 		wlan_cfg_set_tso_desc_attach_defer(soc->wlan_cfg_ctx, 1);
+		soc->wlan_cfg_ctx->rxdma1_enable = 0;
 		break;
 	case TARGET_TYPE_QCN9000:
 		wlan_cfg_set_tso_desc_attach_defer(soc->wlan_cfg_ctx, 1);
+		wlan_cfg_set_rxdma1_enable(soc->wlan_cfg_ctx);
 		break;
 	case TARGET_TYPE_QCN9224:
 	case TARGET_TYPE_QCA5332:
 	case TARGET_TYPE_QCN6432:
 	case TARGET_TYPE_QCA5424:
 		wlan_cfg_set_tso_desc_attach_defer(soc->wlan_cfg_ctx, 1);
+		wlan_cfg_set_rxdma1_enable(soc->wlan_cfg_ctx);
 		break;
 	default:
 		qdf_print("%s: Unknown tgt type %d\n", __func__, target_type);

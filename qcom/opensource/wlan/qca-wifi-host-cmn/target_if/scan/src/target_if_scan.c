@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -495,11 +495,10 @@ target_if_scan_register_event_handler(struct wlan_objmgr_psoc *psoc, void *arg)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	status = wmi_unified_register_event_handler(
+	status = wmi_unified_register_event(
 			wmi_handle,
 			wmi_scan_event_id,
-			target_if_scan_event_handler,
-			WMI_RX_WORK_CTX);
+			target_if_scan_event_handler);
 	if (status) {
 		target_if_err("Failed to register Scan match event cb");
 		return QDF_STATUS_E_FAILURE;

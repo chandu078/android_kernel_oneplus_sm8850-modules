@@ -159,6 +159,11 @@ QDF_STATUS lim_send_set_max_tx_power_req(struct mac_context *mac,
 		int8_t txPower,
 		struct pe_session *pe_session);
 
+#ifdef OPLUS_FEATURE_SOFTAP_DCS_SWITCH
+//Add for softap connect fail monitor
+void hostapd_send_sae_uevent(struct sir_sae_msg *sae_msg);
+#endif /* OPLUS_FEATURE_SOFTAP_DCS_SWITCH */
+
 /**
  * lim_get_num_pwr_levels() - Utility to get number of tx power levels
  * @is_psd: PSD power check
@@ -1652,7 +1657,7 @@ void lim_update_session_he_capable_chan_switch(struct mac_context *mac,
  * Return: None
  */
 void lim_set_he_caps(struct mac_context *mac, uint8_t *ie_start,
-		     uint32_t num_bytes, uint8_t band, uint8_t vdev_id);
+		     uint32_t num_bytes, uint8_t band);
 
 /**
  * lim_send_he_caps_ie() - gets HE capability and send to firmware via wma
@@ -1889,9 +1894,9 @@ void lim_update_session_he_capable_chan_switch(struct mac_context *mac,
 {
 }
 
-static inline void lim_set_he_caps(struct mac_context *mac, uint8_t *ie_start,
-				   uint32_t num_bytes, uint8_t band,
-				   uint8_t vdev_id)
+static inline void lim_set_he_caps(struct mac_context *mac, struct pe_session *session,
+				   uint8_t *ie_start, uint32_t num_bytes,
+				   uint8_t band)
 {
 }
 
@@ -3520,10 +3525,10 @@ lim_skip_tpc_update_for_sta(struct mac_context *mac,
  * Return: QDF_STATUS_SUCCESS on success, error code otherwise
  */
 QDF_STATUS lim_get_6g_power_type_with_bw(
-	struct mac_context *mac,
-	struct pe_session *session,
-	qdf_freq_t chan_freq,
-	enum reg_6g_ap_type *power_type_6g);
+        struct mac_context *mac,
+        struct pe_session *session,
+        qdf_freq_t chan_freq,
+        enum reg_6g_ap_type *power_type_6g);
 
 #ifdef FEATURE_WLAN_GC_SKIP_JOIN
 static inline bool

@@ -1326,17 +1326,6 @@ QDF_STATUS wma_process_ch_avoid_update_req(tp_wma_handle wma_handle,
 #ifdef FEATURE_WLAN_TDLS
 int wma_update_tdls_peer_state(WMA_HANDLE handle,
 			       struct tdls_peer_update_state *peer_state);
-
-/*
- * wma_update_tdls_off_chan_mode() - Process the message from TDLS to send
- * off-channel mode to firmware
- * @handle: ol scn handle
- * @ch_params: off-channel params
- *
- * Return: 0 for success or error code
- */
-int wma_update_tdls_off_chan_mode(WMA_HANDLE handle,
-				  struct tdls_channel_switch_params *ch_params);
 #endif
 
 void wma_set_vdev_mgmt_rate(tp_wma_handle wma, uint8_t vdev_id);
@@ -1792,4 +1781,10 @@ wma_update_edca_pifs_param(WMA_HANDLE handle,
 QDF_STATUS
 wma_update_bss_peer_phy_mode(struct wlan_channel *des_chan,
 			     struct wlan_objmgr_vdev *vdev);
+
+#ifdef OPLUS_FEATURE_CONN_POWER_MONITOR
+//add for connectivity power monitor
+int oplusLpmUeventInit(void);
+void oplusConnUeventDeinit(void);
+#endif /* OPLUS_FEATURE_CONN_POWER_MONITOR */
 #endif

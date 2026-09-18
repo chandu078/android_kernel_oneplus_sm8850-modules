@@ -243,8 +243,7 @@ void ipa_uc_stat(struct wlan_objmgr_pdev *pdev)
 
 #ifdef IPA_OPT_WIFI_DP_CTRL
 void ipa_set_opt_dp_ctrl_flt(struct wlan_objmgr_pdev *pdev,
-			     struct ipa_wdi_opt_dpath_flt_add_cb_params *flt,
-			     uint8_t opr)
+			     struct ipa_wdi_opt_dpath_flt_add_cb_params *flt)
 {
 	struct wlan_ipa_priv *ipa_obj;
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
@@ -263,25 +262,11 @@ void ipa_set_opt_dp_ctrl_flt(struct wlan_objmgr_pdev *pdev,
 		return;
 	}
 
-	switch (opr) {
-	case IPA_OPT_DP_RESV:
-		wlan_ipa_wdi_opt_dpath_flt_rsrv_cb(ipa_obj, NULL);
-		break;
-	case IPA_OPT_DP_ADD:
-		wlan_ipa_wdi_opt_dpath_flt_add_cb(ipa_obj, flt);
-		break;
-	case IPA_OPT_DP_CTRL_ADD:
-		wlan_ipa_wdi_opt_dpath_ctrl_flt_add_cb(ipa_obj, flt);
-		break;
-	default:
-		ipa_err("invalid operation %d", opr);
-		break;
-	}
+	wlan_ipa_wdi_opt_dpath_ctrl_flt_add_cb(ipa_obj, flt);
 }
 
 void ipa_set_opt_dp_ctrl_flt_rm(struct wlan_objmgr_pdev *pdev,
-				struct ipa_wdi_opt_dpath_flt_rem_cb_params *flt,
-				uint8_t opr)
+				struct ipa_wdi_opt_dpath_flt_rem_cb_params *flt)
 {
 	struct wlan_ipa_priv *ipa_obj;
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
@@ -300,32 +285,16 @@ void ipa_set_opt_dp_ctrl_flt_rm(struct wlan_objmgr_pdev *pdev,
 		return;
 	}
 
-	switch (opr) {
-	case IPA_OPT_DP_RELEASE:
-		wlan_ipa_wdi_opt_dpath_flt_rsrv_rel_cb_wrapper(ipa_obj);
-		break;
-	case IPA_OPT_DP_REM:
-		wlan_ipa_wdi_opt_dpath_flt_rem_cb(ipa_obj, flt);
-		break;
-	case IPA_OPT_DP_CTRL_REM:
-		wlan_ipa_wdi_opt_dpath_ctrl_flt_rem_cb_wrapper(ipa_obj,
-							       flt);
-		break;
-	default:
-		ipa_err("invalid operation %d", opr);
-		break;
-	}
+	wlan_ipa_wdi_opt_dpath_ctrl_flt_rem_cb_wrapper(ipa_obj, flt);
 }
 #else
 void ipa_set_opt_dp_ctrl_flt(struct wlan_objmgr_pdev *pdev,
-			     struct ipa_wdi_opt_dpath_flt_add_cb_params *flt,
-			     uint8_t opr)
+			     struct ipa_wdi_opt_dpath_flt_add_cb_params *flt)
 {
 }
 
 void ipa_set_opt_dp_ctrl_flt_rm(struct wlan_objmgr_pdev *pdev,
-				struct ipa_wdi_opt_dpath_flt_rem_cb_params *flt,
-				uint8_t opr)
+				struct ipa_wdi_opt_dpath_flt_rem_cb_params *flt)
 {
 }
 #endif

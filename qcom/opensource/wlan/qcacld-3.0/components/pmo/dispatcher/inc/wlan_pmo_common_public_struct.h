@@ -103,7 +103,6 @@ enum pmo_beacon_dtim_policy {
  *  before the entering the Active state
  * @pmo_sta_ps_param_ito_repeat_count: Indicates ito repeated count
  * @pmo_sta_ps_param_spec_wake_interval: OPM speculative wake interval
- * @pmo_sta_ps_param_opm_level: OPM power save level
  */
 enum pmo_sta_powersave_param {
 	pmo_sta_ps_param_rx_wake_policy = 0,
@@ -116,7 +115,6 @@ enum pmo_sta_powersave_param {
 	pmo_sta_ps_param_advanced_power_max_tx_before_wake = 7,
 	pmo_sta_ps_param_ito_repeat_count = 8,
 	pmo_sta_ps_param_spec_wake_interval = 9,
-	pmo_sta_ps_param_opm_level = 10,
 };
 
 /**
@@ -172,13 +170,11 @@ enum pmo_wow_enable_type {
  * @PMO_PS_ADVANCED_POWER_SAVE_DISABLE: Disable advanced power save mode
  * @PMO_PS_ADVANCED_POWER_SAVE_ENABLE: Enable power save mode
  * @PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED: User Defined
- * @PMO_PS_ADVANCED_POWER_SAVE_LATENCY_BASED : Latency Enabled
  */
 enum powersave_mode {
 	PMO_PS_ADVANCED_POWER_SAVE_DISABLE = 0,
 	PMO_PS_ADVANCED_POWER_SAVE_ENABLE = 1,
-	PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED = 2,
-	PMO_PS_ADVANCED_POWER_SAVE_LATENCY_BASED = 3
+	PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED = 2
 };
 
 /**
@@ -194,8 +190,12 @@ enum pmo_suspend_mode {
 	PMO_SUSPEND_WOW,
 	PMO_SUSPEND_SHUTDOWN
 };
-
-#define PMO_TARGET_SUSPEND_TIMEOUT   (4000)
+//#ifdef OPLUS_FEATURE_WIFI_DCS_SWITCH
+//lixiong2@CONNECTIVITY.HARDWARE.WIFI.9832451, modify the time of suspend 
+//#define PMO_TARGET_SUSPEND_TIMEOUT   (4000)
+//#else
+#define PMO_TARGET_SUSPEND_TIMEOUT   (10000)
+//#endif /* OPLUS_FEATURE_WIFI_DCS_SWITCH */
 #define PMO_WAKE_LOCK_TIMEOUT        1000
 #define PMO_RESUME_TIMEOUT           (4000)
 
@@ -585,13 +585,11 @@ struct pmo_igmp_offload_req {
  * struct pmo_ps_params - structure to hold OPM params
  *
  * @opm_mode: OPM mode
- * @ps_opm_level: power save opm level
  * @ps_ito: power save inactivity timeout
  * @spec_wake: OPM speculative wake interval
  */
 struct pmo_ps_params {
 	enum powersave_mode opm_mode;
-	uint8_t ps_opm_level;
 	uint16_t ps_ito;
 	uint16_t spec_wake;
 };

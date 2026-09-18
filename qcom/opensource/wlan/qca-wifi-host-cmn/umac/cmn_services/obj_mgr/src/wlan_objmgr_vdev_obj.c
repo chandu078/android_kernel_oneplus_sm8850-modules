@@ -64,7 +64,8 @@ static QDF_STATUS wlan_objmgr_vdev_object_status(
 		 * If component failed to allocate its object, treat it as
 		 * failure, complete object need to be cleaned up
 		 */
-		} else if (QDF_IS_STATUS_ERROR(vdev->obj_status[id])) {
+		} else if ((vdev->obj_status[id] == QDF_STATUS_E_NOMEM) ||
+			(vdev->obj_status[id] == QDF_STATUS_E_FAILURE)) {
 			status = QDF_STATUS_E_FAILURE;
 			break;
 		}
@@ -131,7 +132,7 @@ static struct vdev_osif_priv *wlan_objmgr_vdev_get_osif_priv(
 	return osif_priv;
 }
 
-#if defined(FEATURE_WLAN_SUPPORT_P2P_R2) || defined(FEATURE_WLAN_SUPPORT_PCC)
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 void wlan_vdev_set_wfd_mode(struct wlan_objmgr_vdev *vdev, uint8_t wfd_mode)
 {
 	vdev->vdev_mlme.wfd_mode = wfd_mode;
@@ -148,15 +149,7 @@ wlan_vdev_get_wfd_mode(struct wlan_vdev_create_params *params)
 {
 	return params->wfd_mode;
 }
-#else
-static inline uint8_t
-wlan_vdev_get_wfd_mode(struct wlan_vdev_create_params *params)
-{
-	return 0xFF;
-}
-#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 || FEATURE_WLAN_SUPPORT_PCC */
 
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 bool wlan_vdev_p2p_is_wfd_r2_mode(struct wlan_objmgr_psoc *psoc,
 				  uint8_t vdev_id)
 {
@@ -178,41 +171,18 @@ bool wlan_vdev_p2p_is_wfd_r2_mode(struct wlan_objmgr_psoc *psoc,
 	wfd_mode = wlan_vdev_mlme_get_wfd_mode(vdev);
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
-	if (wfd_mode == P2P_MODE_WFD_R2)
+	if (wfd_mode == P2P_MODE_WFD_R2 || wfd_mode == P2P_MODE_WFD_PCC)
 		return true;
 
 	return false;
+}
+#else
+static inline uint8_t
+wlan_vdev_get_wfd_mode(struct wlan_vdev_create_params *params)
+{
+	return 0xFF;
 }
 #endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-#ifdef FEATURE_WLAN_SUPPORT_PCC
-bool wlan_vdev_p2p_is_pcc_mode(struct wlan_objmgr_psoc *psoc,
-			       uint8_t vdev_id)
-{
-	uint8_t wfd_mode;
-	struct wlan_objmgr_vdev *vdev;
-
-	if (!psoc) {
-		obj_mgr_err("psoc is NULL");
-		return false;
-	}
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_MLME_OBJMGR_ID);
-	if (!vdev) {
-		obj_mgr_err("vdev is NULL for id%d", vdev_id);
-		return false;
-	}
-
-	wfd_mode = wlan_vdev_mlme_get_wfd_mode(vdev);
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
-	if (wfd_mode == P2P_MODE_WFD_PCC)
-		return true;
-
-	return false;
-}
-#endif /* FEATURE_WLAN_SUPPORT_PCC */
 
 struct wlan_objmgr_vdev *wlan_objmgr_vdev_obj_create(
 			struct wlan_objmgr_pdev *pdev,
@@ -336,31 +306,20 @@ struct wlan_objmgr_vdev *wlan_objmgr_vdev_obj_create(
 			WLAN_MAX_PDEV_TEMP_PEERS);
 	/* TODO init other parameters */
 
-	/**
-	 * Initialize vdev->obj_status[] to QDF_STATUS_COMP_DISABLED
-	 * and abort the handler iteration on first error
-	 * except QDF_STATUS_COMP_ASYNC to prevent subsequent
-	 * components from executing after a failure.
-	 */
-	for (id = 0; id < WLAN_UMAC_MAX_COMPONENTS; id++)
-		vdev->obj_status[id] = QDF_STATUS_COMP_DISABLED;
-
 	/* Invoke registered create handlers */
 	for (id = 0; id < WLAN_UMAC_MAX_COMPONENTS; id++) {
 		handler = g_umac_glb_obj->vdev_create_handler[id];
 		arg = g_umac_glb_obj->vdev_create_handler_arg[id];
-		if (handler) {
+		if (handler)
 			vdev->obj_status[id] = handler(vdev, arg);
-			if (QDF_IS_STATUS_ERROR(vdev->obj_status[id]) &&
-			    vdev->obj_status[id] != QDF_STATUS_COMP_ASYNC)
-				break;
-		}
+		else
+			vdev->obj_status[id] = QDF_STATUS_COMP_DISABLED;
 	}
 
 	/* Derive object status */
 	obj_status = wlan_objmgr_vdev_object_status(vdev);
 
-	if (QDF_IS_STATUS_SUCCESS(obj_status)) {
+	if (obj_status == QDF_STATUS_SUCCESS) {
 		/* Object status is SUCCESS, Object is created */
 		vdev->obj_state = WLAN_OBJ_STATE_CREATED;
 		/* Invoke component registered status handlers */
@@ -379,7 +338,7 @@ struct wlan_objmgr_vdev *wlan_objmgr_vdev_obj_create(
 	} else if (obj_status == QDF_STATUS_COMP_ASYNC) {
 		vdev->obj_state = WLAN_OBJ_STATE_PARTIALLY_CREATED;
 	/* Component object failed to be created, clean up the object */
-	} else if (QDF_IS_STATUS_ERROR(obj_status)) {
+	} else if (obj_status == QDF_STATUS_E_FAILURE) {
 		/* Clean up the psoc */
 		obj_mgr_err("VDEV comp objects creation failed for vdev-id:%d",
 			vdev->vdev_objmgr.vdev_id);

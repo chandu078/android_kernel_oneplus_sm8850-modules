@@ -144,13 +144,7 @@
  * @buf_len: Length of the read memory requested
  * @offset: APF work memory offset to fetch from
  * @lock: APF Context lock
- * @apf_inst_pool: Pointers to stored instructions
- * @apf_inst_total_len: Total expected length for each slot
- * @apf_inst_curr_len: Current accumulated length for each slot
- * @apf_inst_index: Index of the current active slot (circular buffer)
- * @apf_inst_timestamp: Timestamp when instruction was stored (microseconds)
  */
-#define APF_HISTORY_LEN 5
 struct hdd_apf_context {
 	unsigned int magic;
 	qdf_event_t qdf_apf_event;
@@ -160,11 +154,6 @@ struct hdd_apf_context {
 	uint32_t buf_len;
 	uint32_t offset;
 	qdf_spinlock_t lock;
-	uint8_t *apf_inst_pool[APF_HISTORY_LEN];
-	uint32_t apf_inst_total_len[APF_HISTORY_LEN];
-	uint32_t apf_inst_curr_len[APF_HISTORY_LEN];
-	uint8_t apf_inst_index;
-	uint64_t apf_inst_timestamp[APF_HISTORY_LEN];
 };
 #endif /* FEATURE_WLAN_APF */
 
@@ -329,7 +318,6 @@ enum hdd_adapter_flags {
  * @SOFTAP_INIT_DONE: Software Access Point (SAP) is initialized
  * @VENDOR_ACS_RESPONSE_PENDING: Waiting for event for vendor acs
  * @SOFTAP_ADD_INTF_LINK: add_intf_link is set for multi link SAP
- * @SOFTAP_LINK_REMOVAL_IN_PROGRESS: mlo sap link remove flag
  * @WLAN_LINK_FLAG_BITS_MAX: Max bit size of this enum
  */
 enum hdd_link_flags {
@@ -338,7 +326,6 @@ enum hdd_link_flags {
 	SOFTAP_INIT_DONE,
 	VENDOR_ACS_RESPONSE_PENDING,
 	SOFTAP_ADD_INTF_LINK,
-	SOFTAP_LINK_REMOVAL_IN_PROGRESS,
 	WLAN_LINK_FLAG_BITS_MAX,
 };
 
@@ -600,7 +587,6 @@ typedef enum {
 	NET_DEV_HOLD_LOCAL_PKT_CAPTURE = 65,
 	NET_DEV_HOLD_SENT_FRAME_TO_USERSPACE = 66,
 	NET_DEV_HOLD_SYSFS_APFMODE_STORE = 67,
-	NET_DEV_HOLD_APF_INSTRUCTION = 69,
 
 	/* Keep it at the end */
 	NET_DEV_HOLD_ID_MAX
@@ -1464,7 +1450,6 @@ enum hdd_wlm_latency_level {
  *                    fetched
  * @wfd_mode: WFD mode for P2P interface
  * @enable_active_apf_mode: Enable active APF mode flag
- * @dhcp_config_setsuspend: Enable when DHCP in progress and get setsuspend cmd
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1668,11 +1653,10 @@ struct hdd_adapter {
 	struct get_station_client_info sta_client_info[GET_STA_MAX_HOST_CLIENT];
 	bool wlm_ll_conn_flag;
 	struct wlan_hdd_link_info *discon_link_info;
-#if defined(FEATURE_WLAN_SUPPORT_P2P_R2) || defined(FEATURE_WLAN_SUPPORT_PCC)
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 	uint8_t wfd_mode;
 #endif
 	bool enable_active_apf_mode;
-	bool dhcp_config_setsuspend;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
@@ -2620,10 +2604,6 @@ struct hdd_context {
 #ifdef FEATURE_WLAN_TX_POWERBOOST
 	struct hdd_tx_powerboost tx_pb;
 #endif
-#if defined(WLAN_SYSFS) && defined(WLAN_TAS_SYSFS)
-	bool tas_enabled;
-	bool tas_send_to_fw;
-#endif
 };
 
 /**
@@ -2693,7 +2673,25 @@ struct hdd_channel_info {
 	u_int8_t vht_center_freq_seg0;
 	u_int8_t vht_center_freq_seg1;
 };
+#ifdef OPLUS_FEATURE_WIFI_DCS_SWITCH
+//Add for wifi switch monitor
+enum wlan_hostdriver_loadstatus {
+	INSMOD_SUCCESS = 1,
+	INSMOD_FAIL,
+	RMMOD_SUCCESS,
+	RMMOD_FAIL,
+	INI_PRASE_SUCCESS,
+	INI_PRASE_FAIL,
+};
 
+struct wlan_hostdriver_loadresult {
+	u_int8_t insmod_status;
+	u_int8_t rmmod_status;
+	u_int8_t ini_prase_status;
+};
+
+void wlan_driver_send_uevent(char *enable);
+#endif /* OPLUS_FEATURE_WIFI_DCS_SWITCH */
 /**
  * struct hdd_chwidth_info - channel width related info
  * @sir_chwidth_valid: If nl_chan_width is valid in Sir
@@ -3272,22 +3270,6 @@ void hdd_adapter_put(struct hdd_adapter *adapter);
 struct wlan_hdd_link_info *
 hdd_get_link_info_by_link_addr(struct hdd_context *hdd_ctx,
 			       struct qdf_mac_addr *link_addr);
-
-/**
- * hdd_get_link_info_by_mac_and_vdev_for_adapter() - Get link info by MAC and vdev ID
- * @adapter: adapter reference
- * @mac_addr: MAC address to match
- * @vdev_id: Vdev ID to match
- *
- * Find link_info that matches both MAC address and vdev_id.
- * This is more robust than matching MAC address alone.
- *
- * Return: Pointer to link_info on success, NULL on failure
- */
-struct wlan_hdd_link_info *
-hdd_get_link_info_by_mac_and_vdev_for_adapter(struct hdd_adapter *adapter,
-					      struct qdf_mac_addr *mac_addr,
-					      uint8_t vdev_id);
 
 struct hdd_adapter *hdd_get_adapter_by_macaddr(struct hdd_context *hdd_ctx,
 					       tSirMacAddr mac_addr);
@@ -4615,24 +4597,6 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held);
 int hdd_configure_cds(struct hdd_context *hdd_ctx);
 int hdd_set_fw_params(struct hdd_adapter *adapter);
 
-/**
- * hdd_send_tas_mode() - Retrieve TAS mode and send pdev param to firmware
- * @hdd_ctx: HDD context
- *
- * This function reads the TAS configuration stored in hdd context and
- * sends the TAS mode parameter to firmware via mlme_check_index_setparam.
- *
- * Return: 0 on success, negative errno on failure
- */
-#if defined(WLAN_SYSFS) && defined(WLAN_TAS_SYSFS)
-int hdd_send_tas_mode(struct hdd_context *hdd_ctx);
-#else
-static inline int hdd_send_tas_mode(struct hdd_context *hdd_ctx)
-{
-	return 0;
-}
-#endif
-
 #ifdef MULTI_CLIENT_LL_SUPPORT
 /**
  * wlan_hdd_deinit_multi_client_info_table() - to deinit multi client info table
@@ -5846,8 +5810,7 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
 /**
  * hdd_roam_vdev_mac_addr_update() - API to update OSIF/HDD on VDEV
  * mac addr update due to roaming.
- * @primary_vdev: VDEV undergoing roaming
- * @vdev_id: vdev ID for which the HDD MAC address needs to be updated
+ * @vdev: vdev pointer
  * @old_self_mac: Current self link mac of VDEV
  * @new_self_mac: New self link mac of VDEV
  *
@@ -5857,8 +5820,7 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS hdd_roam_vdev_mac_addr_update(struct wlan_objmgr_vdev *primary_vdev,
-					 uint8_t vdev_id,
+QDF_STATUS hdd_roam_vdev_mac_addr_update(struct wlan_objmgr_vdev *vdev,
 					 struct qdf_mac_addr *old_self_mac,
 					 struct qdf_mac_addr *new_self_mac);
 
@@ -6010,6 +5972,11 @@ static inline void wlan_hdd_link_speed_update(struct wlan_objmgr_psoc *psoc,
 					      bool is_link_speed_good)
 {}
 #endif
+
+//#ifdef OPLUS_FEATURE_WIFI_WSA
+//Add for STBC&MRC
+int send_oplus_uevent(const char *src);
+//#endif OPLUS_FEATURE_WIFI_WSA
 
 /**
  * hdd_update_multicast_list() - update the multicast list

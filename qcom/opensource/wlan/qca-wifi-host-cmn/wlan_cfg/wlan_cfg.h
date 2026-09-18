@@ -271,6 +271,7 @@ struct wlan_srng_cfg {
  * @raw_mode_war: enable/disable raw mode war
  * @enable_data_stall_detection: enable/disable specific data stall detection
  * @disable_intra_bss_fwd: flag to disable intra bss forwarding
+ * @rxdma1_enable: flag to indicate if rxdma1 is enabled
  * @delay_mon_replenish: delay monitor buffer replenish
  * @max_ast_idx:
  * @resv_ast_idx: AST entries reserved for directly connected client
@@ -400,7 +401,6 @@ struct wlan_srng_cfg {
  * @dp_eapol_stats: flag to enable/disable eapol drop stats
  * @is_ndp_bw_flow_ctrl_enabled: NDP bw flow control enabled/disabled flag
  * @dp_tx_page_pool: DP TX page pool enable/disable
- * @dp_aux_refill_ring: DP aux refill ring config
  */
 struct wlan_cfg_dp_soc_ctxt {
 	int num_int_ctxts;
@@ -513,6 +513,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	bool raw_mode_war;
 	uint32_t enable_data_stall_detection;
 	bool disable_intra_bss_fwd;
+	bool rxdma1_enable;
 	bool delay_mon_replenish;
 	int max_ast_idx;
 	int resv_ast_idx;
@@ -683,7 +684,6 @@ struct wlan_cfg_dp_soc_ctxt {
  * @nss_enabled: 1 - NSS enabled, 0 - NSS disabled
  * @dma_tx_mon_buf_ring_size: Tx monitor BUF Ring size
  * @sw2rxdma_link_ring_size: SW2RXDMA link ring size
- * @dp_direct_refill_ring: DP direct refill ring config
  */
 struct wlan_cfg_dp_pdev_ctxt {
 	int rx_dma_buf_ring_size;
@@ -2503,6 +2503,13 @@ uint8_t wlan_cfg_radio1_default_reo_get(struct wlan_cfg_dp_soc_ctxt *cfg);
  */
 uint8_t wlan_cfg_radio2_default_reo_get(struct wlan_cfg_dp_soc_ctxt *cfg);
 
+/**
+ * wlan_cfg_set_rxdma1_enable() - Enable rxdma1
+ * @wlan_cfg_ctx: soc configuration context
+ *
+ * Return: None
+ */
+void wlan_cfg_set_rxdma1_enable(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx);
 
 /**
  * wlan_cfg_is_delay_mon_replenish() - Get if delayed monitor replenish
@@ -2640,24 +2647,22 @@ wlan_cfg_get_dp_soc_ppeds_tx_desc_borrow_limit(struct wlan_cfg_dp_soc_ctxt *cfg)
 
 #ifdef DP_FEATURE_TX_PAGE_POOL
 void wlan_cfg_get_tx_pp_cfg(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
-			    bool *tx_pp_enabled, bool *tx_pp_prealloc_en);
+			    bool *tx_pp_enabled);
 #else
 static inline void
 wlan_cfg_get_tx_pp_cfg(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
-		       bool *tx_pp_enabled, bool *tx_pp_prealloc_en)
+		       bool *tx_pp_enabled)
 {
 }
 #endif
 
 #ifdef DP_FEATURE_RX_BUFFER_RECYCLE
 void wlan_cfg_get_rx_pp_cfg(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
-			    bool *rx_pp_enabled, size_t *rx_buf_size,
-			    uint32_t *rx_pool_size, bool *rx_pp_prealloc_en);
+			    bool *rx_pp_enabled, size_t *rx_buf_size);
 #else
 static inline void
 wlan_cfg_get_rx_pp_cfg(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
-		       bool *rx_pp_enabled, size_t *rx_buf_size,
-		       uint32_t *rx_pool_size, bool *rx_pp_prealloc_en)
+		       bool *rx_pp_enabled, size_t *rx_buf_size)
 {
 }
 #endif

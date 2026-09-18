@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,6 +35,17 @@
 #include <wlan_hdd_main.h>
 
 /* Preprocessor definitions and constants */
+
+#ifdef OPLUS_FEATURE_SOFTAP_DCS_SWITCH
+//Add for softap connect fail monitor
+void hostapdConnUeventInit(void);
+void hostapdConnUeventDeinit(void);
+void hostapdConnSendUevent(char *envp[]);
+void hostapd_driver_send_uevent(struct hdd_adapter *sta_adapter,
+                                uint32_t reasoncode,
+                                uint8_t *macaddr,
+                                eSapDisassocReason reason);
+#endif /* OPLUS_FEATURE_SOFTAP_DCS_SWITCH */
 
 struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 				      tSirMacAddr macAddr,
@@ -518,14 +529,12 @@ bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx,
  * @hdd_ctx: Pointer to hdd context
  * @twt_responder: twt responder configure value
  * @vdev_id: Vdev id
- * @sap_hw_mode: sap hardware mode
  *
  * Return: none
  */
 void
 wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
-				 bool twt_responder, uint8_t vdev_id,
-				 eCsrPhyMode sap_hw_mode);
+				 bool twt_responder, uint8_t vdev_id);
 #ifdef WLAN_FEATURE_11BE_MLO
 #ifdef WLAN_FEATURE_MULTI_LINK_SAP
 /**
@@ -538,38 +547,6 @@ wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
  */
 QDF_STATUS hdd_multi_link_sap_vdev_attach(struct wlan_hdd_link_info *link_info,
 					  unsigned int link_id);
-#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
-/**
- * wlan_hdd_validate_mlo_link_removal_request() - check link removal request
- * @link_info: link info structure
- * @config_tbtt: tbtt count from use space
- *
- * This API use to check if link removal is allow for current state and active
- * link number
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_hdd_validate_mlo_link_removal_request(struct wlan_hdd_link_info *link_info,
-					   uint32_t config_tbtt);
-
-/**
- * wlan_hdd_process_mlo_link_removal_cmd() - send link removal request to FW
- * @link_info: link info structure
- * @psoc: PSOC object information
- * @params: link removal params
- *
- * This API use to send link removal request with WMI_MLO_LINK_REMOVAL_CMDID
- * to FW.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_hdd_process_mlo_link_removal_cmd(struct wlan_hdd_link_info *link_info,
-				      struct wlan_objmgr_psoc *psoc,
-				      const struct  cfg80211_link_reconfig_removal_params *params);
-
-#endif
 #else
 static inline QDF_STATUS
 hdd_multi_link_sap_vdev_attach(struct wlan_hdd_link_info *link_info,
@@ -591,26 +568,6 @@ static inline void wlan_hdd_mlo_reset(struct wlan_hdd_link_info *link_info)
 {
 }
 #endif /* end WLAN_FEATURE_11BE_MLO */
-
-#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
-/**
- * wlan_hdd_mlo_sap_link_removal_cap() - get mlo sap link removal support
- * @hdd_ctx: Pointer to hdd context
- *
- * Get link removal support from fw wmi service, if support set wiphy flag of
- * NL80211_EXT_FEATURE_MLD_LINK_REMOVAL_OFFLOAD which hostapd/kernel will
- * check when link removal request from user space.
- *
- * Return: true if support,false if not support
- */
-bool wlan_hdd_mlo_sap_link_removal_cap(struct hdd_context *hdd_ctx);
-#else
-static inline
-bool wlan_hdd_mlo_sap_link_removal_cap(struct hdd_context *hdd_ctx)
-{
-	return false;
-}
-#endif
 
 #ifdef WLAN_FEATURE_SAP_ACS_OPTIMIZE
 /**
@@ -651,6 +608,11 @@ bool hdd_mlosap_check_support_multi_link(struct hdd_context *hdd_ctx)
 	return false;
 }
 #endif
+#ifdef OPLUS_BUG_STABILITY
+// Add for: hotspot manager
+int oplus_wlan_hdd_modify_acl(struct net_device *dev, char *extra);
+int oplus_wlan_hdd_set_max_assoc(struct net_device *dev, char *extra);
+#endif /* OPLUS_BUG_STABILITY */
 
 #ifdef WLAN_CHIPSET_STATS
 /*

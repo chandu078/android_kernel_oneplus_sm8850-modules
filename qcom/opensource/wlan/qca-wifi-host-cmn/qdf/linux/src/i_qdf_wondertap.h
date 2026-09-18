@@ -14,7 +14,7 @@
 #ifndef _I_QDF_WONDERTAP_H
 #define _I_QDF_WONDERTAP_H
 
-#include <wonder/wondertap.h>
+#include "wondertap.h"
 
 #define QDF_WONDERTAP_HT_MAX_NSS WONDERTAP_HT_NSS_MAX
 #define QDF_WONDERTAP_VHT_MAX_NSS WONDERTAP_VHT_NSS_MAX

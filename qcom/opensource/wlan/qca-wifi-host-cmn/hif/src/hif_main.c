@@ -59,8 +59,6 @@
 #include <qdf_tracepoint.h>
 #include "qdf_ssr_driver_dump.h"
 
-bool g_target_access_allowed = true;
-
 void hif_dump(struct hif_opaque_softc *hif_ctx, uint8_t cmd_id, bool start)
 {
 	hif_trigger_dump(hif_ctx, cmd_id, start);
@@ -429,11 +427,6 @@ static const struct qwlan_hw qwlan_hw_list[] = {
 		.name = "WCN7750_V1",
 	},
 	{
-		.id = WCN7750_V2,
-		.subid = 0,
-		.name = "WCN7750_V2",
-	},
-	{
 		.id = QCC2072_V1,
 		.subid = 0,
 		.name = "QCC2072_V1",
@@ -442,11 +435,6 @@ static const struct qwlan_hw qwlan_hw_list[] = {
 		.id = WCN6450_V1,
 		.subid = 0,
 		.name = "WCN6450_V1",
-	},
-	{
-		.id = WCN6450_V2,
-		.subid = 0,
-		.name = "WCN6450_V2",
 	},
 	{
 		.id = QCA6490_v2_1,
@@ -512,13 +500,7 @@ static const struct qwlan_hw qwlan_hw_list[] = {
 		.id = WCN3990_CLARENCE,
 		.subid = 0,
 		.name = "WCN3990",
-	},
-	{
-		.id = WCN7760_COLOGNE,
-		.subid = 0,
-		.name = "WCN7760",
 	}
-
 };
 
 /**
@@ -1369,7 +1351,6 @@ struct hif_opaque_softc *hif_open(qdf_device_t qdf_ctx,
 	hif_ce_desc_history_log_register(scn);
 	hif_desc_history_log_register();
 	qdf_ssr_driver_dump_register_region("hif", scn, sizeof(*scn));
-	hif_set_target_access_allowed(true);
 
 out:
 	return GET_HIF_OPAQUE_HDL(scn);
@@ -1518,8 +1499,6 @@ QDF_STATUS hif_print_ce(struct hif_softc *scn, uint8_t print_type)
 		     qdf_atomic_test_bit(TASKLET_STATE_RUN,
 					 &tasklet_entry->intr_tq.state))) {
 			CE_state = scn->ce_id_to_state[ce_id];
-			if (CE_state->service_dl)
-				continue;
 			if (CE_state->status_ring) {
 				hal_get_sw_hptp(scn->hal_soc,
 						CE_state->status_ring->srng_ctx,
@@ -3607,16 +3586,3 @@ void hif_set_load_balance_enabled_flag(struct hif_opaque_softc *hif_ctx)
 	scn->is_load_balance_enabled = true;
 }
 #endif
-
-/**
- * hif_set_target_access_allowed() - Set target access value
- * @access_allowed: True if access to target is allowed false otherwise
- *
- * Return: None
- */
-void hif_set_target_access_allowed(bool access_allowed)
-{
-	g_target_access_allowed = access_allowed;
-
-	hif_info("Target access allowed: %u", access_allowed);
-}

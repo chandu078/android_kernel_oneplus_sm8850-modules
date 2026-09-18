@@ -577,8 +577,7 @@ int wlfw_ind_register_send_sync_msg(struct icnss_priv *priv)
 		}
 	} else if (priv->device_id == WCN6750_DEVICE_ID ||
 		   priv->device_id == WCN6450_DEVICE_ID ||
-		   priv->device_id == WCN7750_DEVICE_ID ||
-		   priv->device_id == WCN8750_DEVICE_ID) {
+		   priv->device_id == WCN7750_DEVICE_ID) {
 		req->fw_init_done_enable_valid = 1;
 		req->fw_init_done_enable = 1;
 		req->cal_done_enable_valid = 1;
@@ -599,13 +598,6 @@ int wlfw_ind_register_send_sync_msg(struct icnss_priv *priv)
 	req->async_data_enable = 1;
 
 	priv->stats.ind_register_req++;
-
-	/* Enable only when XO trim related resources are valid */
-	if (!IS_ERR_OR_NULL(priv->xo_trim_conf.xo_calib_reg) &&
-	    !IS_ERR_OR_NULL(priv->xo_trim_conf.wcal_pbs)) {
-		req->xo_trim_enable_valid = 1;
-		req->xo_trim_enable = 1;
-	}
 
 	ret = qmi_txn_init(&priv->qmi, &txn,
 			   wlfw_ind_register_resp_msg_v01_ei, resp);
@@ -1415,7 +1407,6 @@ static void icnss_get_qdss_cfg_filename(struct icnss_priv *priv,
 	char *build_str = QDSS_FILE_BUILD_STR;
 
 	if (priv->device_id == WCN7750_DEVICE_ID ||
-	    priv->device_id == WCN8750_DEVICE_ID ||
 	    priv->device_id == WCN6450_DEVICE_ID)
 		snprintf(filename_tmp, filename_len, QDSS_TRACE_CONFIG_FILE
 			"_%s%s.cfg", build_str, HW_V1_NUMBER);
@@ -1726,81 +1717,6 @@ int wlfw_qdss_trace_stop(struct icnss_priv *priv, unsigned long long option)
 {
 	return wlfw_send_qdss_trace_mode_req(priv, QMI_WLFW_QDSS_TRACE_OFF_V01,
 					     option);
-}
-
-/**
- * icnss_wlfw_misc_req_send_sync() - Send QMI_WLFW_MISC_REQ with provided type
- * @priv: ICNSS platform data
- * @type: subtype for QMI_WLFW_MISC_REQ
- *
- * Return: 0 for success, negative values otherwise
- */
-static int icnss_wlfw_misc_req_send_sync(struct icnss_priv *priv,
-					 enum wlfw_misc_req_enum_v01 type)
-{
-	int ret = 0;
-	struct wlfw_misc_req_msg_v01 *req;
-	struct wlfw_misc_resp_msg_v01 *resp;
-	struct qmi_txn txn;
-
-	if (type <= WLFW_MISC_REQ_ENUM_MIN_VAL_V01 ||
-	    type >= WLFW_MISC_REQ_ENUM_MAX_VAL_V01) {
-		icnss_pr_err("Invalid type[%d] for MISC_REQ\n", type);
-		return -EINVAL;
-	}
-
-	req = kzalloc(sizeof(*req), GFP_KERNEL);
-	if (!req) {
-		icnss_pr_err("Failed to allocate req for MISC_REQ[%d]\n", type);
-		return -ENOMEM;
-	}
-
-	resp = kzalloc(sizeof(*resp), GFP_KERNEL);
-	if (!resp) {
-		icnss_pr_err("Failed to allocate resp for MISC_REQ[%d]\n", type);
-		kfree(req);
-		return -ENOMEM;
-	}
-
-	ret = qmi_txn_init(&priv->qmi, &txn,
-			   wlfw_misc_resp_msg_v01_ei, resp);
-
-	if (ret < 0) {
-		icnss_pr_err("Fail to init txn for MISC_REQ[%d]: %d\n",
-			     type, ret);
-		goto end;
-	}
-
-	req->type = type;
-	ret = qmi_send_request(&priv->qmi, NULL, &txn,
-			       QMI_WLFW_MISC_REQ_V01,
-			       WLFW_MISC_REQ_MSG_V01_MAX_MSG_LEN,
-			       wlfw_misc_req_msg_v01_ei, req);
-	if (ret < 0) {
-		qmi_txn_cancel(&txn);
-		icnss_pr_err("Fail to send MISC_REQ[%d]: %d\n", type, ret);
-		goto end;
-	}
-
-	ret = qmi_txn_wait(&txn, priv->ctrl_params.qmi_timeout);
-	if (ret < 0) {
-		icnss_pr_err("Failed to wait for resp of MISC_REQ[%d]: %d\n",
-			     type, ret);
-		goto end;
-	} else if (resp->resp.result != QMI_RESULT_SUCCESS_V01) {
-		icnss_pr_err("MISC_REQ[%d] failed, result:%d error:%d\n",
-			     type, resp->resp.result, resp->resp.error);
-		ret = -resp->resp.result;
-		goto end;
-	} else {
-		icnss_pr_dbg("Sent MISC_REQ[%d] successfully\n", type);
-		ret = 0;
-	}
-
-end:
-	kfree(req);
-	kfree(resp);
-	return ret;
 }
 
 static int wlfw_wlan_cfg_send_sync_msg(struct icnss_priv *priv,
@@ -2732,8 +2648,7 @@ static void wlfw_qdss_trace_req_mem_ind_cb(struct qmi_handle *qmi,
 	}
 
 	if (priv->device_id == WCN6450_DEVICE_ID ||
-	    priv->device_id == WCN7750_DEVICE_ID ||
-	    priv->device_id == WCN8750_DEVICE_ID)
+	    priv->device_id == WCN7750_DEVICE_ID)
 		icnss_free_qdss_mem(priv);
 
 	if (priv->qdss_mem_seg_len) {
@@ -3061,35 +2976,6 @@ out:
 	return ret;
 }
 
-static void icnss_wlfw_xo_trim_ind_cb(struct qmi_handle *qmi,
-				      struct sockaddr_qrtr *sq,
-				      struct qmi_txn *txn,
-				      const void *data)
-{
-	struct icnss_priv *priv =
-		container_of(qmi, struct icnss_priv, qmi);
-	const struct wlfw_xo_trim_ind_msg_v01 *ind_msg = data;
-	u8 *trim_value;
-
-	if (!txn) {
-		icnss_pr_err("Spurious XO_TRIM indication\n");
-		return;
-	}
-
-	icnss_pr_dbg("Received XO_TRIM with trim val: %d\n", ind_msg->trim_val);
-	trim_value = kzalloc(sizeof(*trim_value), GFP_KERNEL);
-	if (!trim_value) {
-		icnss_pr_err("Failed to allocate memory\n");
-		goto out;
-	}
-
-	*trim_value = ind_msg->trim_val;
-
-out:
-	icnss_driver_event_post(priv, ICNSS_DRIVER_EVENT_XO_TRIM_IND,
-				0, trim_value);
-}
-
 static int icnss_ims_wfc_call_twt_cfg_send_sync
 	(struct icnss_priv *priv,
 	const struct wlfw_wfc_call_twt_config_ind_msg_v01 *ind_msg)
@@ -3317,14 +3203,6 @@ static struct qmi_msg_handler wlfw_msg_handlers[] = {
 		sizeof(struct wlfw_driver_async_data_ind_msg_v01),
 		.fn = icnss_wlfw_driver_async_data_ind_cb
 	},
-	{
-		.type = QMI_INDICATION,
-		.msg_id = QMI_WLFW_XO_TRIM_IND_V01,
-		.ei = wlfw_xo_trim_ind_msg_v01_ei,
-		.decoded_size =
-		sizeof(struct wlfw_xo_trim_ind_msg_v01),
-		.fn = icnss_wlfw_xo_trim_ind_cb
-	},
 	{}
 };
 
@@ -3452,7 +3330,6 @@ int icnss_register_fw_service(struct icnss_priv *priv)
 
 	if (priv->device_id == WCN6750_DEVICE_ID ||
 	    priv->device_id == WCN7750_DEVICE_ID ||
-	    priv->device_id == WCN8750_DEVICE_ID ||
 	    priv->device_id == WCN6450_DEVICE_ID)
 		ret = qmi_add_lookup(&priv->qmi, WLFW_SERVICE_ID_V01,
 				     WLFW_SERVICE_VERS_V01,
@@ -3547,8 +3424,7 @@ int icnss_send_wlan_enable_to_fw(struct icnss_priv *priv,
 		memcpy(req->shadow_reg, config->shadow_reg_cfg,
 		       sizeof(struct wlfw_msi_cfg_s_v01) * req->shadow_reg_len);
 	} else if (priv->device_id == WCN6450_DEVICE_ID ||
-		   priv->device_id == WCN7750_DEVICE_ID ||
-		   priv->device_id == WCN8750_DEVICE_ID) {
+		   priv->device_id == WCN7750_DEVICE_ID) {
 		req->shadow_reg_v3_valid = 1;
 		if (config->num_shadow_reg_v3_cfg >
 			MAX_NUM_SHADOW_REG_V3)
@@ -3614,8 +3490,7 @@ static inline u32 icnss_get_host_build_type(void)
 static void icnss_wlfw_host_cap_parse_mlo(struct icnss_priv *priv,
 					 struct wlfw_host_cap_req_msg_v01 *req)
 {
-	if (priv->device_id == WCN7750_DEVICE_ID ||
-	    priv->device_id == WCN8750_DEVICE_ID) {
+	if (priv->device_id == WCN7750_DEVICE_ID) {
 		req->mlo_capable_valid = 1;
 		req->mlo_capable = 1;
 		req->mlo_chip_id_valid = 1;
@@ -3659,19 +3534,19 @@ static void icnss_populate_gpio_config(struct icnss_priv *priv,
 		req->gpio_config[gpio_info_type].gpio_bitreserved = cfg_arr[WLFW_GPIO_BITRESERVED_V01];
 		icnss_pr_dbg("GPIO_NUM: %d, GPIO_NAME: %s, PMIC_INDEX: %d, GPIO_TYPE: %s\n",
 			     req->gpio_config[gpio_info_type].gpio_num,
-			     icnss_gpio_name_str(req->gpio_config[gpio_info_type].gpio_name),
+			     icnss_gpio_name_str[req->gpio_config[gpio_info_type].gpio_name],
 			     req->gpio_config[gpio_info_type].pmic_index,
-			     icnss_gpio_type_str(req->gpio_config[gpio_info_type].gpio_type));
+			     icnss_gpio_type_str[req->gpio_config[gpio_info_type].gpio_type]);
 		icnss_pr_dbg("OUTPUT_VALUE: %s, FUNC_SELECT: %d, GPIO_DIRECTION: %s, DRIVE_STRENGTH: %d\n",
-			     icnss_gpio_output_str(req->gpio_config[gpio_info_type].output_value),
+			     icnss_gpio_output_str[req->gpio_config[gpio_info_type].output_value],
 			     req->gpio_config[gpio_info_type].func,
-			     icnss_gpio_direction_str(req->gpio_config[gpio_info_type].direction),
+			     icnss_gpio_direction_str[req->gpio_config[gpio_info_type].direction],
 			     req->gpio_config[gpio_info_type].drive_strength);
 		icnss_pr_dbg("BIAS_TYPE: %s, IS_CLK: %d, IS_WAKE: %d, INTRPT_TRIGGER_TYPE: %s\n",
-			     icnss_gpio_bias_str(req->gpio_config[gpio_info_type].bias),
+			     icnss_gpio_bias_str[req->gpio_config[gpio_info_type].bias],
 			     req->gpio_config[gpio_info_type].is_clk,
 			     req->gpio_config[gpio_info_type].is_wake,
-			     icnss_gpio_intr_trigger_str(req->gpio_config[gpio_info_type].intrpt_trigger_type));
+			     icnss_gpio_intr_trigger_str[req->gpio_config[gpio_info_type].intrpt_trigger_type]);
 		icnss_pr_dbg("PRIORITY: %d, GPIO_BITRESERVED: %d, GPIO_ARRAY_VALID: %d, GPIO_OWNER: %d\n",
 			     req->gpio_config[gpio_info_type].priority,
 			     req->gpio_config[gpio_info_type].gpio_bitreserved,
@@ -3777,14 +3652,13 @@ int wlfw_host_cap_send_sync(struct icnss_priv *priv)
 		if (priv->gpio_config_arr[i][WLFW_GPIO_ARRAY_VALID_V01]) {
 			if (priv->gpio_config_arr[i][WLFW_GPIO_OWNER_V01])
 				icnss_populate_gpio_config(priv, req, i, priv->gpio_config_arr[i]);
-
-			req->gpio_config_valid = 1;
-			req->gpio_config_len = GPIO_TYPE_MAX_V01;
 		} else {
 			icnss_populate_gpio_config(priv, req, i, priv->gpio_config_arr[i]);
 		}
 	}
 
+	req->gpio_config_valid = 1;
+	req->gpio_config_len = GPIO_TYPE_MAX_V01;
 	req->gpio_info_valid = 1;
 	req->gpio_info_len = GPIO_TYPE_MAX_V01;
 
@@ -4108,23 +3982,6 @@ out:
 	kfree(req);
 	kfree(resp);
 	return ret;
-}
-
-/**
- * icnss_wlfw_xo_trim_result_send_sync - Notify the XO trim result to target.
- * @plat_priv: Pointer to platform driver context.
- * @result: XO trim result.
- *
- * Return: 0 on success, errno othrewise
- */
-int icnss_wlfw_xo_trim_result_send_sync(struct icnss_priv *priv,
-					int result)
-{
-	enum wlfw_misc_req_enum_v01 type = (result ?
-					    WLFW_REQ_XO_TRIM_FAIL_V01 :
-					    WLFW_REQ_XO_TRIM_SUCCESS_V01);
-
-	return icnss_wlfw_misc_req_send_sync(priv, type);
 }
 
 /* IMS Service */

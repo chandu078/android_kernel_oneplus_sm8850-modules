@@ -17,10 +17,8 @@
 #include <wma_api.h>
 #include "cds_api.h"
 #include "cdp_txrx_ctrl.h"
-#include <wlan_hdd_hostapd.h>
 
 static struct hdd_wondertap_context *g_wt_ctx;
-static DEFINE_MUTEX(g_wt_ctx_mutex);
 
 static enum phy_ch_width
 __wlan_hdd_convert_wt_bandwidth_to_phy_ch_width(qdf_wondertap_rate_bw_t bw)
@@ -309,15 +307,6 @@ int __wlan_hdd_start_wondertap_intf(struct hdd_context *hdd_ctx,
 	}
 	set_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
 
-	if (hdd_is_connection_in_progress(NULL, NULL) ||
-	    hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx,
-						      adapter->device_mode)) {
-		ret = -EBUSY;
-		hdd_err_rl("Failed to start wonder tap as either connection or link switch is in progress ret = %d",
-			   ret);
-		goto stop_adapter;
-	}
-
 	if (!policy_mgr_allow_concurrency(hdd_ctx->psoc,
 					  PM_PASSTHRU_MODE,
 					  params->channel.freq,
@@ -508,12 +497,8 @@ int wlan_hdd_wondertap_init(void **handle,
 		goto destroy_sync;
 	}
 
-	if (hdd_is_connection_in_progress(NULL, NULL) ||
-	    hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx,
-						      QDF_PASSTHRU_MODE)) {
+	if (hdd_is_connection_in_progress(NULL, NULL)) {
 		errno = -EBUSY;
-		hdd_err_rl("Failed to start wonder tap as either connection or link switch is in progress errno = %d",
-			   errno);
 		goto destroy_sync;
 	}
 
@@ -548,10 +533,6 @@ int wlan_hdd_wondertap_init(void **handle,
 		goto create_wondertap_event_failed;
 	}
 
-	mutex_lock(&g_wt_ctx_mutex);
-	g_wt_ctx = wt_ctx;
-	mutex_unlock(&g_wt_ctx_mutex);
-
 	status = qdf_runtime_lock_init(&wt_ctx->wondertap_rtpm_lock);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("passthrough mode rtpm lock creation failed");
@@ -570,6 +551,8 @@ int wlan_hdd_wondertap_init(void **handle,
 	qdf_wake_lock_acquire(&wt_ctx->wondertap_wakelock,
 			      WIFI_POWER_EVENT_WAKELOCK_PASSTHRU);
 	qdf_runtime_pm_prevent_suspend_sync(&wt_ctx->wondertap_rtpm_lock);
+
+	g_wt_ctx = wt_ctx;
 
 	adapter = __wlan_hdd_create_wondertap_intf(hdd_ctx, handle, params);
 	if (IS_ERR_OR_NULL(adapter)) {
@@ -607,10 +590,7 @@ create_wake_lock_failed:
 	qdf_runtime_lock_deinit(&wt_ctx->wondertap_rtpm_lock);
 
 create_rtpm_lock_failed:
-	mutex_lock(&g_wt_ctx_mutex);
 	qdf_event_destroy(&wt_ctx->wondertap_vdev_event);
-	g_wt_ctx = NULL;
-	mutex_unlock(&g_wt_ctx_mutex);
 
 create_wondertap_event_failed:
 	qdf_mem_free(wt_ctx);
@@ -621,6 +601,7 @@ mem_malloc_failed:
 destroy_sync:
 	osif_vdev_sync_trans_stop(vdev_sync);
 	osif_vdev_sync_destroy(vdev_sync);
+	g_wt_ctx = NULL;
 
 	return errno;
 }
@@ -703,12 +684,10 @@ void wlan_hdd_wondertap_deinit(void *handle,
 			      WIFI_POWER_EVENT_WAKELOCK_PASSTHRU);
 	qdf_wake_lock_destroy(&g_wt_ctx->wondertap_wakelock);
 	qdf_runtime_lock_deinit(&g_wt_ctx->wondertap_rtpm_lock);
-
-	mutex_lock(&g_wt_ctx_mutex);
 	qdf_event_destroy(&g_wt_ctx->wondertap_vdev_event);
+
 	qdf_mem_free(g_wt_ctx);
 	g_wt_ctx = NULL;
-	mutex_unlock(&g_wt_ctx_mutex);
 
 destroy_sync:
 	osif_vdev_sync_trans_stop(vdev_sync);
@@ -985,12 +964,10 @@ wlan_hdd_wondertap_get_capabilities(void *handle,
 void hdd_sme_passthrough_mode_callback(uint8_t vdev_id, bool is_up)
 {
 	hdd_debug("Channel change successful for wondertap");
+	if (cds_is_driver_recovering())
+		return;
 
-	mutex_lock(&g_wt_ctx_mutex);
-	if (g_wt_ctx)
-		qdf_event_set(&g_wt_ctx->wondertap_vdev_event);
-
-	mutex_unlock(&g_wt_ctx_mutex);
+	qdf_event_set(&g_wt_ctx->wondertap_vdev_event);
 }
 
 /**
@@ -1039,14 +1016,10 @@ void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup)
 		  g_wt_ctx ? 1 : 0, force_cleanup);
 
 	hdd_hold_rtnl_lock();
-	mutex_lock(&g_wt_ctx_mutex);
 
 	if (force_cleanup && g_wt_ctx) {
 		hdd_ctx = g_wt_ctx->hdd_ctx;
 		adapter = g_wt_ctx->wt_adapter;
-		/* Keep reference to event for later use */
-		qdf_event_t *vdev_event = &g_wt_ctx->wondertap_vdev_event;
-		mutex_unlock(&g_wt_ctx_mutex);
 
 		wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
@@ -1054,11 +1027,11 @@ void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup)
 
 		dev_close(adapter->dev);
 
-		qdf_event_reset(vdev_event);
+		qdf_event_reset(&g_wt_ctx->wondertap_vdev_event);
 		sme_delete_pe_session(hdd_ctx->mac_handle, adapter->deflink->vdev_id,
 				      QDF_PASSTHRU_MODE);
 
-		status = qdf_wait_for_event_completion(vdev_event,
+		status = qdf_wait_for_event_completion(&g_wt_ctx->wondertap_vdev_event,
 						       WLAN_WONDERTAP_VDEV_OP_TIMEOUT_MS);
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("wondertap vdev teardown failed:%d", status);
@@ -1074,24 +1047,15 @@ void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup)
 
 		__wlan_hdd_destroy_wondertap_intf(hdd_ctx, adapter);
 
-		/* Final cleanup under mutex */
-		mutex_lock(&g_wt_ctx_mutex);
-		if (g_wt_ctx) {
-			qdf_runtime_pm_allow_suspend(
-						&g_wt_ctx->wondertap_rtpm_lock);
-			qdf_wake_lock_release(
-					&g_wt_ctx->wondertap_wakelock,
-					WIFI_POWER_EVENT_WAKELOCK_PASSTHRU);
-			qdf_wake_lock_destroy(&g_wt_ctx->wondertap_wakelock);
-			qdf_runtime_lock_deinit(&g_wt_ctx->wondertap_rtpm_lock);
-
-			qdf_event_destroy(&g_wt_ctx->wondertap_vdev_event);
-			qdf_mem_free(g_wt_ctx);
-			g_wt_ctx = NULL;
-		}
+		qdf_runtime_pm_allow_suspend(&g_wt_ctx->wondertap_rtpm_lock);
+		qdf_wake_lock_release(&g_wt_ctx->wondertap_wakelock,
+				      WIFI_POWER_EVENT_WAKELOCK_PASSTHRU);
+		qdf_wake_lock_destroy(&g_wt_ctx->wondertap_wakelock);
+		qdf_runtime_lock_deinit(&g_wt_ctx->wondertap_rtpm_lock);
+		qdf_event_destroy(&g_wt_ctx->wondertap_vdev_event);
+		qdf_mem_free(g_wt_ctx);
+		g_wt_ctx = NULL;
 	}
-
-	mutex_unlock(&g_wt_ctx_mutex);
 
 	hdd_release_rtnl_lock();
 	hdd_exit();

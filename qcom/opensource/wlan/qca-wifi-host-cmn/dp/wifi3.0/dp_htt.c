@@ -3133,12 +3133,64 @@ static inline bool dp_validate_ring_num(int ring_num)
 	return false;
 }
 
+static void
+dp_queue_mon_ring_stats(struct dp_pdev *pdev,
+			int lmac_id, uint32_t *num_srng,
+			struct dp_soc_srngs_state *soc_srngs_state)
+{
+	QDF_STATUS status;
+
+	if (pdev->soc->wlan_cfg_ctx->rxdma1_enable) {
+		status = dp_get_srng_ring_state_from_hal
+			(pdev->soc, pdev,
+			 &pdev->soc->rxdma_mon_buf_ring[lmac_id],
+			 RXDMA_MONITOR_BUF,
+			 &soc_srngs_state->ring_state[*num_srng]);
+
+		if (status == QDF_STATUS_SUCCESS) {
+			++(*num_srng);
+			if (dp_validate_ring_num(*num_srng))
+				return;
+		}
+
+		status = dp_get_srng_ring_state_from_hal
+			(pdev->soc, pdev,
+			 &pdev->soc->rxdma_mon_dst_ring[lmac_id],
+			 RXDMA_MONITOR_DST,
+			 &soc_srngs_state->ring_state[*num_srng]);
+
+		if (status == QDF_STATUS_SUCCESS) {
+			++(*num_srng);
+			if (dp_validate_ring_num(*num_srng))
+				return;
+		}
+
+		status = dp_get_srng_ring_state_from_hal
+			(pdev->soc, pdev,
+			 &pdev->soc->rxdma_mon_desc_ring[lmac_id],
+			 RXDMA_MONITOR_DESC,
+			 &soc_srngs_state->ring_state[*num_srng]);
+
+		if (status == QDF_STATUS_SUCCESS) {
+			++(*num_srng);
+			qdf_assert_always(*num_srng < DP_MAX_SRNGS);
+			if (dp_validate_ring_num(*num_srng))
+				return;
+		}
+	}
+}
 #else /* !QCA_MONITOR_PKT_SUPPORT */
 static inline bool dp_validate_ring_num(int ring_num)
 {
 	return false;
 }
 
+static inline void
+dp_queue_mon_ring_stats(struct dp_pdev *pdev,
+			int lmac_id, uint32_t *num_srng,
+			struct dp_soc_srngs_state *soc_srngs_state)
+{
+}
 #endif /* QCA_MONITOR_PKT_SUPPORT */
 
 #ifndef WLAN_DP_DISABLE_TCL_CMD_CRED_SRNG
@@ -3431,6 +3483,9 @@ static void dp_queue_ring_stats(struct dp_pdev *pdev)
 	     mac_id++) {
 		lmac_id = dp_get_lmac_id_for_pdev_id(pdev->soc,
 						     mac_id, pdev->pdev_id);
+
+		dp_queue_mon_ring_stats(pdev, lmac_id, &j,
+					soc_srngs_state);
 
 		status = dp_get_srng_ring_state_from_hal
 			(pdev->soc, pdev,
@@ -4156,9 +4211,9 @@ static inline void dp_htt_rx_nbuf_free(qdf_nbuf_t nbuf)
  * @peer_mac_addr: peer mac address
  * @is_wds: wds flag
  *
- * Return: false in case wds is not supported and is_wds is set else true
+ * Return: None
  */
-static inline bool dp_check_is_wds_valid(struct dp_soc *soc, uint16_t peer_id,
+static inline void dp_check_is_wds_valid(struct dp_soc *soc, uint16_t peer_id,
 					 uint16_t hw_peer_id, uint8_t vdev_id,
 					 uint8_t *peer_mac_addr,
 					 uint8_t is_wds)
@@ -4168,16 +4223,14 @@ static inline bool dp_check_is_wds_valid(struct dp_soc *soc, uint16_t peer_id,
 		       soc, peer_id, hw_peer_id,
 		       QDF_MAC_ADDR_REF(peer_mac_addr), vdev_id);
 		qdf_assert_always(0);
-		return false;
 	}
-	return true;
 }
 
 #ifdef WLAN_HAPS_ENABLE
 static void dp_haps_indication(struct dp_soc *soc, uint32_t *msg_word)
 {
 	uint8_t vdev_id;
-	qdf_ktime_t time_rcvd;
+	uint64_t time_rcvd;
 	uint32_t timer_high, timer_low;
 	struct dp_vdev *vdev;
 	struct cdp_haps_ops *haps_ops;
@@ -4221,18 +4274,18 @@ static void dp_haps_indication(struct dp_soc *soc, uint32_t *msg_word)
 
 	switch (action_code) {
 	case HTT_T2H_HAPS_ACTION_PAUSE:
-		haps_ops->haps_handle_ind(vdev->osif_vdev, STATE_PAUSE,
-					  time_rcvd, false, false);
+		haps_ops->haps_handle_ind(vdev->osif_vdev, 1, time_rcvd,
+					  false, false);
 		break;
 
 	case HTT_T2H_HAPS_ACTION_PAUSE_WITH_ONESHOT_UNPAUSE:
-		haps_ops->haps_handle_ind(vdev->osif_vdev, STATE_PAUSE,
-					  time_rcvd, true, false);
+		haps_ops->haps_handle_ind(vdev->osif_vdev, 1, time_rcvd,
+					  true, false);
 		break;
 
 	case HTT_T2H_HAPS_ACTION_UNPAUSE:
-		haps_ops->haps_handle_ind(vdev->osif_vdev, STATE_UNPAUSE,
-					  time_rcvd, false, false);
+		haps_ops->haps_handle_ind(vdev->osif_vdev, 0, time_rcvd,
+					  false, false);
 		break;
 
 	default:
@@ -4540,13 +4593,8 @@ void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 			 * peer ast_list.
 			 */
 			is_wds = !!(dpsoc->peer_id_to_obj_map[peer_id]);
-			if (!dp_check_is_wds_valid(soc->dp_soc, peer_id,
-						   hw_peer_id, vdev_id,
-						   peer_mac_addr, is_wds)) {
-				dp_err("invalid peer map trigger self recovery");
-				qdf_trigger_self_recovery(NULL, QDF_DP_INVALID_PEER_MAP);
-				break;
-			}
+			dp_check_is_wds_valid(soc->dp_soc, peer_id, hw_peer_id,
+					      vdev_id, peer_mac_addr, is_wds);
 			dp_rx_peer_map_handler(soc->dp_soc, peer_id, hw_peer_id,
 					       vdev_id, peer_mac_addr, 0,
 					       is_wds);

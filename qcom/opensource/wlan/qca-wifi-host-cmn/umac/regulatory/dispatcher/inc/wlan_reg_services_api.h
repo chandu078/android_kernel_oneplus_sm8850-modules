@@ -90,17 +90,6 @@ bool wlan_reg_is_5ghz_ch_freq(qdf_freq_t freq);
 #define WLAN_REG_IS_5GHZ_CH_FREQ(freq) wlan_reg_is_5ghz_ch_freq(freq)
 
 /**
- * wlan_reg_is_5ghz_unii3_chan_freq() - Check if the given 5GHz channel
- * frequency is uinii3 band frequency or not.
- * @freq: Channel frequency
- *
- * Return: true if given 5GHz channel frequency is uinii3 band frequency
- * frequency, else false
- */
-bool wlan_reg_is_5ghz_unii3_chan_freq(qdf_freq_t freq);
-#define WLAN_REG_IS_5GHZ_UNII3_CHAN_FREQ(freq) wlan_reg_is_5ghz_unii3_chan_freq(freq)
-
-/**
  * wlan_reg_is_range_overlap_2g() - Check if the given low_freq and high_freq
  * is in the 2G range.
  *
@@ -762,7 +751,7 @@ wlan_reg_get_best_6g_power_type(struct wlan_objmgr_psoc *psoc,
  * @ap_pwr_type: AP's power type for 6G as advertised in HE ops IE
  * @chan_freq: Connection channel frequency
  * @center_320: 320 MHz center frequency
- * @ch_width: bandwidth
+ * @ch_width: bandwdith
  *
  * Return: QDF_STATUS
  */

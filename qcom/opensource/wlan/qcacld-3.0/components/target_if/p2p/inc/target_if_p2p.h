@@ -168,25 +168,4 @@ bool target_if_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
  */
 bool target_if_p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc);
 #endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-#ifdef FEATURE_WLAN_SUPPORT_PCC
-/**
- * target_if_p2p_is_fw_support_pcc() - return PCC service capability
- * from FW.
- * @psoc: pointer to PSOC object
- *
- * Return: true if PCC supported by FW otherwise false
- */
-bool target_if_p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc);
-#endif /* FEATURE_WLAN_SUPPORT_PCC */
-
-/**
- * target_if_p2p_is_fw_cancel_one_shot_noa_supported() - Check if FW supports
- * cancel one shot NoA
- * @psoc: pointer to psoc object
- *
- * Return: true if FW supports cancel one shot NoA, false otherwise
- */
-bool target_if_p2p_is_fw_cancel_one_shot_noa_supported(struct wlan_objmgr_psoc *psoc);
-
 #endif /* _TARGET_IF_P2P_H_ */

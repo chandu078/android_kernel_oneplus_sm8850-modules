@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -766,6 +766,41 @@ dp_mon_config_undecoded_metadata_capture(struct dp_pdev *pdev, int val)
 	return status;
 }
 #endif
+
+/**
+ * dp_monitor_mode_ring_config() - Send the tlv config to fw for monitor buffer
+ *                                 ring based on target
+ * @soc: soc handle
+ * @mac_for_pdev: WIN- pdev_id, MCL- mac id
+ * @pdev: physical device handle
+ * @ring_num: mac id
+ * @htt_tlv_filter: tlv filter
+ *
+ * Return: zero on success, non-zero on failure
+ */
+static inline QDF_STATUS
+dp_monitor_mode_ring_config(struct dp_soc *soc, uint8_t mac_for_pdev,
+			    struct dp_pdev *pdev, uint8_t ring_num,
+			    struct htt_rx_ring_tlv_filter htt_tlv_filter)
+{
+	QDF_STATUS status;
+
+	if (soc->wlan_cfg_ctx->rxdma1_enable)
+		status = htt_h2t_rx_ring_cfg(soc->htt_handle, mac_for_pdev,
+					     soc->rxdma_mon_buf_ring[ring_num]
+					     .hal_srng,
+					     RXDMA_MONITOR_BUF,
+					     RX_MONITOR_BUFFER_SIZE,
+					     &htt_tlv_filter);
+	else
+		status = htt_h2t_rx_ring_cfg(soc->htt_handle, mac_for_pdev,
+					     pdev->rx_mac_buf_ring[ring_num]
+					     .hal_srng,
+					     RXDMA_BUF, RX_DATA_BUFFER_SIZE,
+					     &htt_tlv_filter);
+
+	return status;
+}
 
 /**
  * dp_get_mon_vdev_from_pdev_wifi3() - Get vdev id of monitor mode
@@ -6242,10 +6277,8 @@ dp_init_mon_chan_band(struct dp_mon_pdev *mon_pdev)
 {
 	uint8_t mac_id;
 
-	for (mac_id = 0; mac_id < MAX_NUM_LMAC_HW; mac_id++) {
+	for (mac_id = 0; mac_id < MAX_NUM_LMAC_HW; mac_id++)
 		mon_pdev->mon_mac[mac_id].mon_chan_band = REG_BAND_UNKNOWN;
-		mon_pdev->mon_mac[mac_id].mac_id = mac_id;
-	}
 }
 #else
 static inline void

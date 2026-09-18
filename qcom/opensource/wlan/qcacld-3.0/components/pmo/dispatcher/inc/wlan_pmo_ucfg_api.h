@@ -65,16 +65,6 @@ QDF_STATUS ucfg_pmo_psoc_close(struct wlan_objmgr_psoc *psoc);
 uint32_t ucfg_pmo_get_apf_instruction_size(struct wlan_objmgr_psoc *psoc);
 
 /**
- * ucfg_pmo_store_apf_mode() - store the APF mode
- * @psoc: pointer to psoc object
- * @apf_mode: apf mode
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS ucfg_pmo_store_apf_mode(struct wlan_objmgr_psoc *psoc,
-				   uint32_t apf_mode);
-
-/**
  * ucfg_pmo_set_apf_mode() - set the APF mode
  * @psoc: pointer to psoc object
  * @apf_mode: apf mode
@@ -1605,13 +1595,6 @@ ucfg_pmo_set_apf_mode(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-static inline QDF_STATUS
-ucfg_pmo_store_apf_mode(struct wlan_objmgr_psoc *psoc,
-			uint32_t apf_mode)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
 static inline uint8_t
 ucfg_pmo_get_pkt_filter_bitmap(struct wlan_objmgr_psoc *psoc)
 {
@@ -2621,26 +2604,4 @@ QDF_STATUS ucfg_pmo_get_vdev_bridge_addr(struct wlan_objmgr_vdev *vdev,
  * Return: true if FW debug is enable otherwise false
  */
 bool ucfg_pmo_is_fw_debug_enable(struct wlan_objmgr_psoc *psoc);
-
-/**
- * ucfg_pmo_get_ns_offload_enable_dynamic() - get NS offload dynamic enable
- * @vdev: vdev objmgr handle
- *
- * Return: true is NS offload is dynamically disabled else false
- */
-bool
-ucfg_pmo_get_ns_offload_enable_dynamic(struct wlan_objmgr_vdev *vdev);
-
-/**
- * ucfg_pmo_set_ns_offload_enable_dynamic() - Set NS offload dynamic enable
- * @vdev: vdev objmgr handle
- * @trigger: pmo trigger
- * @ns_offload_enable_dyn: NS offload enable dynamic
- *
- * Return: None
- */
-void
-ucfg_pmo_set_ns_offload_enable_dynamic(struct wlan_objmgr_vdev *vdev,
-				       enum pmo_offload_trigger trigger,
-				       bool ns_offload_enable_dyn);
 #endif /* end  of _WLAN_PMO_UCFG_API_H_ */

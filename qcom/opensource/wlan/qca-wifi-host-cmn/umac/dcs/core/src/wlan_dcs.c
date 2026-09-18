@@ -403,10 +403,7 @@ wlan_dcs_wlan_interference_get_stats_delta(
 	if ((curr_stats->mib_stats.listen_time <= 0) ||
 	    (curr_stats->reg_tsf32 <= prev_stats->reg_tsf32)) {
 		if (unlikely(dcs_host_params->dcs_debug >= DCS_DEBUG_CRITICAL))
-			dcs_debug("ignoring due to negative TSF value: Listen time %u cur tsf %u prev %u",
-				  curr_stats->mib_stats.listen_time,
-				  curr_stats->reg_tsf32,
-				  prev_stats->reg_tsf32);
+			dcs_debug("ignoring due to negative TSF value");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -419,9 +416,7 @@ wlan_dcs_wlan_interference_get_stats_delta(
 	if (prev_stats->mib_stats.reg_rxclr_cnt >
 			curr_stats->mib_stats.reg_rxclr_cnt) {
 		if (unlikely(dcs_host_params->dcs_debug >= DCS_DEBUG_CRITICAL))
-			dcs_debug("ignoring due to negative rxclr count prev %u, cur %u",
-				  prev_stats->mib_stats.reg_rxclr_cnt,
-				  curr_stats->mib_stats.reg_rxclr_cnt);
+			dcs_debug("ignoring due to negative rxclr count");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -546,13 +541,8 @@ wlan_dcs_wlan_interference_process(struct wlan_objmgr_psoc *psoc,
 					&rx_frame_delta, &cycle_count_delta,
 					&my_bss_rx_delta, &reg_tsf_delta);
 
-	if (QDF_IS_STATUS_ERROR(status)) {
-		/* only if level is critial as for verbose its already dumped */
-		if (unlikely(dcs_host_params.dcs_debug == DCS_DEBUG_CRITICAL))
-			wlan_dcs_im_print_stats(prev_stats, curr_stats,
-						vdev_id);
+	if (QDF_IS_STATUS_ERROR(status))
 		goto copy_stats;
-	}
 
 	if (cycle_count_delta < rxclr_delta) {
 		if (unlikely(dcs_host_params.dcs_debug >= DCS_DEBUG_CRITICAL))

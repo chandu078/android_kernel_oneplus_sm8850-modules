@@ -2146,7 +2146,8 @@ ucfg_mlme_get_vdev_phy_mode(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		phymode = WLAN_PHYMODE_AUTO;
 		goto done;
 	}
-	phymode = wlan_cm_fw_to_host_phymode(mlme_obj->mgmt.generic.phy_mode);
+	phymode = mlme_obj->mgmt.generic.phy_mode;
+
 done:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 

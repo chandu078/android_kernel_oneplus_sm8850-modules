@@ -809,16 +809,6 @@ struct wlan_mlme_cfg_sap {
 };
 
 /**
- * struct wlan_mlme_p2p_cfg - P2P related config items
- * @p2p_go_cancel_one_shot_noa: Go can cancel one-shot NoA schedule
- * @p2p_gc_keep_awake_during_noa: Gc keeps awake during NoA
- */
-struct wlan_mlme_p2p_cfg {
-	bool p2p_go_cancel_one_shot_noa;
-	bool p2p_gc_keep_awake_during_noa;
-};
-
-/**
  * struct wlan_mlme_dfs_cfg - DFS Capabilities related config items
  * @dfs_master_capable: Is DFS master mode support enabled
  * @dfs_disable_channel_switch: disable channel switch on radar detection
@@ -1181,7 +1171,6 @@ struct mlme_tgt_caps {
  * @supported_mcs_set: supported MCS set
  * @basic_mcs_set: basic MCS set
  * @current_mcs_set: current MCS set
- * @cck_rx_tx_support_mode: cck rx tx support enable modes
  */
 struct wlan_mlme_rates {
 	uint8_t cfp_period;
@@ -1195,7 +1184,6 @@ struct wlan_mlme_rates {
 	struct mlme_cfg_str supported_mcs_set;
 	struct mlme_cfg_str basic_mcs_set;
 	struct mlme_cfg_str current_mcs_set;
-	uint32_t cck_rx_tx_support_mode;
 };
 
 
@@ -1539,7 +1527,6 @@ struct wlan_mlme_aux_dev_caps {
  * @wlan_mlme_aux0_dev_caps: capability for aux0
  * @bt_profile_con: Bluetooth connection profile
  * @relaxed_lpi_conn_policy: Relaxed LPI connection policy flag
- * @edca_txop_limit: EDCA TXOP limit in milliseconds.
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1614,7 +1601,6 @@ struct wlan_mlme_generic {
 		wlan_mlme_aux0_dev_caps[WLAN_MLME_HW_MODE_MAX];
 	bool bt_profile_con;
 	bool relaxed_lpi_conn_policy;
-	uint32_t edca_txop_limit;
 };
 
 /**
@@ -1909,8 +1895,7 @@ enum station_prefer_bw {
  * @mlo_max_simultaneous_links:     number of simultaneous links
  * @mlo_prefer_percentage:          percentage to boost/reduce mlo scoring
  * @mlo_5gl_5gh_mlsr:               enable/disable 5GL+5GH MLSR
- * @ext_mld_cap_supp:               Extended MLD cap support in assoc req
- * @exclude_ext_mld_cap:            Exclude Extended MLD caps in assoc req
+ * @ext_mld_cap_supp:               Include/exclude Extended MLD caps in assoc
  * @epcs_capability:                epcs capability enable or disable flag
  * @usr_disable_eht:                user disable the eht for STA
  * @eht_disable_punct_in_us_lpi:    Disable eht puncture in us lpi mode
@@ -1950,7 +1935,6 @@ struct wlan_mlme_sta_cfg {
 	int8_t mlo_prefer_percentage;
 	bool mlo_5gl_5gh_mlsr;
 	bool ext_mld_cap_supp;
-	bool exclude_ext_mld_cap;
 #endif
 #ifdef WLAN_FEATURE_11BE
 	bool epcs_capability;
@@ -2091,7 +2075,6 @@ struct fw_scan_channels {
  * @roam_bg_scan_bad_rssi_threshold:RSSI threshold for background roam
  * @roam_bg_scan_client_bitmap: Bitmap used to identify the scan clients
  * @roam_bg_scan_bad_rssi_offset_2g:RSSI threshold offset for 2G to 5G roam
- * @bg_roam_scan_flag: bg_roam_scan Enable/Disable
  * @roam_data_rssi_threshold_triggers: triggers of bad data RSSI threshold to
  *                                     roam
  * @roam_data_rssi_threshold: Bad data RSSI threshold to roam
@@ -2239,7 +2222,6 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t roam_bg_scan_bad_rssi_threshold;
 	uint32_t roam_bg_scan_client_bitmap;
 	uint32_t roam_bg_scan_bad_rssi_offset_2g;
-	bool bg_roam_scan_flag;
 	uint32_t roam_data_rssi_threshold_triggers;
 	int32_t roam_data_rssi_threshold;
 	uint32_t rx_data_inactivity_time;
@@ -2950,7 +2932,6 @@ struct wlan_mlme_iot {
  * @dfs_cfg: DFS related CFG Items
  * @sap_protection_cfg: SAP erp protection related CFG items
  * @sap_cfg: sap CFG items
- * @p2p: p2p CFG items
  * @nss_chains_ini_cfg: Per vdev nss, chains related CFG items
  * @sta: sta CFG Items
  * @stats: stats CFG Items
@@ -3007,7 +2988,6 @@ struct wlan_mlme_cfg {
 	struct wlan_mlme_dfs_cfg dfs_cfg;
 	struct wlan_mlme_sap_protection sap_protection_cfg;
 	struct wlan_mlme_cfg_sap sap_cfg;
-	struct wlan_mlme_p2p_cfg p2p;
 	struct wlan_mlme_nss_chains nss_chains_ini_cfg;
 	struct wlan_mlme_sta_cfg sta;
 	struct wlan_mlme_stats_cfg stats;

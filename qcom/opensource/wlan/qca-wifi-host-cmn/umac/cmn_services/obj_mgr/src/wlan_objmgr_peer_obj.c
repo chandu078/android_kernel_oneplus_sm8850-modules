@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -149,6 +149,7 @@ static QDF_STATUS wlan_objmgr_peer_obj_free(struct wlan_objmgr_peer *peer)
 
 }
 
+#ifdef WLAN_OBJMGR_REF_ID_DEBUG
 static void
 wlan_objmgr_peer_init_ref_id_debug(struct wlan_objmgr_peer *peer)
 {
@@ -157,6 +158,10 @@ wlan_objmgr_peer_init_ref_id_debug(struct wlan_objmgr_peer *peer)
 	for (id = 0; id < WLAN_REF_ID_MAX; id++)
 		qdf_atomic_init(&peer->peer_objmgr.ref_id_dbg[id]);
 }
+#else
+static inline void
+wlan_objmgr_peer_init_ref_id_debug(struct wlan_objmgr_peer *peer) {}
+#endif
 
 void
 wlan_peer_set_phymode(struct wlan_objmgr_peer *peer, enum wlan_phymode phymode)
@@ -815,13 +820,20 @@ void *wlan_objmgr_peer_get_comp_private_obj(
 }
 qdf_export_symbol(wlan_objmgr_peer_get_comp_private_obj);
 
+#ifdef WLAN_OBJMGR_REF_ID_DEBUG
 static inline void
 wlan_objmgr_peer_get_debug_id_ref(struct wlan_objmgr_peer *peer,
 				  wlan_objmgr_ref_dbgid id)
 {
 	qdf_atomic_inc(&peer->peer_objmgr.ref_id_dbg[id]);
 }
+#else
+static inline void
+wlan_objmgr_peer_get_debug_id_ref(struct wlan_objmgr_peer *peer,
+				  wlan_objmgr_ref_dbgid id) {}
+#endif
 
+#ifdef WLAN_OBJMGR_REF_ID_DEBUG
 static QDF_STATUS
 wlan_objmgr_peer_release_debug_id_ref(struct wlan_objmgr_peer *peer,
 				      wlan_objmgr_ref_dbgid id)
@@ -842,6 +854,14 @@ wlan_objmgr_peer_release_debug_id_ref(struct wlan_objmgr_peer *peer,
 	qdf_atomic_dec(&peer->peer_objmgr.ref_id_dbg[id]);
 	return QDF_STATUS_SUCCESS;
 }
+#else
+static QDF_STATUS
+wlan_objmgr_peer_release_debug_id_ref(struct wlan_objmgr_peer *peer,
+				      wlan_objmgr_ref_dbgid id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 #ifdef WLAN_OBJMGR_REF_ID_TRACE
 static inline void
@@ -1469,6 +1489,12 @@ wlan_objmgr_print_peer_ref_ids(struct wlan_objmgr_peer *peer,
 	wlan_objmgr_print_ref_ids(peer->peer_objmgr.ref_id_dbg, log_level);
 }
 
+uint32_t
+wlan_objmgr_peer_get_comp_ref_cnt(struct wlan_objmgr_peer *peer,
+				  enum wlan_umac_comp_id id)
+{
+	return qdf_atomic_read(&peer->peer_objmgr.ref_id_dbg[id]);
+}
 #else
 void
 wlan_objmgr_print_peer_ref_ids(struct wlan_objmgr_peer *peer,
@@ -1479,14 +1505,14 @@ wlan_objmgr_print_peer_ref_ids(struct wlan_objmgr_peer *peer,
 	pending_ref = qdf_atomic_read(&peer->peer_objmgr.ref_cnt);
 	obj_mgr_log_level(log_level, "Pending refs -- %d", pending_ref);
 }
-#endif
 
 uint32_t
 wlan_objmgr_peer_get_comp_ref_cnt(struct wlan_objmgr_peer *peer,
 				  enum wlan_umac_comp_id id)
 {
-	return qdf_atomic_read(&peer->peer_objmgr.ref_id_dbg[id]);
+	return 0;
 }
+#endif
 
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 QDF_STATUS wlan_peer_update_macaddr(struct wlan_objmgr_peer *peer,

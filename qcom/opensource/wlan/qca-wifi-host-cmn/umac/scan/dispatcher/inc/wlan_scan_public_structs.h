@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -706,6 +706,11 @@ struct scan_cache_entry {
 	enum wlan_phymode non_intersected_phymode;
 	uint32_t recv_freq;
 	uint8_t ap_pwr_type_6g;
+#ifdef OPLUS_FEATURE_WIFI_VENDOR_FT
+	bool vendor_ft_adaptive;
+	uint8_t vendor_ft_mdie[WLAN_MOBILITY_DOMAIN_IE_MAX_LEN + 2];
+	uint32_t vendor_ft_rsn_offset;
+#endif /* OPLUS_FEATURE_WIFI_VENDOR_FT */
 };
 
 #define MAX_FAVORED_BSSID 16
@@ -768,7 +773,6 @@ enum dot11_mode_filter {
  * @match_link_id: Flag to match self IEEE link id of scan entry
  * @flush_all_except_conn_entry: FLag to flush all the scan entry except entry
  *                               which are connected
- * @flush_local_gen: Flag to match and flush locally generated entries
  * @reserved: Reserved
  * @age_threshold: If set return entry which are newer than the age_threshold
  * @num_of_bssid: number of bssid passed
@@ -809,8 +813,7 @@ struct scan_filter {
 		match_mld_addr:1,
 		match_link_id:1,
 		flush_all_except_conn_entry:1,
-		flush_local_gen:1,
-		reserved:6;
+		reserved:7;
 	qdf_time_t age_threshold;
 	uint8_t num_of_bssid;
 	uint8_t num_of_ssid;

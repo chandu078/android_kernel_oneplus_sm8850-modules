@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -82,19 +82,13 @@ scm_scan_get_pdev_global_event_handlers(struct scan_event_listeners *listeners,
 	struct cb_handler *cb_handlers  = &(pdev_ev_handler->cb_handlers[0]);
 
 	for (i = 0; i < MAX_SCAN_EVENT_HANDLERS_PER_PDEV; i++, cb_handlers++) {
-		/* Allocate one callback at a time when cb_handlers->func is not null */
 		if ((cb_handlers->func) &&
 		    (listeners->count < MAX_SCAN_EVENT_LISTENERS)) {
-			listeners->cb[listeners->count] = qdf_mem_malloc_atomic(sizeof(struct cb_handler));
-			if (listeners->cb[listeners->count]) {
-				listeners->cb[listeners->count]->func =
-					cb_handlers->func;
-				listeners->cb[listeners->count]->arg =
-					cb_handlers->arg;
-				listeners->count++;
-			} else {
-				scm_err_rl("Failed to allocate memory for pdev global event handler %d", i);
-			}
+			listeners->cb[listeners->count].func =
+				cb_handlers->func;
+			listeners->cb[listeners->count].arg =
+				cb_handlers->arg;
+			listeners->count++;
 		}
 	}
 
@@ -116,19 +110,13 @@ scm_scan_get_requester_event_handler(struct scan_event_listeners *listeners,
 	idx = requester_id & WLAN_SCAN_REQUESTER_ID_MASK;
 	if (idx < WLAN_MAX_REQUESTORS) {
 		ev_handler = &(requesters[idx].ev_handler);
-		/* Allocate one callback at a time when ev_handler->func is not null */
 		if (ev_handler->func) {
 			if (listeners->count < MAX_SCAN_EVENT_LISTENERS) {
-				listeners->cb[listeners->count] = qdf_mem_malloc_atomic(sizeof(struct cb_handler));
-				if (listeners->cb[listeners->count]) {
-					listeners->cb[listeners->count]->func =
-								     ev_handler->func;
-					listeners->cb[listeners->count]->arg =
-								     ev_handler->arg;
-					listeners->count++;
-				} else {
-					scm_err_rl("Failed to allocate memory for requester event handler %d", idx);
-				}
+				listeners->cb[listeners->count].func =
+							     ev_handler->func;
+				listeners->cb[listeners->count].arg =
+							     ev_handler->arg;
+				listeners->count++;
 			}
 		}
 		return QDF_STATUS_SUCCESS;
@@ -137,42 +125,6 @@ scm_scan_get_requester_event_handler(struct scan_event_listeners *listeners,
 		return QDF_STATUS_E_INVAL;
 	}
 
-}
-
-static void
-scm_scan_invoke_requester_ev_handler(
-		struct wlan_objmgr_vdev *vdev,
-		struct scan_event *event,
-		struct wlan_scan_obj *scan,
-		struct scan_requester_info *requesters,
-		wlan_scan_requester requester_id)
-{
-	uint32_t idx;
-	struct cb_handler cb;
-	struct cb_handler *ev_handler;
-
-	idx = requester_id & WLAN_SCAN_REQUESTER_ID_PREFIX;
-	if (idx != WLAN_SCAN_REQUESTER_ID_PREFIX)
-		return;
-
-	idx = requester_id & WLAN_SCAN_REQUESTER_ID_MASK;
-	if (idx < WLAN_MAX_REQUESTORS) {
-		qdf_mem_zero(&cb, sizeof(cb));
-		qdf_spin_lock_bh(&scan->lock);
-		/* find owner who triggered this scan request */
-		ev_handler = &(requesters[idx].ev_handler);
-		if (ev_handler->func) {
-			cb.func = ev_handler->func;
-			cb.arg = ev_handler->arg;
-		}
-		qdf_spin_unlock_bh(&scan->lock);
-		/* notify requester handler */
-		if (cb.func)
-			cb.func(vdev, event, cb.arg);
-	} else {
-		scm_err("invalid requester id %d",
-			requester_id);
-	}
 }
 
 static void scm_scan_post_event(struct wlan_objmgr_vdev *vdev,
@@ -202,21 +154,8 @@ static void scm_scan_post_event(struct wlan_objmgr_vdev *vdev,
 
 	listeners = qdf_mem_malloc_atomic(sizeof(*listeners));
 	if (!listeners) {
-		/* In lower memory case, atomic allocation may be failed.
-		 * To avoid app layer stuck for waiting scan completion,
-		 * try normal allocation and invoke requester handler only.
-		 */
-		scm_warn("couldn't allocate listeners list by atomic way");
-		listeners = qdf_mem_malloc(sizeof(*listeners));
-		if (!listeners) {
-			scm_warn("couldn't allocate listeners list by normal way");
-			scm_scan_invoke_requester_ev_handler(
-				vdev, event, scan, requesters,
-				event->requester);
-			scm_debug("requester id %d handler invoked",
-				  event->requester);
-			return;
-		}
+		scm_warn("couldn't allocate listeners list");
+		return;
 	}
 
 	/* initialize number of listeners */
@@ -242,13 +181,9 @@ static void scm_scan_post_event(struct wlan_objmgr_vdev *vdev,
 
 	/* notify all interested handlers */
 	for (i = 0; i < listeners->count; i++) {
-		if (listeners->cb[i] && listeners->cb[i]->func) {
-			scm_listener_cb_exe_dur_start(scan, i);
-			listeners->cb[i]->func(vdev, event, listeners->cb[i]->arg);
-			scm_listener_cb_exe_dur_end(scan, i);
-			qdf_mem_free(listeners->cb[i]);
-			listeners->cb[i] = NULL;
-		}
+		scm_listener_cb_exe_dur_start(scan, i);
+		listeners->cb[i].func(vdev, event, listeners->cb[i].arg);
+		scm_listener_cb_exe_dur_end(scan, i);
 	}
 	qdf_mem_free(listeners);
 }
@@ -711,39 +646,17 @@ static void scm_req_update_concurrency_params(struct wlan_objmgr_vdev *vdev,
 	 */
 	if ((ap_present && sap_peer_count) ||
 	    (go_present && go_peer_count)) {
-		uint32_t sta_max_dwell_time;
-
-		sta_max_dwell_time = SCAN_CTS_DURATION_MS_MAX -
-			SCAN_ROAM_SCAN_CHANNEL_SWITCH_TIME;
-
-		if (ap_present) {
-			if (!policy_mgr_is_hw_dbs_capable(psoc)) {
+		if ((policy_mgr_is_hw_dbs_capable(psoc) &&
+		     policy_mgr_is_sap_go_on_2g(psoc)) ||
+		     !policy_mgr_is_hw_dbs_capable(psoc)) {
+			if (ap_present)
 				req->scan_req.dwell_time_active_2g =
 					QDF_MIN(req->scan_req.dwell_time_active,
-						sta_max_dwell_time);
-
-				req->scan_req.dwell_time_active =
-					QDF_MIN(req->scan_req.dwell_time_active,
-						sta_max_dwell_time);
-				req->scan_req.dwell_time_passive =
-					QDF_MIN(req->scan_req.dwell_time_passive,
-						sta_max_dwell_time);
-
-				req->scan_req.dwell_time_active_6g =
-					QDF_MIN(req->scan_req.dwell_time_active_6g,
-						sta_max_dwell_time);
-				req->scan_req.dwell_time_passive_6g =
-					QDF_MIN(req->scan_req.dwell_time_passive_6g,
-						sta_max_dwell_time);
-			} else if (policy_mgr_is_sap_go_on_2g(psoc)) {
-				req->scan_req.dwell_time_active_2g =
-					QDF_MIN(req->scan_req.dwell_time_active,
-						sta_max_dwell_time);
-			}
-		} else {
-			req->scan_req.dwell_time_active_2g = 0;
+						(SCAN_CTS_DURATION_MS_MAX -
+						SCAN_ROAM_SCAN_CHANNEL_SWITCH_TIME));
+			else
+				req->scan_req.dwell_time_active_2g = 0;
 		}
-
 		req->scan_req.min_rest_time = req->scan_req.max_rest_time;
 	}
 
@@ -1122,6 +1035,16 @@ scm_update_channel_list(struct scan_start_request *req,
 	     !(scan_obj->scan_def.skip_dfs_chan_in_p2p_search && p2p_search) &&
 	     !scan_obj->miracast_enabled)
 		skip_dfs_ch = false;
+
+	if (skip_dfs_ch) {
+		scm_nofl_debug("skip dfs ch allow_dfs_chan_in_scan = %d allow_dfs_chan_in_first_scan = %d first_scan_done = %d skip_dfs_chan_in_p2p_seach = %d p2p_search = %d miracast_enabled = %d",
+				scan_obj->scan_def.allow_dfs_chan_in_scan,
+				scan_obj->scan_def.allow_dfs_chan_in_first_scan,
+				first_scan_done,
+				scan_obj->scan_def.skip_dfs_chan_in_p2p_search,
+				p2p_search,
+				scan_obj->miracast_enabled);
+	}
 
 	for (i = 0; i < req->scan_req.chan_list.num_chan; i++) {
 		uint32_t freq;

@@ -1104,30 +1104,9 @@ QDF_STATUS csr_update_channel_list(struct mac_context *mac)
 				pChanList->chanParam[num_channel].nan_disabled =
 					true;
 
-			/* Channel flags to be set by HOST
-			 *
-			 * DFS channel: is_passive + dfsSet
-			 * Indoor channel: is_passive
-			 * DFS + Indoor channel: is_passive + dfsSet
-			 */
-
-			if (wlan_reg_is_6ghz_chan_freq(
-				pChanList->chanParam[num_channel].freq)) {
-				if (wlan_reg_is_6g_freq_indoor(mac->pdev,
-					pChanList->chanParam[num_channel].freq))
-					pChanList->chanParam[num_channel].is_passive = true;
-			} else {
-				if (wlan_reg_is_dfs_for_freq(mac->pdev,
-					pChanList->chanParam[num_channel].freq)) {
-					pChanList->chanParam[num_channel].dfsSet = true;
-					pChanList->chanParam[num_channel].is_passive = true;
-				}
-
-				if (wlan_reg_is_freq_indoor(mac->pdev,
-					pChanList->chanParam[num_channel].freq))
-					pChanList->chanParam[num_channel].is_passive = true;
-			}
-
+			if (CHANNEL_STATE_DFS == channel_state)
+				pChanList->chanParam[num_channel].dfsSet =
+					true;
 
 			pChanList->chanParam[num_channel].quarter_rate =
 							is_5mhz_enabled;
@@ -3600,7 +3579,6 @@ csr_roam_chk_lnk_set_ctx_rsp(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 	eCsrRoamResult result = eCSR_ROAM_RESULT_NONE;
 	struct set_context_rsp *pRsp = (struct set_context_rsp *)msg_ptr;
 	struct qdf_mac_addr connected_bssid;
-	bool is_roam = false;
 
 	if (!pRsp) {
 		sme_err("set key response is NULL");
@@ -3629,10 +3607,6 @@ csr_roam_chk_lnk_set_ctx_rsp(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 		  mac_ctx->obss_scan_offload, chan_freq,
 		  wlan_get_opmode_from_vdev_id(mac_ctx->pdev, sessionId));
 
-	if (MLME_IS_ROAMING_IN_PROG(mac_ctx->psoc, sessionId) ||
-	    MLME_IS_ROAM_SYNCH_IN_PROGRESS(mac_ctx->psoc, sessionId))
-		is_roam = true;
-
 	if (CSR_IS_WAIT_FOR_KEY(mac_ctx, sessionId)) {
 		/* We are done with authentication, whethere succeed or not */
 		csr_roam_substate_change(mac_ctx, eCSR_ROAM_SUBSTATE_NONE,
@@ -3644,14 +3618,6 @@ csr_roam_chk_lnk_set_ctx_rsp(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 			return;
 		}
 		policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs(mac_ctx->psoc);
-		/*
-		 * Keys are now installed, safe to trigger SAP restart
-		 * This handles the deferred SAP restart for
-		 * ROAM_AUTH_STATUS_CONNECTED case
-		 */
-		policy_mgr_trigger_deferred_sap_restart(mac_ctx->psoc,
-							sessionId,
-							is_roam);
 	}
 	if (eSIR_SME_SUCCESS == pRsp->status_code) {
 		qdf_copy_macaddr(&roam_info->peerMac, &pRsp->peer_macaddr);
@@ -4119,41 +4085,15 @@ csr_roam_chk_lnk_assoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 		if (csr_akm_type == eCSR_AUTH_TYPE_OWE) {
 			roam_info->owe_pending_assoc_ind = qdf_mem_malloc(
 							    sizeof(*pAssocInd));
-			if (roam_info->owe_pending_assoc_ind) {
+			if (roam_info->owe_pending_assoc_ind)
 				qdf_mem_copy(roam_info->owe_pending_assoc_ind,
 					     pAssocInd, sizeof(*pAssocInd));
-				if (pAssocInd->assocReqLength) {
-					roam_info->owe_pending_assoc_ind->assocReqPtr =
-						qdf_mem_malloc(pAssocInd->assocReqLength);
-					if (roam_info->owe_pending_assoc_ind->assocReqPtr) {
-						qdf_mem_copy(roam_info->owe_pending_assoc_ind->assocReqPtr,
-							     pAssocInd->assocReqPtr,
-							     pAssocInd->assocReqLength);
-					} else {
-						sme_err("OWE assocReqPtr alloc failed");
-						roam_info->owe_pending_assoc_ind->assocReqPtr = NULL;
-					}
-				}
-			}
 		} else if (csr_akm_type == eCSR_AUTH_TYPE_FT_RSN_PSK) {
 			roam_info->ft_pending_assoc_ind = qdf_mem_malloc(
 			    sizeof(*pAssocInd));
-			if (roam_info->ft_pending_assoc_ind) {
+			if (roam_info->ft_pending_assoc_ind)
 				qdf_mem_copy(roam_info->ft_pending_assoc_ind,
 					     pAssocInd, sizeof(*pAssocInd));
-				if (roam_info->ft_pending_assoc_ind->assocReqLength) {
-					roam_info->ft_pending_assoc_ind->assocReqPtr =
-						qdf_mem_malloc(pAssocInd->assocReqLength);
-					if (roam_info->ft_pending_assoc_ind->assocReqPtr) {
-						qdf_mem_copy(roam_info->ft_pending_assoc_ind->assocReqPtr,
-							     pAssocInd->assocReqPtr,
-							     pAssocInd->assocReqLength);
-					} else {
-						sme_err("FT assocReqPtr alloc failed");
-						roam_info->ft_pending_assoc_ind->assocReqPtr = NULL;
-					}
-				}
-			}
 		}
 		status = csr_roam_call_callback(mac_ctx, sessionId,
 					roam_info, eCSR_ROAM_INFRA_IND,
@@ -4161,13 +4101,9 @@ csr_roam_chk_lnk_assoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			/* Refused due to Mac filtering */
 			if (roam_info->owe_pending_assoc_ind) {
-				if (roam_info->owe_pending_assoc_ind->assocReqPtr)
-					qdf_mem_free(roam_info->owe_pending_assoc_ind->assocReqPtr);
 				qdf_mem_free(roam_info->owe_pending_assoc_ind);
 				roam_info->owe_pending_assoc_ind = NULL;
 			} else if (roam_info->ft_pending_assoc_ind) {
-				if (roam_info->ft_pending_assoc_ind->assocReqPtr)
-					qdf_mem_free(roam_info->ft_pending_assoc_ind->assocReqPtr);
 				qdf_mem_free(roam_info->ft_pending_assoc_ind);
 				roam_info->ft_pending_assoc_ind = NULL;
 			}
@@ -5370,7 +5306,6 @@ QDF_STATUS csr_cm_update_fils_info(struct wlan_objmgr_vdev *vdev,
 				   struct bss_description *bss_desc,
 				   struct wlan_cm_vdev_connect_req *req)
 {
-	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -5448,10 +5383,8 @@ QDF_STATUS cm_csr_handle_join_req(struct wlan_objmgr_vdev *vdev,
 	status = wlan_fill_bss_desc_from_scan_entry(mac_ctx, bss_desc,
 						    join_req->entry);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		mgmt_txrx_frame_hex_dump(
-			util_scan_entry_frame_ptr(join_req->entry),
-			util_scan_entry_frame_len(join_req->entry),
-			false);
+		mgmt_txrx_frame_hex_dump(util_scan_entry_frame_ptr(join_req->entry),
+						    util_scan_entry_frame_len(join_req->entry), false);
 		qdf_mem_free(bss_desc);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -6026,12 +5959,6 @@ QDF_STATUS cm_csr_handle_diconnect_req(struct wlan_objmgr_vdev *vdev,
 	if (!session || !CSR_IS_SESSION_VALID(mac_ctx, vdev_id)) {
 		sme_err("session not found for vdev_id %d", vdev_id);
 		return QDF_STATUS_E_INVAL;
-	}
-
-	if (cm_csr_is_ss_wait_for_key(vdev_id)) {
-		mlme_debug("Stop Wait for key timer");
-		cm_stop_wait_for_key_timer(mac_ctx->psoc, vdev_id);
-		cm_csr_set_ss_none(vdev_id);
 	}
 
 	cm_csr_set_joining(vdev_id);
@@ -7022,28 +6949,6 @@ enum wlan_serialization_cmd_type csr_get_cmd_type(tSmeCmd *sme_cmd)
 	return cmd_type;
 }
 
-bool csr_is_sme_umac_ser_cmd_type(struct wlan_serialization_command *cmd)
-{
-	if (!cmd || cmd->source != WLAN_UMAC_COMP_MLME)
-		return false;
-
-	switch (cmd->cmd_type) {
-	case WLAN_SER_CMD_WM_STATUS_CHANGE:
-	case WLAN_SER_CMD_FORCE_DISASSOC_STA:
-	case WLAN_SER_CMD_FORCE_DEAUTH_STA:
-	case WLAN_SER_CMD_ADDTS:
-	case WLAN_SER_CMD_DELTS:
-	case WLAN_SER_CMD_SET_HW_MODE:
-	case WLAN_SER_CMD_NSS_UPDATE:
-	case WLAN_SER_CMD_SET_DUAL_MAC_CONFIG:
-	case WLAN_SER_CMD_SET_ANTENNA_MODE:
-	case WLAN_SER_CMD_SAP_BW_UPDATE:
-		return true;
-	default:
-		return false;
-	}
-}
-
 static uint32_t csr_get_monotonous_number(struct mac_context *mac_ctx)
 {
 	uint32_t cmd_id;
@@ -7061,6 +6966,12 @@ static void csr_fill_cmd_timeout(struct wlan_serialization_command *cmd)
 	switch (cmd->cmd_type) {
 	case WLAN_SER_CMD_WM_STATUS_CHANGE:
 		cmd->cmd_timeout_duration = SME_CMD_PEER_DISCONNECT_TIMEOUT;
+		break;
+	case WLAN_SER_CMD_VDEV_START_BSS:
+		cmd->cmd_timeout_duration = SME_CMD_VDEV_START_BSS_TIMEOUT;
+		break;
+	case WLAN_SER_CMD_VDEV_STOP_BSS:
+		cmd->cmd_timeout_duration = SME_CMD_STOP_BSS_CMD_TIMEOUT;
 		break;
 	case WLAN_SER_CMD_FORCE_DISASSOC_STA:
 	case WLAN_SER_CMD_FORCE_DEAUTH_STA:
@@ -8224,7 +8135,7 @@ QDF_STATUS csr_bss_start(struct mac_context *mac, uint32_t vdev_id,
 	csr_set_sap_ser_params(&cmd, WLAN_SER_CMD_VDEV_START_BSS);
 	cmd.umac_cmd = start_bss_cfg;
 	cmd.vdev = vdev;
-	cmd.cmd_timeout_duration = SME_CMD_VDEV_START_BSS_TIMEOUT;
+	csr_fill_cmd_timeout(&cmd);
 
 	status = wlan_vdev_mlme_ser_start_bss(&cmd);
 	switch (status) {
@@ -8280,7 +8191,7 @@ QDF_STATUS csr_roam_issue_stop_bss_cmd(struct mac_context *mac,
 	csr_set_sap_ser_params(&cmd, WLAN_SER_CMD_VDEV_STOP_BSS);
 	cmd.umac_cmd = stop_bss_req;
 	cmd.vdev = vdev;
-	cmd.cmd_timeout_duration = SME_CMD_STOP_BSS_CMD_TIMEOUT;
+	csr_fill_cmd_timeout(&cmd);
 
 	status = wlan_vdev_mlme_ser_stop_bss(&cmd);
 	switch (status) {

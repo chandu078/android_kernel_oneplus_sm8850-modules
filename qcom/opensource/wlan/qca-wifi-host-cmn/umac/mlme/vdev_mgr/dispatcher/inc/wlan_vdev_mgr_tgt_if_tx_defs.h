@@ -894,7 +894,7 @@ struct vdev_create_params {
 #ifdef WLAN_FEATURE_11BE_MLO
 	uint8_t mlo_mac[QDF_MAC_ADDR_SIZE];
 #endif
-#if defined(FEATURE_WLAN_SUPPORT_P2P_R2) || defined(FEATURE_WLAN_SUPPORT_PCC)
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 	uint32_t wfd_mode;
 #endif
 

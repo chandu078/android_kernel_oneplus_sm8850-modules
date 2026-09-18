@@ -1121,7 +1121,7 @@ static inline bool wma_is_phymode_eht(enum wlan_phymode phymode)
 }
 #endif
 
-#if CONFIG_160MHZ_SUPPORT
+#ifdef CONFIG_160MHZ_SUPPORT
 /**
  * wma_fw_to_host_phymode_160() - convert fw to host phymode for 160 mhz
  * phymodes
@@ -2078,8 +2078,6 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	cmd->peer_max_tx_nss =
 		params->bcn_tx_nss ? params->bcn_tx_nss : cmd->peer_nss;
 
-	cmd->peer_cck_rx_support_5ghz = params->peer_cck_rx_support_5ghz;
-	cmd->peer_cck_tx_support_5ghz = params->peer_cck_tx_support_5ghz;
 	/*
 	 * For STA/P2P CLI mode get the Vdev AKM.
 	 * For SAP mode, since the associating client can choose one
@@ -2406,7 +2404,7 @@ static int wmi_unified_probe_rsp_tmpl_send(tp_wma_handle wma,
 	 */
 	adjusted_tsf_le = cpu_to_le64(0ULL -
 				      wma->interfaces[vdev_id].tsfadjust);
-	/* Update the timestamp in the probe response buffer with adjusted TSF */
+	/* Update the timstamp in the probe response buffer with adjusted TSF */
 	wh = (struct ieee80211_frame *)probe_rsp_info->probeRespTemplate;
 	A_MEMCPY(&wh[1], &adjusted_tsf_le, sizeof(adjusted_tsf_le));
 
@@ -2712,7 +2710,7 @@ static QDF_STATUS wma_unified_bcn_tmpl_send(tp_wma_handle wma,
 	 */
 	adjusted_tsf_le = cpu_to_le64(0ULL -
 				      wma->interfaces[vdev_id].tsfadjust);
-	/* Update the timestamp in the beacon buffer with adjusted TSF */
+	/* Update the timstamp in the beacon buffer with adjusted TSF */
 	wh = (struct ieee80211_frame *)frm;
 	A_MEMCPY(&wh[1], &adjusted_tsf_le, sizeof(adjusted_tsf_le));
 
@@ -3052,7 +3050,6 @@ void wma_send_beacon(tp_wma_handle wma, tpSendbeaconParams bcn_info)
 			}
 		}
 	}
-
 	status = wma_store_bcn_tmpl(wma, vdev_id, bcn_info);
 	if (status != QDF_STATUS_SUCCESS) {
 		wma_err("wma_store_bcn_tmpl Failed");

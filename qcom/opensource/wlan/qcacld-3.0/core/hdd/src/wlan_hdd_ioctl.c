@@ -2027,14 +2027,10 @@ struct link_status_priv {
 static int hdd_conc_set_dwell_time(struct hdd_adapter *adapter,
 				   uint8_t *command)
 {
-	u8 *value;
+	u8 *value = command;
 	int val = 0, temp = 0;
 	int retval = 0;
 
-	if (!command)
-		return -EINVAL;
-
-	value = command;
 	if (strncmp(command, "CONCSETDWELLTIME ACTIVE MAX", 27) == 0) {
 		if (drv_cmd_validate(command, 27)) {
 			hdd_err("Invalid driver command");
@@ -3279,7 +3275,9 @@ static int drv_cmd_set_suspend_mode(struct wlan_hdd_link_info *link_info,
 	struct hdd_adapter *adapter = link_info->adapter;
 	int errno;
 	uint8_t *value = command;
+	QDF_STATUS status;
 	uint8_t idle_monitor;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (QDF_STA_MODE != adapter->device_mode) {
 		hdd_debug("Non-STA interface");
@@ -3304,23 +3302,10 @@ static int drv_cmd_set_suspend_mode(struct wlan_hdd_link_info *link_info,
 		  idle_monitor,
 		  ucfg_pmo_is_configure_apf_per_screen_state(hdd_ctx->psoc));
 
-	if (sme_get_dhcp_status(hdd_ctx->mac_handle, link_info->vdev_id) &&
-	    idle_monitor == 1) {
+	if (sme_get_dhcp_status(hdd_ctx->mac_handle, link_info->vdev_id)) {
 		hdd_nofl_debug("DHCP in progress. Ignore SETSUSPEND command");
-		adapter->dhcp_config_setsuspend = true;
 		return 0;
 	}
-
-	return hdd_handle_apf_mode_on_idle(hdd_ctx, link_info, idle_monitor);
-}
-
-int hdd_handle_apf_mode_on_idle(struct hdd_context *hdd_ctx,
-				struct wlan_hdd_link_info *link_info,
-				uint8_t idle_monitor)
-{
-	QDF_STATUS status;
-	struct hdd_adapter *adapter = link_info->adapter;
-	struct wlan_objmgr_vdev *vdev;
 
 	if (ucfg_pmo_is_configure_apf_per_screen_state(hdd_ctx->psoc)) {
 		if (idle_monitor == 0) {
@@ -4877,6 +4862,18 @@ static int drv_cmd_conc_set_dwell_time(struct wlan_hdd_link_info *link_info,
 {
 	return hdd_conc_set_dwell_time(link_info->adapter, command);
 }
+
+#ifdef OPLUS_BUG_STABILITY
+int wlan_hdd_is_wfd(void)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (hdd_ctx != NULL) {
+		return ((hdd_ctx->miracast_value == MIRACAST_SOURCE) ||
+				(hdd_ctx->miracast_value == MIRACAST_SINK));
+	}
+	return 0;
+}
+#endif /* OPLUS_BUG_STABILITY */
 
 static int drv_cmd_miracast(struct wlan_hdd_link_info *link_info,
 			    struct hdd_context *hdd_ctx,

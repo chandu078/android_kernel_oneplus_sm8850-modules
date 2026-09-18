@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,7 +24,6 @@
 #include <dp_rx_mon_1.0.h>
 #include <dp_mon_1.0.h>
 #include <dp_mon_filter_1.0.h>
-#include <hif.h>
 
 #include "htt_ppdu_stats.h"
 #if defined(DP_CON_MON)
@@ -282,6 +281,8 @@ void dp_mon_rings_deinit_1_0(struct dp_pdev *pdev)
 			       RXDMA_MONITOR_STATUS, 0);
 		dp_srng_deinit(soc, &soc->sw2rxdma_link_ring[lmac_id],
 			       SW2RXDMA_LINK_RELEASE, 0);
+
+		dp_mon_dest_rings_deinit(pdev, lmac_id);
 	}
 }
 
@@ -299,6 +300,8 @@ void dp_mon_rings_free_1_0(struct dp_pdev *pdev)
 
 		dp_srng_free(soc, &soc->rxdma_mon_status_ring[lmac_id]);
 		dp_srng_free(soc, &soc->sw2rxdma_link_ring[lmac_id]);
+
+		dp_mon_dest_rings_free(pdev, lmac_id);
 	}
 }
 
@@ -358,6 +361,9 @@ QDF_STATUS dp_mon_rings_init_1_0(struct dp_pdev *pdev)
 			dp_mon_err("%pK: " RNG_ERR "sw2rxdma_link_ring", soc);
 			goto fail1;
 		}
+
+		if (dp_mon_dest_rings_init(pdev, lmac_id))
+			goto fail1;
 	}
 	return QDF_STATUS_SUCCESS;
 
@@ -392,6 +398,9 @@ QDF_STATUS dp_mon_rings_alloc_1_0(struct dp_pdev *pdev)
 			dp_mon_err("%pK: " RNG_ERR "sw2rxdma_link_ring", soc);
 			goto fail1;
 		}
+
+		if (dp_mon_dest_rings_alloc(pdev, lmac_id))
+			goto fail1;
 	}
 	return QDF_STATUS_SUCCESS;
 
@@ -559,28 +568,12 @@ static void dp_mon_vdev_timer(void *arg)
 	int max_mac_rings = wlan_cfg_get_num_mac_rings(pdev->wlan_cfg_ctx);
 	struct dp_mon_soc *mon_soc = soc->monitor_soc;
 	struct dp_mon_mac *mon_mac;
-	uint8_t mac_id = 0;
-	enum reg_wifi_band mon_band;
-	uint8_t dp_intr_id = wlan_cfg_get_num_contexts(soc->wlan_cfg_ctx);
-	struct dp_intr *dp_intr_ctx = NULL;
-
 
 	if (!qdf_atomic_read(&soc->cmn_init_done))
 		return;
 
 	start_time = qdf_get_log_timestamp();
 	dp_update_num_mac_rings_for_dbs(soc, &max_mac_rings);
-	if (dp_monitor_is_chan_band_known(pdev, mac_id)) {
-		mon_band = dp_monitor_get_chan_band(pdev, mac_id);
-		lmac_id = pdev->ch_band_lmac_id_mapping[mon_band];
-		if (qdf_likely(lmac_id != DP_MON_INVALID_LMAC_ID)) {
-			dp_intr_id = soc->mon_intr_id_lmac_map[lmac_id];
-			dp_srng_record_timer_entry(soc, dp_intr_id);
-		}
-	}
-
-	if (dp_intr_id < WLAN_CFG_INT_NUM_CONTEXTS)
-		dp_intr_ctx = &soc->intr_ctx[dp_intr_id];
 
 	while (yield == DP_TIMER_NO_YIELD) {
 		for (lmac_iter = 0; lmac_iter < max_mac_rings; lmac_iter++) {
@@ -590,7 +583,7 @@ static void dp_mon_vdev_timer(void *arg)
 
 			if (lmac_iter == lmac_id)
 				work_done = dp_monitor_process(
-						    soc, dp_intr_ctx,
+						    soc, NULL,
 						    lmac_iter, remaining_quota);
 			else
 				work_done =
@@ -619,10 +612,6 @@ budget_done:
 		qdf_timer_mod(&mon_soc->mon_vdev_timer, 1);
 	else
 		qdf_timer_mod(&mon_soc->mon_vdev_timer, DP_INTR_POLL_TIMER_MS);
-
-	if (lmac_id != DP_MON_INVALID_LMAC_ID)
-		dp_srng_record_timer_exit(soc, dp_intr_id);
-
 }
 
 /* MCL specific functions */
@@ -851,6 +840,10 @@ QDF_STATUS dp_mon_htt_srng_setup_1_0(struct dp_soc *soc,
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
+	status = dp_mon_htt_dest_srng_setup(soc, pdev, mac_id, mac_for_pdev);
+	if (status != QDF_STATUS_SUCCESS)
+		return status;
+
 	if (!soc->rxdma_mon_status_ring[mac_id].hal_srng)
 		return QDF_STATUS_SUCCESS;
 
@@ -896,6 +889,13 @@ QDF_STATUS dp_mon_htt_srng_setup_1_0(struct dp_soc *soc,
 
 	if (mon_soc->monitor_mode_v2)
 		return status;
+
+	if (wlan_cfg_is_delay_mon_replenish(soc->wlan_cfg_ctx)) {
+		status = dp_mon_htt_dest_srng_setup(soc, pdev,
+						    mac_id, mac_for_pdev);
+		if (status != QDF_STATUS_SUCCESS)
+			return status;
+	}
 
 	if (!soc->rxdma_mon_status_ring[mac_id].hal_srng)
 		return QDF_STATUS_SUCCESS;

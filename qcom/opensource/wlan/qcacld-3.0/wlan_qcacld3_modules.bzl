@@ -1,4 +1,3 @@
-load(":repo_paths.bzl", "modules_label", "soc_label")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load(":target_variants.bzl", "get_all_variants")
@@ -9,10 +8,6 @@ _target_chipset_map = {
     ],
     "neo-la": [
         "kiwi-v2",
-    ],
-    "sa510m": [
-        "qca6574",
-        "qca6490",
     ],
     "anorak": [
         "qca6490",
@@ -47,11 +42,6 @@ _target_chipset_map = {
         "peach-v2",
         "kiwi-v2",
         "wcn7750",
-        "wcn6450",
-        "adrastea",
-    ],
-    "alor-le": [
-        "wcn7750",
     ],
     "sdxkova": [
         "kiwi-v2",
@@ -69,23 +59,9 @@ _target_chipset_map = {
         "qca6490_cnss2",
         "kiwi-v2",
     ],
-    "hamoa": [
-        "kiwi-v2",
-    ],
-    "chora": [
-        "wcn7750",
-        "wcn6450",
-    ],
-    "shikra":[
-            "wlan",
-    ],
-    "hamoa_la": [
-        "kiwi-v2",
-    ],
 }
 
 _chipset_hw_map = {
-    "wlan"   : "ADRASTEA",
     "kiwi-v2": "BERYLLIUM",
     "peach": "BERYLLIUM",
     "peach-v2": "BERYLLIUM",
@@ -98,13 +74,9 @@ _chipset_hw_map = {
     "wcn6450": "RHINE",
     "fig": "BORON",
     "wcn7760": "BERYLLIUM",
-    "qca6574": "ROME",
-    "adrastea" : "ADRASTEA",
 }
 
 _chipset_header_map = {
-    "wlan" : [
-    ],
     "peach-v2": [
         "api/hw/peach/v2",
         "cmn/hal/wifi3.0/peach",
@@ -150,11 +122,7 @@ _chipset_header_map = {
     "wcn7760": [
         "api/hw/qcc2072/v1",
         "cmn/hal/wifi3.0/qcc2072",
-    ],
-    "qca6574": [
-    ],
-    "adrastea" : [
-    ],
+    ]
 }
 
 _hw_header_map = {
@@ -175,10 +143,6 @@ _hw_header_map = {
         "cmn/hal/wifi3.0/rh",
     ],
     "HELIUMPLUS": [
-    ],
-    "ROME": [
-    ],
-    "ADRASTEA" : [
     ],
 }
 
@@ -406,7 +370,6 @@ _fixed_ipaths = [
     "components/wmi/inc",
     "components/wmi/src",
     "core/bmi/inc",
-    "core/bmi/src",
     "core/cds/inc",
     "core/cds/src",
     "core/dp/htt",
@@ -455,7 +418,6 @@ _fixed_ipaths = [
     "os_if/twt/inc",
     "os_if/telemetry/inc",
     "uapi/linux",
-    "cmn/hif/src/snoc",
 ]
 
 # paths where include files are private in src folders
@@ -1265,23 +1227,6 @@ _conditional_srcs = {
 		"cmn/ipa/core/src/wlan_ipa_logging.c"
 	    ],
     },
-    "CONFIG_LEGACY_IPA_OFFLOAD": {
-        True: [
-            "core/dp/txrx/ol_txrx_ipa.c",
-            "cmn/qdf/linux/src/qdf_ipa.c",
-            "cmn/ipa/core/src/wlan_ipa_core.c",
-            "cmn/ipa/core/src/wlan_ipa_main.c",
-            "cmn/ipa/core/src/wlan_ipa_rm.c",
-            "cmn/ipa/core/src/wlan_ipa_stats.c",
-            "cmn/ipa/dispatcher/src/wlan_ipa_obj_mgmt_api.c",
-            "cmn/ipa/dispatcher/src/wlan_ipa_tgt_api.c",
-            "cmn/ipa/dispatcher/src/wlan_ipa_ucfg_api.c",
-            "cmn/target_if/ipa/src/target_if_ipa.c",
-            "core/hdd/src/wlan_hdd_ipa.c",
-            # TODO: need a separate flag for sysfs
-            "core/hdd/src/wlan_hdd_sysfs_ipa.c",
-        ],
-    },
     "CONFIG_IPCIE_FW_SIM": {
         True: [
             "core/pld/src/pld_pcie_fw_sim.c",
@@ -1302,47 +1247,6 @@ _conditional_srcs = {
         True: [
             "cmn/os_if/linux/ftm/src/wlan_ioctl_ftm.c",
         ],
-    },
-    "CONFIG_AR6320_SUPPORT": {
-        True: [
-            "cmn/hif/src/ce/ce_service_legacy.c",
-            "core/dp/txrx/ol_cfg.c",
-            "core/dp/txrx/ol_rx.c",
-            "core/dp/txrx/ol_rx_defrag.c",
-            "core/dp/txrx/ol_rx_fwd.c",
-            "core/dp/txrx/ol_rx_pn.c",
-            "core/dp/txrx/ol_rx_reorder.c",
-            "core/dp/txrx/ol_rx_reorder_timeout.c",
-            "core/dp/txrx/ol_tx.c",
-            "core/dp/txrx/ol_txrx.c",
-            "core/dp/txrx/ol_txrx_encap.c",
-            "core/dp/txrx/ol_txrx_peer_find.c",
-            "core/dp/txrx/ol_tx_desc.c",
-            "core/dp/txrx/ol_tx_send.c",
-            "core/dp/htt/htt.c",
-            "core/dp/htt/htt_fw_stats.c",
-            "core/dp/htt/htt_h2t.c",
-            "core/dp/htt/htt_rx.c",
-            "core/dp/htt/htt_t2h.c",
-            "core/dp/htt/htt_tx.c",
-        ],
-    },
-    "CONFIG_AR6320_TX_THROTTLE": {
-        True: [
-            "core/dp/txrx/ol_txrx_ipa.c",
-        ]
-    },
-    "CONFIG_AR6320_LL_DP_SUPPORT": {
-        True: [
-            "core/dp/htt/htt_rx_ll.c",
-            "core/dp/txrx/ol_tx_ll.c",
-            "core/dp/txrx/ol_tx_ll_legacy.c",
-        ]
-    },
-    "CONFIG_AR6320_MONITOR_MODE": {
-        True: [
-            "core/dp/htt/htt_monitor_rx.c",
-        ]
     },
     "CONFIG_LITHIUM": {
         True: [
@@ -1422,7 +1326,6 @@ _conditional_srcs = {
     "CONFIG_PLD_SNOC_ICNSS_FLAG": {
         True: [
             "core/pld/src/pld_snoc.c",
-            "cmn/hif/src/snoc/if_snoc.c",
         ],
     },
     "CONFIG_POWER_MANAGEMENT_OFFLOAD": {
@@ -1538,7 +1441,7 @@ _conditional_srcs = {
             "components/cmn_services/logging/src/wlan_connectivity_logging.c",
         ],
     },
-    "CONFIG_QCACLD_WLAN_CONNECTIVITY_LOGGING": {
+    "CONFIG_QCACLD_WLAN_CONNECTIVITY_DIAG_LOGGING": {
         True: [
             "core/hdd/src/wlan_hdd_connectivity_logging.c",
             "components/cmn_services/logging/src/wlan_connectivity_logging.c",
@@ -1859,7 +1762,7 @@ _conditional_srcs = {
             "cmn/target_if/cfr/src/target_if_cfr_enh.c",
         ],
     },
-    "CONFIG_WLAN_FASTPATH_AND_NOT_RHINE": {
+    "CONFIG_WLAN_FASTPATH": {
         True: [
             "core/dp/txrx/ol_tx_ll_fastpath.c",
         ],
@@ -1924,6 +1827,7 @@ _conditional_srcs = {
     "CONFIG_WLAN_FEATURE_BMI": {
         True: [
             "cmn/hif/src/ce/ce_bmi.c",
+            "cmn/hif/src/sdio/hif_bmi_reg_access.c",
             "core/bmi/src/bmi.c",
             "core/bmi/src/bmi_1.c",
             "core/bmi/src/ol_fw.c",
@@ -2386,7 +2290,7 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_sysfs_txrx_stats.c",
         ],
     },
-    "CONFIG_WLAN_TX_FLOW_CONTROL_LEGACY": {
+    "LEGACY_CONFIG_WLAN_TX_FLOW_CONTROL_LEGACY": {
         True: [
             "core/dp/txrx/ol_txrx_legacy_flow_control.c",
         ],
@@ -2533,16 +2437,6 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_tx_powerboost.c",
         ],
     },
-    "CONFIG_WLAN_HAPS_ENABLE": {
-        True: [
-            "components/dp/core/src/wlan_dp_haps.c",
-        ],
-    },
-    "CONFIG_WLAN_TAS_SYSFS": {
-        True: [
-            "core/hdd/src/wlan_hdd_sysfs_tas.c",
-        ],
-    },
 }
 
 def _define_module_for_target_variant_chipset(target, variant, chipset):
@@ -2553,38 +2447,35 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     chipset_ipaths = _chipset_header_map[chipset]
     hw_ipaths = _hw_header_map[hw]
 
-    if target != "sa510m":
-        deps = select({
-            "//build/qcom_build_extensions:qtisocrepo_true": [
-                soc_label("all_headers"),
-                soc_label("{}/net/wireless/cfg80211".format(tv)),
-                soc_label("{}/drivers/iommu/qcom_iommu_util".format(tv)),
-                soc_label("{}/drivers/remoteproc/rproc_qcom_common".format(tv)),
-                soc_label("{}/drivers/soc/qcom/qmi_helpers".format(tv)),
-                soc_label("{}/kernel/sched/walt/sched-walt".format(tv)),
-            ],
-            "//build/qcom_build_extensions:qtisocrepo_false": ["//msm-kernel:all_headers"],
-        })
+    deps = select({
+        "//build/kernel/kleaf:socrepo_true": [
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}/net/wireless/cfg80211".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/iommu/qcom_iommu_util".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/remoteproc/rproc_qcom_common".format(tv),
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/qmi_helpers".format(tv),
+            "//vendor/qcom/kernel:{}/kernel/sched/walt/sched-walt".format(tv),
+        ],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
+    })
 
-        deps += select({
-            "//build/qcom_build_extensions:qtisocrepo_true": [
-                soc_label("{}/drivers/soc/qcom/qcom_va_minidump".format(tv)),
-            ],
-            "//build/qcom_build_extensions:qtisocrepo_false": [],
-        })
-    else:
-        deps = [ "//msm-kernel:all_headers_arm", ]
+    deps += select({
+        "//build/kernel/kleaf:socrepo_true": [
+            "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
+        ],
+        "//build/kernel/kleaf:socrepo_false": [],
+    })
 
     if target == "neo-la":
         kernel_build = select({
             "//build/kernel/kleaf:microxr_kernel_build_true": "//:target_kernel_build",
-            "//build/kernel/kleaf:socrepo_true": soc_label("{}_base_kernel".format(tv)),
-            "//conditions:default": "//msm-kernel:{}".format(tv),
+            "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
+            "//conditions:default": "//vendor/qcom/kernel:{}".format(tv),
         })
     else:
         kernel_build = select({
-            "//build/qcom_build_extensions:qtisocrepo_true": soc_label("{}_base_kernel".format(tv)),
-            "//build/qcom_build_extensions:qtisocrepo_false": "//msm-kernel:{}".format(tv),
+            "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
+            "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(tv),
         })
 
     ipaths = chipset_ipaths + hw_ipaths + _fixed_ipaths
@@ -2709,14 +2600,6 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         cmd = "cat $(SRCS) > $@",
     )
     native.genrule(
-        name = "configs/{}_defconfig_generate_defconfig".format(tvc),
-        outs = ["configs/{}_defconfig.generated_defconfig".format(tvc)],
-        srcs = [
-            "configs/{}_gki_{}_defconfig".format(target, chipset),
-        ],
-        cmd = "cat $(SRCS) > $@",
-    )
-    native.genrule(
         name = "configs/{}_defconfig_generate_debug-defconfig".format(tvc),
         outs = ["configs/{}_defconfig.generated_debug-defconfig".format(tvc)],
         srcs = [
@@ -2728,52 +2611,34 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     srcs = native.glob(iglobs) + _fixed_srcs
 
-    if target == "sdxkova" or target == "shikra":
+    if target == "sdxkova":
         out = "wlan.ko"
-    elif target == "sa510m":
-        out = "{}.ko".format(chipset)
     else:
         out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
 
     kconfig = "Kconfig"
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
-    if chipset == "qca6750" or chipset == "wcn7750" or chipset == "wcn6450" or chipset == "wlan" or chipset == "adrastea":
+    if chipset == "qca6750" or chipset == "wcn7750" or chipset == "wcn6450":
         deps += [
-            modules_label("qcom/opensource/wlan/platform:{}_icnss2".format(tv)),
-        ]
-    elif target != "sa510m":
-        deps += [
-            modules_label("qcom/opensource/wlan/platform:{}_cnss2".format(tv)),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
         ]
     else:
         deps += [
-            "//wlan/platform:{}_cnss2".format(tv),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/wlan/platform:{}_cnss2".format(tv),
         ]
-    if target != "sa510m":
-        deps = deps + [
-            modules_label("qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv)),
-            modules_label("qcom/opensource/wlan/platform:{}_cnss_utils".format(tv)),
-            modules_label("qcom/opensource/wlan/platform:{}_cnss_nl".format(tv)),
-            modules_label("qcom/opensource/wlan/platform:wlan-platform-headers"),
-        ]
-    else:
-        deps = deps + [
-                "//wlan/platform:{}_cnss_prealloc".format(tv),
-                "//wlan/platform:{}_cnss_utils".format(tv),
-                "//wlan/platform:{}_cnss_nl".format(tv),
-                "//wlan/platform:wlan-platform-headers",
-            ]
 
-    if target == "sa510m":
+    deps = deps + [
+        "//vendor/qcom/sm8850-modules/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
+        "//vendor/qcom/sm8850-modules/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
+        "//vendor/qcom/sm8850-modules/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
+        "//vendor/qcom/sm8850-modules/qcom/opensource/wlan/platform:wlan-platform-headers",
+    ]
+
+    if target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm":
         deps = deps + [
-            "//dataipa:include_headers",
-            "//dataipa:{}_{}_ipam".format(target, variant),
-        ]
-    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa" and target != "alor-le" and target != "shikra":
-        deps = deps + [
-            modules_label("qcom/opensource/dataipa:include_headers"),
-            modules_label("qcom/opensource/dataipa:{}_{}_ipam".format(target, variant)),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/dataipa:include_headers",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
         ]
 
     if target == "sdxkova":
@@ -2792,6 +2657,8 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     deps = deps + select({
         ":wonder_enabled": [
 	    # Add dependency of wonder here
+	    "//vendor/qcom/proprietary/wlan/noship/passthru-test-suite-internal:{}_passthru_test".format(tv),
+	    "//vendor/qcom/proprietary/wlan/noship/passthru-test-suite-internal:passthru_test_headers",
         ],
         "//conditions:default": [],
     })
@@ -2799,17 +2666,15 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     wonder_srcs = "wonder_srcs_{}".format(tvc)
     native.filegroup(
         name = wonder_srcs,
-        srcs = select({
-            ":wonder_enabled": [
-                "core/hdd/src/wlan_hdd_wondertap.c",
-            ],
-            "//conditions:default": ["core/hdd/inc/wlan_hdd_wondertap.h"],
-        }),
+        # Controlled via Kconfig symbol CONFIG_WONDER_SUPPORT (see conditional_srcs below)
+        srcs = [
+            "core/hdd/src/wlan_hdd_wondertap.c",
+        ],
         visibility = ["//visibility:private"],
     )
 
     combined_conditional_srcs = dict(_conditional_srcs)
-    wonder_kcfg_key = "CONFIG_DRIVER_PASSTHRU_MODE"
+    wonder_kcfg_key = "CONFIG_WONDER_SUPPORT"
     existing_inner = combined_conditional_srcs.get(wonder_kcfg_key, {})
     existing_true_list = existing_inner.get(True, [])
     existing_true_list = existing_true_list + [
@@ -2836,7 +2701,9 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         includes = ipaths + ["."],
         kconfig = kconfig,
         defconfig = defconfig,
-        local_defines = ["OPLUS_BUG_STABILITY"],
+        #ifdef OPLUS_FEATURE_WIFI_FTM
+        local_defines = ["OPLUS_FEATURE_WIFI_BDF", "OPLUS_FEATURE_WIFI_MAC", "OPLUS_FEATURE_WIFI_FTM", "OPLUS_FEATURE_WIFI_DCS_SWITCH","OPLUS_BUG_STABILITY","OPLUS_FEATURE_CONN_POWER_MONITOR", "OPLUS_FEATURE_WIFI_VENDOR_FT"],
+        #endif /*OPLUS_FEATURE_WIFI_FTM*/
         conditional_srcs = combined_conditional_srcs,
         copts = copts,
         out = out,
@@ -2861,7 +2728,7 @@ def define_dist(target, variant, chipsets):
             mode_overrides = {"**/*": "644"},
             log = "info",
         )
-    if target != "sdxkova" and target != "alor-le" and target != "shikra":
+    if target != "sdxkova":
         copy_to_dist_dir(
             name = "{}_all_modules_dist".format(tv),
             data = dataList,

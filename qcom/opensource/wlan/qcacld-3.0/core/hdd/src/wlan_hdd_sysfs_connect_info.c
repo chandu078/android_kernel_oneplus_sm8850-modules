@@ -28,8 +28,6 @@
 #include "qwlan_version.h"
 #include "wlan_policy_mgr_ucfg.h"
 #include "wlan_hdd_object_manager.h"
-#include "wlan_hdd_cfg80211.h"
-#include "wlan_hdd_assoc.h"
 
 /**
  * wlan_hdd_version_info() - Populate driver, FW and HW version
@@ -186,8 +184,6 @@ wlan_hdd_add_vht_cap_info(struct hdd_connection_info *conn_info,
 	return length;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) && \
-	defined(WLAN_FEATURE_11AX)
 /**
  * wlan_hdd_add_he_cap_info() - Populate HE info
  * @conn_info: station connection information
@@ -240,14 +236,6 @@ wlan_hdd_add_he_cap_info(struct hdd_connection_info *conn_info,
 	length = ret;
 	return length;
 }
-#else
-static inline ssize_t
-wlan_hdd_add_he_cap_info(struct hdd_connection_info *conn_info,
-			 uint8_t *buf, ssize_t buf_avail_len)
-{
-	return 0;
-}
-#endif
 
 /**
  * hdd_auth_type_str() - Get string for enum csr auth type
@@ -423,10 +411,6 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 	bool is_standby = false;
 	uint8_t curr_hw_mode;
 	struct wlan_objmgr_vdev *vdev;
-	uint32_t chan_freq;
-	enum phy_ch_width ch_width;
-	struct wlan_channel chan_info;
-	int8_t rssi;
 
 	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		len = scnprintf(buf, buf_avail_len,
@@ -541,28 +525,6 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 		tx_bit_rate = cfg80211_calculate_bitrate(&conn_info->txrate);
 		rx_bit_rate = cfg80211_calculate_bitrate(&conn_info->rxrate);
 
-		if (is_standby) {
-			int ret;
-			int link_id = conn_info->ieee_link_id;
-
-			ret = wlan_hdd_get_standby_link_chan_info(adapter,
-								  link_id,
-								  &chan_info);
-			if (ret) {
-				hdd_debug("Failed to get standby link info, linkid: %d",
-					  conn_info->ieee_link_id);
-				return length;
-			}
-
-			chan_freq = chan_info.ch_freq;
-			ch_width = chan_info.ch_width;
-			rssi = WLAN_INVALID_RSSI_VALUE;
-		} else {
-			chan_freq = conn_info->chan_freq;
-			ch_width = conn_info->ch_width;
-			rssi = conn_info->signal;
-		}
-
 		len = scnprintf(buf + length, buf_avail_len - length,
 				"freq: %u\n"
 				"ch_width: %s\n"
@@ -571,9 +533,9 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 				"rx_bit_rate: %u\n"
 				"last_auth_type: %s\n"
 				"dot11mode: %s\n",
-				chan_freq,
-				hdd_ch_width_str(ch_width),
-				rssi,
+				conn_info->chan_freq,
+				hdd_ch_width_str(conn_info->ch_width),
+				conn_info->signal,
 				tx_bit_rate,
 				rx_bit_rate,
 				hdd_auth_type_str(conn_info->last_auth_type),

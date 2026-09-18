@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -272,7 +272,9 @@ static void dp_mon_filter_set_reset_mcopy_dest(struct dp_pdev *pdev,
 	enum dp_mon_filter_mode mode = DP_MON_FILTER_MCOPY_MODE;
 	enum dp_mon_filter_srng_type srng_type;
 
-	srng_type = DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF;
+	srng_type = ((soc->wlan_cfg_ctx->rxdma1_enable) ?
+			DP_MON_FILTER_SRNG_TYPE_RXDMA_MON_BUF :
+			DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF);
 
 	/* Set the filter */
 	if (pfilter->valid) {
@@ -443,7 +445,9 @@ void dp_mon_filter_set_reset_rx_enh_capture_dest(struct dp_pdev *pdev,
 	enum dp_mon_filter_mode mode = DP_MON_FILTER_RX_CAPTURE_MODE;
 	enum dp_mon_filter_srng_type srng_type;
 
-	srng_type = DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF;
+	srng_type = ((soc->wlan_cfg_ctx->rxdma1_enable) ?
+			DP_MON_FILTER_SRNG_TYPE_RXDMA_MON_BUF :
+			DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF);
 
 	/* Set the filter */
 	if (pfilter->valid) {
@@ -561,11 +565,14 @@ void dp_mon_filter_reset_rx_enh_capture_1_0(struct dp_pdev *pdev)
 static void dp_mon_filter_set_reset_mon_dest(struct dp_pdev *pdev,
 					     struct dp_mon_filter *pfilter)
 {
+	struct dp_soc *soc = pdev->soc;
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 	enum dp_mon_filter_mode mode = DP_MON_FILTER_MONITOR_MODE;
 	enum dp_mon_filter_srng_type srng_type;
 
-	srng_type = DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF;
+	srng_type = ((soc->wlan_cfg_ctx->rxdma1_enable) ?
+			DP_MON_FILTER_SRNG_TYPE_RXDMA_MON_BUF :
+			DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF);
 
 	/* set the filter */
 	if (pfilter->valid) {
@@ -794,11 +801,14 @@ static
 void dp_mon_filter_set_reset_rx_pkt_log_cbf_dest(struct dp_pdev *pdev,
 						 struct dp_mon_filter *pfilter)
 {
+	struct dp_soc *soc = pdev->soc;
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 	enum dp_mon_filter_mode mode = DP_MON_FILTER_PKT_LOG_CBF_MODE;
 	enum dp_mon_filter_srng_type srng_type;
 
-	srng_type = DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF;
+	srng_type = ((soc->wlan_cfg_ctx->rxdma1_enable) ?
+			DP_MON_FILTER_SRNG_TYPE_RXDMA_MON_BUF :
+			DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF);
 
 	/*set the filter */
 	if (pfilter->valid) {
@@ -888,6 +898,8 @@ void dp_mon_filter_reset_rx_pktlog_cbf_1_0(struct dp_pdev *pdev)
  * dp_mon_should_reset_buf_ring_filter() - Reset the monitor buf ring filter
  * @pdev: DP PDEV handle
  *
+ * WIN has targets which does not support monitor mode, but still do the
+ * monitor mode init/deinit, only the rxdma1_enable flag will be set to 0.
  * MCL need to do the monitor buffer ring filter reset always, but this is
  * not needed for WIN targets where rxdma1 is not enabled (the indicator
  * that monitor mode is not enabled.
@@ -943,8 +955,11 @@ static QDF_STATUS dp_mon_filter_dest_update(struct dp_pdev *pdev,
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 	enum dp_mon_filter_srng_type srng_type;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t target_type = hal_get_target_type(soc->hal_soc);
 
-	srng_type = DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF;
+	srng_type = ((soc->wlan_cfg_ctx->rxdma1_enable) ?
+			DP_MON_FILTER_SRNG_TYPE_RXDMA_MON_BUF :
+			DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF);
 
 	dp_mon_filter_h2t_setup(soc, pdev, srng_type, pfilter);
 	*pmon_mode_set = pfilter->valid;
@@ -953,19 +968,30 @@ static QDF_STATUS dp_mon_filter_dest_update(struct dp_pdev *pdev,
 		status = dp_mon_ht2_rx_ring_cfg(soc, pdev,
 						srng_type,
 						&pfilter->tlv_filter);
-		mon_pdev->mon_dst_filter_reset = false;
 	} else if (dp_mon_should_reset_buf_ring_filter(pdev)) {
 		if (dp_mon_filter_dest_for_mm_rx_mon(soc)) {
 			dp_info("Reset rxdma buffer to regular filter");
 			status = soc->arch_ops.dp_rxdma_ring_sel_cfg(soc);
-			mon_pdev->mon_dst_filter_reset = false;
 		} else {
 			status = dp_mon_ht2_rx_ring_cfg(soc, pdev,
 							srng_type,
 							&pfilter->tlv_filter);
-			mon_pdev->mon_dst_filter_reset = true;
+		}
+	} else {
+		/*
+		 * For WIN case the monitor buffer ring is used and it does need
+		 * reset when monitor mode gets enabled/disabled.
+		 */
+		if (soc->wlan_cfg_ctx->rxdma1_enable ||
+		    target_type == TARGET_TYPE_QCN9160) {
+			if (mon_pdev->monitor_configured || *pmon_mode_set) {
+				status = dp_mon_ht2_rx_ring_cfg(soc, pdev,
+								srng_type,
+								&pfilter->tlv_filter);
+			}
 		}
 	}
+
 	return status;
 }
 
@@ -974,7 +1000,9 @@ static void dp_mon_filter_dest_reset(struct dp_pdev *pdev)
 	struct dp_soc *soc = pdev->soc;
 	enum dp_mon_filter_srng_type srng_type;
 
-	srng_type = DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF;
+	srng_type = ((soc->wlan_cfg_ctx->rxdma1_enable) ?
+			DP_MON_FILTER_SRNG_TYPE_RXDMA_MON_BUF :
+			DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF);
 
 	dp_mon_filter_reset_mon_srng(soc, pdev, srng_type);
 }

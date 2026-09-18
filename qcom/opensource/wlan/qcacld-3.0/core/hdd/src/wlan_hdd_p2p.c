@@ -59,7 +59,6 @@
 #include "os_if_dp_local_pkt_capture.h"
 #include "wlan_twt_ucfg_ext_cfg.h"
 #include "wlan_twt_ucfg_ext_api.h"
-#include "wlan_twt_ucfg_api.h"
 
 /* Ms to Time Unit Micro Sec */
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
@@ -655,52 +654,42 @@ int hdd_set_p2p_noa(struct net_device *dev, uint8_t *command)
 	}
 	hdd_debug("P2P_SET GO noa: count=%d interval=%d duration=%d start=%d",
 		  count, interval, duration, start);
-
-	noa.count = count;
-	noa.duration = duration;
-	noa.interval = interval;
-	noa.start = start;
-	ret = hdd_set_p2p_noa_fill_params(adapter, &noa);
-
-	if (!ret)
-		return wlan_hdd_set_power_save(adapter, &noa);
-
-	return ret;
-}
-
-int hdd_set_p2p_noa_fill_params(struct hdd_adapter *adapter,
-				struct p2p_ps_config *noa)
-{
-	noa->duration = MS_TO_TU_MUS(noa->duration);
-	noa->interval = MS_TO_TU_MUS(noa->interval);
+	duration = MS_TO_TU_MUS(duration);
+	interval = MS_TO_TU_MUS(interval);
 	/* PS Selection
 	 * Periodic noa (2)
 	 * Single NOA   (4)
 	 */
-	noa->opp_ps = 0;
-	noa->ct_window = 0;
-	if (noa->count == 1) {
-		if (noa->duration > noa->interval)
-			noa->duration = noa->interval;
-		noa->duration = 0;
-		noa->single_noa_duration = noa->duration;
-		noa->ps_selection = P2P_POWER_SAVE_TYPE_SINGLE_NOA;
+	noa.opp_ps = 0;
+	noa.ct_window = 0;
+	if (count == 1) {
+		if (duration > interval)
+			duration = interval;
+		noa.duration = 0;
+		noa.single_noa_duration = duration;
+		noa.ps_selection = P2P_POWER_SAVE_TYPE_SINGLE_NOA;
 	} else {
-		if (noa->count && noa->duration >= noa->interval) {
+		if (count && (duration >= interval)) {
 			hdd_err("Duration should be less than interval");
 			return -EINVAL;
 		}
-		noa->single_noa_duration = 0;
-		noa->ps_selection = P2P_POWER_SAVE_TYPE_PERIODIC_NOA;
+		noa.duration = duration;
+		noa.single_noa_duration = 0;
+		noa.ps_selection = P2P_POWER_SAVE_TYPE_PERIODIC_NOA;
 	}
 
-	noa->vdev_id = adapter->deflink->vdev_id;
+	noa.start = start;
+	noa.interval = interval;
+	noa.count = count;
+	noa.vdev_id = adapter->deflink->vdev_id;
 
-	hdd_debug("P2P_PS_ATTR:opp ps %d ct window %d count %d interval %d duration %d start %d single noa duration %d ps selection %x",
-		  noa->opp_ps, noa->ct_window, noa->count, noa->interval,
-		  noa->duration, noa->start, noa->single_noa_duration,
-		  noa->ps_selection);
-	return 0;
+	hdd_debug("P2P_PS_ATTR:opp ps %d ct window %d count %d interval %d "
+		  "duration %d start %d single noa duration %d "
+		  "ps selection %x", noa.opp_ps, noa.ct_window, noa.count,
+		  noa.interval, noa.duration, noa.start,
+		  noa.single_noa_duration, noa.ps_selection);
+
+	return wlan_hdd_set_power_save(adapter, &noa);
 }
 
 /**
@@ -1683,15 +1672,23 @@ static bool wlan_hdd_p2p_is_wfd_r2_twt_enable(struct hdd_adapter *adapter,
 					      struct wlan_objmgr_psoc *psoc,
 					      uint8_t vdev_id)
 {
-	uint8_t twt_resp_cfg;
-
 	if (!wlan_vdev_p2p_is_wfd_r2_mode(psoc, vdev_id))
 		return false;
 
-	ucfg_twt_cfg_get_responder(psoc, &twt_resp_cfg);
-	if (!ucfg_twt_resp_check_bit(psoc, vdev_id, QDF_P2P_GO_MODE,
-				     twt_resp_cfg))
-		return false;
+	if (adapter->device_mode == QDF_P2P_GO_MODE) {
+		uint8_t twt_resp_cfg;
+
+		ucfg_twt_cfg_get_responder(psoc, &twt_resp_cfg);
+		if (!ucfg_twt_resp_check_bit(psoc, vdev_id, QDF_P2P_GO_MODE,
+					     twt_resp_cfg))
+			return false;
+	} else if (adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+		bool twt_req;
+
+		hdd_get_twt_requestor(psoc, &twt_req);
+		if (!twt_req)
+			return false;
+	}
 
 	return true;
 }
@@ -1702,72 +1699,6 @@ wlan_hdd_p2p_is_wfd_r2_twt_enable(struct hdd_adapter *adapter,
 				  uint8_t vdev_id)
 {
 	return false;
-}
-#endif
-
-#ifdef FEATURE_WLAN_SUPPORT_PCC
-/**
- * wlan_hdd_p2p_is_pcc_twt_enable() - This function checks TWT enable for
- * PCC mode or not
- * @adapter: pointer to adapter
- * @psoc: pointer to PSOC object
- * @vdev_id: VDEV ID
- *
- * Return: true if P2P is in PCC mode and TWT is enable otherwise false
- */
-static bool wlan_hdd_p2p_is_pcc_twt_enable(struct hdd_adapter *adapter,
-					   struct wlan_objmgr_psoc *psoc,
-					   uint8_t vdev_id)
-{
-	uint8_t twt_resp_cfg;
-
-	if (!wlan_vdev_p2p_is_pcc_mode(psoc, vdev_id))
-		return false;
-
-	ucfg_twt_cfg_get_responder(psoc, &twt_resp_cfg);
-	if (!ucfg_twt_resp_check_bit(psoc, vdev_id, QDF_P2P_GO_MODE,
-				     twt_resp_cfg))
-		return false;
-
-	return true;
-}
-#else
-static inline bool
-wlan_hdd_p2p_is_pcc_twt_enable(struct hdd_adapter *adapter,
-			       struct wlan_objmgr_psoc *psoc,
-			       uint8_t vdev_id)
-{
-	return false;
-}
-#endif
-
-#ifdef WLAN_SUPPORT_TWT
-/**
- * wlan_hdd_p2p_disable_twt() - disable TWT for provided VDEV ID
- * @adapter: pointer to adapter
- * @psoc: pointer to PSOC object
- * @vdev_id: VDEV ID
- *
- * Return: none
- */
-static void
-wlan_hdd_p2p_disable_twt(struct hdd_adapter *adapter,
-			 struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
-{
-	bool twt_rsp_disable_svc;
-
-	ucfg_twt_tgt_caps_get_resp_disable_per_vdev(psoc, &twt_rsp_disable_svc);
-	if (twt_rsp_disable_svc)
-		ucfg_twt_send_responder_disable_per_vdev(psoc, vdev_id);
-	else
-		hdd_send_twt_role_disable_cmd(adapter->hdd_ctx, TWT_RESPONDER,
-					      vdev_id);
-}
-#else
-static inline void
-wlan_hdd_p2p_disable_twt(struct hdd_adapter *adapter,
-			 struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
-{
 }
 #endif
 
@@ -1791,7 +1722,8 @@ int wlan_hdd_set_power_save(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	if (adapter->device_mode != QDF_P2P_GO_MODE) {
+	if (adapter->device_mode != QDF_P2P_GO_MODE &&
+	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
 		hdd_debug("unable to process device mode %d",
 			  adapter->device_mode);
 		return -EINVAL;
@@ -1813,18 +1745,16 @@ int wlan_hdd_set_power_save(struct hdd_adapter *adapter,
 	status = ucfg_p2p_set_ps(psoc, ps_config);
 	hdd_debug("p2p set power save, status:%d", status);
 
-	if (wlan_hdd_p2p_is_pcc_twt_enable(adapter, psoc,
-					   ps_config->vdev_id)) {
-		hdd_debug("PCC mode enabled");
-		return 0;
-	}
-
 	/* P2P-GO-NOA and TWT do not go hand in hand */
-	if (ps_config->duration)
-		wlan_hdd_p2p_disable_twt(adapter, psoc,
-					 adapter->deflink->vdev_id);
-	else
-		wlan_twt_concurrency_update(hdd_ctx);
+	if (ps_config->duration) {
+		hdd_send_twt_role_disable_cmd(hdd_ctx, TWT_RESPONDER,
+					      adapter->deflink->vdev_id);
+	} else {
+		hdd_send_twt_requestor_enable_cmd(hdd_ctx,
+						  adapter->deflink->vdev_id);
+		hdd_send_twt_responder_enable_cmd(hdd_ctx,
+						  adapter->deflink->vdev_id);
+	}
 
 	return qdf_status_to_os_return(status);
 }
@@ -2235,74 +2165,3 @@ int wlan_hdd_cfg80211_p2p_parse_wfd_params(struct wiphy *wiphy,
 }
 #endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 #endif /* FEATURE_WLAN_SUPPORT_USD  || FEATURE_WLAN_SUPPORT_P2P_R2 */
-
-/**
- * __wlan_hdd_cfg80211_p2p_parse_noa_params - This function parses P2P NOA
- * params
- * @wiphy: pointer to wiphy structure
- * @wdev: pointer to wireless device
- * @data: pointer to data
- * @data_len: data length
- *
- * Return: 0 on success, negative errno if error
- */
-static int __wlan_hdd_cfg80211_p2p_parse_noa_params(struct wiphy *wiphy,
-						    struct wireless_dev *wdev,
-						    const void *data,
-						    int data_len)
-{
-	int ret;
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
-	struct p2p_ps_config noa = {0};
-
-	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE ||
-	    hdd_get_conparam() == QDF_GLOBAL_MONITOR_MODE) {
-		hdd_err_rl("Command not allowed in FTM/Monitor mode");
-		return -EPERM;
-	}
-
-	ret = wlan_hdd_validate_context(adapter->hdd_ctx);
-	if (ret)
-		return ret;
-
-	/* Try to handle NoA cancellation first */
-	ret = osif_p2p_noa_cancel(adapter, data, data_len);
-	if (!ret || ret != -ENOENT) {
-		/* NOA cancel and NoA start attributes won't come together */
-		return ret;
-	}
-
-	/* No cancellation attributes found, proceed with regular NoA parsing */
-	if (adapter->device_mode != QDF_P2P_GO_MODE) {
-		hdd_err_rl("Device is not GO");
-		return -EPERM;
-	}
-
-	ret = osif_p2p_parse_noa_params(adapter, &noa, data, data_len);
-	if (ret)
-		return ret;
-
-	ret = hdd_set_p2p_noa_fill_params(adapter, &noa);
-	if (ret)
-		return ret;
-
-	return wlan_hdd_set_power_save(adapter, &noa);
-}
-
-int wlan_hdd_cfg80211_p2p_parse_noa_params(struct wiphy *wiphy,
-					   struct wireless_dev *wdev,
-					   const void *data, int data_len)
-{
-	struct osif_vdev_sync *vdev_sync;
-	int errno;
-
-	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
-	if (errno)
-		return errno;
-
-	errno = __wlan_hdd_cfg80211_p2p_parse_noa_params(wiphy, wdev, data,
-							 data_len);
-	osif_vdev_sync_op_stop(vdev_sync);
-
-	return errno;
-}

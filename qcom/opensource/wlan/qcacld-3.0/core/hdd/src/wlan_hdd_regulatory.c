@@ -41,7 +41,6 @@
 #include "wlan_p2p_ucfg_api.h"
 #include "wlan_mlo_mgr_public_api.h"
 #include <wlan_cfg80211.h>
-#include <nan_ucfg_api.h>
 
 #define REG_RULE_2412_2462    REG_RULE(2412-10, 2462+10, 40, 0, 20, 0)
 
@@ -959,13 +958,6 @@ int hdd_reg_set_band(struct net_device *dev, uint32_t band_bitmap)
 
 	hdd_debug("change band to %u", band_bitmap);
 
-	if (!(band_bitmap & BIT(REG_BAND_2G)) &&
-	    ucfg_is_nan_disc_active(hdd_ctx->psoc)) {
-		hdd_err("NAN is enabled. Failed to set the band bitmap value to %u",
-			band_bitmap);
-		return -EINVAL;
-	}
-
 	if (ucfg_reg_get_band(hdd_ctx->pdev, &current_band) !=
 	    QDF_STATUS_SUCCESS) {
 		hdd_debug("Failed to get current band config");
@@ -1835,8 +1827,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 }
 
 /**
- * hdd_restart_sap_with_new_phymode() - restart the SAP with the new
- * phymode
+ * hdd_restart_sap_with_new_phymode() - restart the SAP with the new phymode
  * @link_info: Link info pointer in HDD adapter.
  * @sap_config: sap configuration pointer
  * @csr_phy_mode: phymode to restart SAP with
@@ -1908,26 +1899,6 @@ hdd_restart_sap_with_new_phymode(struct wlan_hdd_link_info *link_info,
 	mutex_unlock(&hdd_ctx->sap_lock);
 }
 
-static bool
-hdd_is_sap_with_new_chan_width_needed(struct wlan_objmgr_psoc *psoc,
-				      struct wlan_objmgr_pdev *pdev,
-				      struct sap_config *sap_config,
-				      qdf_freq_t oper_freq)
-{
-	enum phy_ch_width new_ch_width;
-
-	new_ch_width = sap_config->ch_params.ch_width;
-
-	/* Force SAP to 20MHz if INI is enabled and country is Indonesia */
-	if (sap_config->ch_params.ch_width != CH_WIDTH_20MHZ &&
-	    policy_mgr_get_sap_force_20mhz_for_country_id(psoc, oper_freq)) {
-		hdd_debug("Force SAP to 20MHz due to INI and country code ID");
-		new_ch_width = CH_WIDTH_20MHZ;
-	}
-
-	return (new_ch_width != sap_config->ch_params.ch_width);
-}
-
 /**
  * hdd_country_change_update_sap() - handle country code change for SAP
  * @hdd_ctx: Global HDD context
@@ -1944,7 +1915,6 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 	struct wlan_objmgr_pdev *pdev = NULL;
 	uint32_t reg_phy_mode, new_phy_mode;
 	bool phy_changed;
-	bool chan_width_changed;
 	qdf_freq_t oper_freq;
 	eCsrPhyMode csr_phy_mode;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_COUNTRY_CHANGE_UPDATE_SAP;
@@ -1981,36 +1951,14 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 				phy_changed =
 					(csr_phy_mode != sap_config->SapHw_mode);
 
-				chan_width_changed =
-					hdd_is_sap_with_new_chan_width_needed(
-							hdd_ctx->psoc,
-							pdev,
-							sap_config,
-							oper_freq);
-
-				hdd_debug("phy_changes: %d, chan_width_changed: %d",
-					  phy_changed, chan_width_changed);
-
-				if (phy_changed) {
-					hdd_restart_sap_with_new_phymode(
-								link_info,
-								sap_config,
-								csr_phy_mode);
-				} else if (chan_width_changed &&
-					   QDF_IS_STATUS_SUCCESS(
-						   policy_mgr_change_sap_channel_with_csa(
-							   hdd_ctx->psoc,
-							   link_info->vdev_id,
-							   oper_freq,
-							   CH_WIDTH_20MHZ,
-							   true))) {
-					hdd_debug("SAP CSA due to chan width changed BW 20 MHz");
-				} else {
+				if (phy_changed)
+					hdd_restart_sap_with_new_phymode(link_info,
+									 sap_config,
+									 csr_phy_mode);
+				else
 					policy_mgr_check_sap_restart(
 							hdd_ctx->psoc,
 							link_info->vdev_id);
-				}
-
 				hdd_debug("Update tx power due to ctry change");
 				wlan_reg_update_tx_power_on_ctry_change(
 						    pdev, link_info->vdev_id);

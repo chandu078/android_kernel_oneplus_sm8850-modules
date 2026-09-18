@@ -47,6 +47,7 @@
 /* Time to passive scan dwell for scan to get channel stats, in milliseconds */
 #define MLME_GET_CHAN_STATS_PASSIVE_SCAN_TIME 40
 #define MLME_GET_CHAN_STATS_WIDE_BAND_PASSIVE_SCAN_TIME 110
+
 struct wlan_mlme_rx_ops *
 mlme_get_rx_ops(struct wlan_objmgr_psoc *psoc)
 {
@@ -1353,20 +1354,6 @@ static void mlme_init_link_recfg_support(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-/**
- * mlme_init_txop_ini_cfg() - initialize edca txop limit ini
- * @psoc: Pointer to PSOC
- * @gen: pointer to generic CFG items
- *
- * Return: None
- */
-static void mlme_init_txop_ini_cfg(struct wlan_objmgr_psoc *psoc,
-				   struct wlan_mlme_generic *gen)
-{
-	gen->edca_txop_limit =
-		cfg_get(psoc, CFG_EDCA_TXOP_LIMIT);
-}
-
 #if defined(WLAN_FEATURE_SR)
 /**
  * mlme_init_sr_ini_cfg() - initialize SR(Spatial Reuse) ini
@@ -1452,7 +1439,6 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 	gen->tx_retry_multiplier = cfg_get(psoc, CFG_TX_RETRY_MULTIPLIER);
 	gen->enable_he_mcs0_for_6ghz_mgmt =
 		cfg_get(psoc, CFG_ENABLE_HE_MCS0_MGMT_6GHZ);
-	mlme_init_txop_ini_cfg(psoc, gen);
 	mlme_init_sr_ini_cfg(psoc, gen);
 	mlme_init_wds_config_cfg(psoc, gen);
 	mlme_init_mgmt_hw_tx_retry_count_cfg(psoc, gen);
@@ -1977,8 +1963,6 @@ static void mlme_init_rates_in_cfg(struct wlan_objmgr_psoc *psoc,
 			      rates->current_mcs_set.data,
 			      sizeof(rates->current_mcs_set.data),
 			      &rates->current_mcs_set.len);
-	rates->cck_rx_tx_support_mode = cfg_get(psoc,
-						CFG_RX_TX_SUPPORT_MODE);
 }
 
 static void mlme_init_passive_enable_in_cfg(struct wlan_objmgr_psoc *psoc,
@@ -3289,8 +3273,6 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LFR_ROAM_BG_SCAN_CLIENT_BITMAP);
 	lfr->roam_bg_scan_bad_rssi_offset_2g =
 		cfg_get(psoc, CFG_LFR_ROAM_BG_SCAN_BAD_RSSI_OFFSET_2G);
-	lfr->bg_roam_scan_flag =
-		cfg_get(psoc, CFG_LFR_BG_ROAM_SCAN_FLAG);
 	lfr->roam_data_rssi_threshold_triggers =
 		cfg_get(psoc, CFG_ROAM_DATA_RSSI_THRESHOLD_TRIGGERS);
 	lfr->roam_data_rssi_threshold =
@@ -3489,15 +3471,10 @@ static void mlme_init_roam_scoring_cfg(struct wlan_objmgr_psoc *psoc,
 	scoring_cfg->roam_score_delta = cfg_get(psoc, CFG_ROAM_SCORE_DELTA);
 	scoring_cfg->apsd_enabled = (bool)cfg_default(CFG_APSD_ENABLED);
 
-	/* If the connection roaming INI setting is present, convert the
-	 * min_roam_score_delta value(which is in percentage) to actual
-	 * value before sending it to firmware.
-	 */
 	ucfg_mlme_get_connection_roaming_ini_present(psoc, &val);
 	if (val) {
 		scoring_cfg->min_roam_score_delta =
-			(cfg_get(psoc, CFG_ROAM_COMMON_MIN_ROAM_DELTA) *
-			 (cfg_max(CFG_CAND_MIN_ROAM_SCORE_DELTA)/100));
+			cfg_get(psoc, CFG_ROAM_COMMON_MIN_ROAM_DELTA) * 100;
 	} else {
 		scoring_cfg->min_roam_score_delta =
 			cfg_get(psoc, CFG_CAND_MIN_ROAM_SCORE_DELTA);
@@ -5030,7 +5007,7 @@ QDF_STATUS wlan_strip_ie(uint8_t *addn_ie, uint16_t *addn_ielen,
 		qdf_mem_zero(extracted_ie, eid_max_len + size_of_len_field + 1);
 
 	while (left >= 2) {
-		elem_id = ptr[0];
+		elem_id  = ptr[0];
 		left -= 1;
 		if (size_of_len_field == TWO_BYTE) {
 			elem_len = *((uint16_t *)&ptr[1]);
@@ -5040,31 +5017,17 @@ QDF_STATUS wlan_strip_ie(uint8_t *addn_ie, uint16_t *addn_ielen,
 			left -= 1;
 		}
 		if (elem_len > left) {
-			mlme_rl_nofl_err("Invalid IEs eid: %d elem_len: %d left: %d",
-					 elem_id, elem_len, left);
+			mlme_err("Invalid IEs eid: %d elem_len: %d left: %d",
+				 elem_id, elem_len, left);
 			qdf_mem_free(tmp_buf);
 			return QDF_STATUS_E_FAILURE;
 		}
 
 		ie_len = elem_len + size_of_len_field + 1;
-
-		/* Check for integer overflow */
-		if (ie_len < elem_len) {
-			mlme_rl_nofl_err("Integer overflow in ie_len calculation, elem_len=%d, ie_len=%d",
-					 elem_len, ie_len);
-			qdf_mem_free(tmp_buf);
-			return QDF_STATUS_E_FAILURE;
-		}
 		if (eid != elem_id ||
 				(oui && qdf_mem_cmp(oui,
 						&ptr[size_of_len_field + 1],
 						oui_length))) {
-			if (tmp_len + ie_len > *addn_ielen) {
-				mlme_rl_nofl_err("tmp_buf overflow tmp_len=%d, ie_len=%d, addn_ielen=%d",
-						 tmp_len, ie_len, *addn_ielen);
-				qdf_mem_free(tmp_buf);
-				return QDF_STATUS_E_FAILURE;
-			}
 			qdf_mem_copy(tmp_buf + tmp_len, &ptr[0], ie_len);
 			tmp_len += ie_len;
 		} else {
@@ -5073,18 +5036,13 @@ QDF_STATUS wlan_strip_ie(uint8_t *addn_ie, uint16_t *addn_ielen,
 			 * take oui IE and store in provided buffer.
 			 */
 			if (extracted_ie) {
-				if (ie_len + extracted_ie_len <= (eid_max_len +
-						 size_of_len_field + 1)) {
+				if (ie_len <= (eid_max_len + size_of_len_field +
+					       1 - extracted_ie_len)) {
 					qdf_mem_copy(
 					extracted_ie + extracted_ie_len,
 					&ptr[0], ie_len);
 					extracted_ie_len += ie_len;
 				} else {
-					if (tmp_len + ie_len > *addn_ielen) {
-						mlme_rl_nofl_err("tmp_buf overflow in extract path");
-						qdf_mem_free(tmp_buf);
-						return QDF_STATUS_E_FAILURE;
-					}
 					qdf_mem_copy(tmp_buf + tmp_len, &ptr[0],
 						     ie_len);
 					tmp_len += ie_len;
@@ -5833,28 +5791,6 @@ QDF_STATUS wlan_set_sap_best_channel_2ghz(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-struct sap_man_chan_info
-*wlan_get_sap_man_chan_info(struct wlan_objmgr_vdev *vdev)
-{
-	struct mlme_legacy_priv *mlme_priv;
-	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_legacy_err("vdev legacy private object is NULL");
-		return NULL;
-	}
-
-	opmode = wlan_vdev_mlme_get_opmode(vdev);
-	if (opmode != QDF_SAP_MODE && opmode != QDF_P2P_GO_MODE) {
-		mlme_err("Cannot get ch_sw_info for mode %d",
-			 opmode);
-		return NULL;
-	}
-
-	return &mlme_priv->mlme_ap.man_chan_info;
-}
-
 struct sap_ch_switch_info *wlan_get_sap_ch_sw_info(
 				struct wlan_objmgr_vdev *vdev)
 {
@@ -5960,6 +5896,7 @@ wlan_set_sap_user_config_freq(struct wlan_objmgr_vdev *vdev,
 		mlme_debug("Cannot set user config freq for mode %d", opmode);
 		return QDF_STATUS_E_FAILURE;
 	}
+
 	mlme_priv->mlme_ap.user_config_sap_ch_freq = freq;
 	return QDF_STATUS_SUCCESS;
 }
@@ -6392,24 +6329,29 @@ rel_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 }
 
-uint32_t wlan_mlme_get_vdev_mac_id(struct wlan_objmgr_vdev *vdev)
+uint32_t wlan_mlme_get_vdev_mac_id(struct wlan_objmgr_pdev *pdev,
+				   uint8_t vdev_id)
 {
+	struct wlan_objmgr_vdev *vdev;
 	struct mlme_legacy_priv *vdev_mlme_priv;
-	uint32_t mac_id = 0xFF;
+	uint32_t mac_id = 0;
 
-	if (!vdev) {
-		mlme_legacy_err("Invalid VDEV");
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev)
 		return mac_id;
-	}
 
 	vdev_mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!vdev_mlme_priv) {
-		mlme_legacy_err("vdev %d private object is NULL",
-				wlan_vdev_get_id(vdev));
-		return mac_id;
+		mlme_legacy_err("vdev %d private object is NULL", vdev_id);
+		goto rel_ref;
 	}
 
-	return vdev_mlme_priv->mac_id;
+	mac_id = vdev_mlme_priv->mac_id;
+rel_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+	return mac_id;
 }
 
 uint8_t
@@ -6584,7 +6526,7 @@ uint16_t mlme_get_p2p_device_seq_num(struct wlan_objmgr_vdev *vdev)
 	return vdev_mlme->p2p_dev_data.seq_num;
 }
 
-#if defined(FEATURE_WLAN_SUPPORT_P2P_R2) || defined(FEATURE_WLAN_SUPPORT_PCC)
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 uint8_t wlan_get_wfd_mode_from_vdev_id(struct wlan_objmgr_psoc *psoc,
 				       uint8_t vdev_id)
 {
@@ -6687,19 +6629,3 @@ QDF_STATUS wlan_sap_set_acs_band_mask(struct wlan_objmgr_vdev *vdev,
 
 	return QDF_STATUS_SUCCESS;
 }
-
-#if (defined(CONNECTIVITY_DIAG_EVENT) && \
-	defined(WLAN_FEATURE_ROAM_OFFLOAD))
-void mlme_reset_log_instance_id(struct wlan_objmgr_vdev *vdev)
-{
-	struct mlme_legacy_priv *mlme_priv;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_legacy_err("vdev legacy private object is NULL");
-		return;
-	}
-
-	mlme_priv->instance = 0;
-}
-#endif

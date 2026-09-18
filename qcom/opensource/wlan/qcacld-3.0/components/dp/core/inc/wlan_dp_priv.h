@@ -592,8 +592,6 @@ struct fse_cache_flush_history {
  * @fst_update_work: FST CMEM update work
  * @fst_update_wq: FST CMEM update workqueue
  * @fst_update_list: List to post event to CMEM update work
- * @last_update_time_ns: last update time in nanoseconds
- * @update_count: counter used to limit the number of fst updates per second
  * @meta_counter:
  * @cmem_ba:
  * @dp_rx_sw_ft_lock: SW FST lock
@@ -633,8 +631,6 @@ struct dp_rx_fst {
 	qdf_work_t fst_update_work;
 	qdf_workqueue_t *fst_update_wq;
 	qdf_list_t fst_update_list;
-	uint64_t last_update_time_ns;
-	uint32_t update_count;
 	uint32_t meta_counter;
 	uint32_t cmem_ba;
 	qdf_spinlock_t dp_rx_sw_ft_lock[MAX_REO_DEST_RINGS];
@@ -713,8 +709,6 @@ struct dp_rx_fst {
  * @hlp_list_lock: Lock to protect hlp link_list operation
  * @hlp_list: List of HLP peers for HLP response handling
  * @disable_rx_aggr: Disable Rx aggregation
- * @dump_periodic_custom_stats: Flag to indicate if the DP internal stats
- *				should be dumped periodically.
  * @spm_intf_ctx: SPM interface context
  * @opm_stats_work: OPM stats work
  * @ipv4_addr: IPv4 address
@@ -802,9 +796,6 @@ struct wlan_dp_intf {
 #endif
 #ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
 	bool disable_rx_aggr[CTRL_RX_AGGR_ID_MAX];
-#endif
-#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
-	bool dump_periodic_custom_stats;
 #endif
 #if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
 	struct wlan_dp_spm_intf_context *spm_intf_ctx;

@@ -53,7 +53,6 @@
 #include "wlan_objmgr_vdev_obj.h"
 #include "utils_mlo.h"
 #include "lim_utils.h"
-#include "wlan_twt_cfg_ext_api.h"
 
 /*
  * cm_is_peer_preset_on_other_sta() - Check if peer exists on other STA
@@ -258,9 +257,20 @@ cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
 		}
 	}
 
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    mlo_get_single_link_ml_roaming(psoc, vdev_id)) {
+		/*
+		 * For single link ML roaming, the peers will be deleted
+		 * before the start of the disconnect sequence for the partner
+		 * vdev. Therefore during disconnect, the BSSID would be zero.
+		 * So for such roaming, unlink the link BSS entries before the
+		 * peer deletion.
+		 */
+		cm_update_scan_mlme_for_mlo_roam(vdev);
+	} else {
 		cm_update_scan_mlme_on_roam(vdev, &connected_bssid,
 					    SCAN_ENTRY_CON_STATE_NONE);
+	}
 
 	if (!MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id))
 		status = wlan_cm_roam_state_change(pdev,
@@ -275,47 +285,6 @@ cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
 
 	return status;
 }
-
-#ifdef WLAN_FEATURE_11BE_MLO
-void cm_update_scan_mlme_for_mlo_roam(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_mlo_dev_context *ml_dev;
-	struct wlan_objmgr_pdev *pdev;
-	struct mlo_link_info *link_info;
-	struct bss_info bss_info = {0};
-	struct mlme_info mlme;
-	QDF_STATUS status;
-	uint8_t i;
-
-	pdev = wlan_vdev_get_pdev(vdev);
-	if (!pdev)
-		return;
-
-	ml_dev = vdev->mlo_dev_ctx;
-	if (!ml_dev)
-		return;
-
-	status = wlan_vdev_mlme_get_ssid(vdev, bss_info.ssid.ssid,
-					 &bss_info.ssid.length);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mlme_err("Unable to retrieve SSID");
-		return;
-	}
-
-	mlme.assoc_state = SCAN_ENTRY_CON_STATE_NONE;
-
-	link_info = &ml_dev->link_ctx->links_info[0];
-	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++, link_info++) {
-		if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
-			continue;
-
-		qdf_copy_macaddr(&bss_info.bssid, &link_info->ap_link_addr);
-		bss_info.freq = link_info->link_chan_info->ch_freq;
-
-		wlan_scan_update_mlme_by_bssinfo(pdev, &bss_info, &mlme);
-	}
-}
-#endif
 
 void
 cm_update_scan_mlme_on_roam(struct wlan_objmgr_vdev *vdev,
@@ -700,6 +669,66 @@ cm_mlo_roam_copy_partner_info(struct wlan_cm_connect_resp *connect_rsp,
 	mlo_roam_copy_partner_info(&connect_rsp->ml_parnter_info,
 				   roam_synch_data, WLAN_INVALID_VDEV_ID,
 				   true);
+}
+
+void
+cm_update_scan_mlme_for_mlo_roam(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *ml_dev;
+	struct wlan_objmgr_pdev *pdev;
+	struct mlo_link_info *link_info;
+	struct scan_filter *filter;
+	struct bss_info bss_info = {0};
+	struct mlme_info mlme;
+	QDF_STATUS status;
+	uint8_t i;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev)
+		return;
+
+	ml_dev = vdev->mlo_dev_ctx;
+	if (!ml_dev || !ml_dev->link_ctx)
+		return;
+
+	status = wlan_vdev_mlme_get_ssid(vdev, bss_info.ssid.ssid,
+					 &bss_info.ssid.length);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("failed to get ssid");
+		return;
+	}
+
+	mlme.assoc_state = SCAN_ENTRY_CON_STATE_NONE;
+
+	filter = qdf_mem_malloc(sizeof(*filter));
+	if (!filter)
+		return;
+
+	link_info = &ml_dev->link_ctx->links_info[0];
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		qdf_mem_zero(filter, sizeof(struct scan_filter));
+		if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
+			continue;
+
+		qdf_copy_macaddr(&bss_info.bssid, &link_info->ap_link_addr);
+		bss_info.freq = link_info->chan_freq;
+
+		wlan_scan_update_mlme_by_bssinfo(pdev, &bss_info, &mlme);
+
+		filter->num_of_bssid = 1;
+		qdf_copy_macaddr(&filter->bssid_list[0],
+				 &link_info->ap_link_addr);
+		if (wlan_scan_is_locally_generated_entry(pdev,
+							 &link_info->ap_link_addr))
+			ucfg_scan_flush_results(pdev, filter);
+
+		link_info++;
+	}
+
+	qdf_mem_free(filter);
 }
 #else
 static inline void
@@ -1231,18 +1260,23 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	vdev = session->vdev;
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_SB_ID);
+	if (!vdev) {
+		mlme_err("vdev object is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev) {
 		status = QDF_STATUS_E_FAILURE;
-		goto end;
+		goto rel_ref;
 	}
 
 	cm_ctx = cm_get_cm_ctx(vdev);
 	if (!cm_ctx) {
 		status = QDF_STATUS_E_FAILURE;
-		goto end;
+		goto rel_ref;
 	}
 
 	roam_req = cm_get_first_roam_command(vdev);
@@ -1333,7 +1367,6 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err(CM_PREFIX_FMT " fail to post WLAN_CM_SM_EV_ROAM_DONE",
 			 CM_PREFIX_REF(vdev_id, cm_id));
-		wlan_cm_tgt_allow_pm_after_roam_sync(psoc, vdev_id);
 		goto error;
 	}
 
@@ -1345,7 +1378,6 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		if (QDF_IS_STATUS_ERROR(status)) {
 			mlme_err(CM_PREFIX_FMT " fail to copy reassoc resp status %d",
 				 CM_PREFIX_REF(vdev_id, cm_id), status);
-			wlan_cm_tgt_allow_pm_after_roam_sync(psoc, vdev_id);
 			goto error;
 		}
 	}
@@ -1354,8 +1386,6 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	mlme_cm_osif_connect_complete(vdev, connect_rsp);
 	mlme_cm_osif_roam_complete(vdev);
 	lim_set_tpc_power(mac_ctx, session, NULL, false);
-	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev))
-		wlan_cm_tgt_allow_pm_after_roam_sync(psoc, vdev_id);
 
 	mlme_debug(CM_PREFIX_FMT, CM_PREFIX_REF(vdev_id, cm_id));
 	cm_remove_cmd(cm_ctx, &cm_id);
@@ -1379,7 +1409,9 @@ error:
 
 	if (QDF_IS_STATUS_ERROR(status))
 		mlo_update_connected_links(vdev, 0);
-end:
+rel_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+
 	return status;
 }
 
@@ -1432,8 +1464,6 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t vdev_id;
 	uint8_t rso_stop_req_bitmap;
-	enum roam_offload_state rso_cmd = WLAN_ROAM_RSO_ENABLED;
-	bool is_host_4way_hs_supported = false;
 
 	roam_synch_data = (struct roam_offload_synch_ind *)data;
 	vdev_id = wlan_vdev_get_id(cm_ctx->vdev);
@@ -1539,23 +1569,18 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 
 	wlan_cm_handle_sta_sta_roaming_enablement(psoc, vdev_id);
 
-	if (wlan_vdev_mlme_is_mlo_link_vdev(cm_ctx->vdev))
+	if (wlan_vdev_mlme_is_mlo_link_vdev(cm_ctx->vdev)) {
 		status = wlan_cm_roam_state_change(pdev,
 						   vdev_id,
 						   WLAN_ROAM_DEINIT,
 						   REASON_ROAM_HANDOFF_DONE);
+	}
 
-	is_host_4way_hs_supported =
-		wlan_psoc_nif_fw_ext2_cap_get(psoc,
-					      WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE);
-	if (roam_synch_data->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED) {
-		if (policy_mgr_is_chan_switch_in_progress(psoc) ||
-		    policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(psoc))
-			rso_cmd = WLAN_ROAM_RSO_STOPPED;
-
+	if (roam_synch_data->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED)
 		wlan_cm_roam_state_change(pdev, vdev_id,
-					  rso_cmd, REASON_CONNECT);
-	} else if (!is_host_4way_hs_supported) {
+					  WLAN_ROAM_RSO_ENABLED,
+					  REASON_CONNECT);
+	else
 		/*
 		 * STA is just in associated state here, RSO
 		 * enable will be sent once EAP & EAPOL will be done by
@@ -1571,8 +1596,6 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 		wlan_cm_roam_state_change(pdev, vdev_id,
 					  WLAN_ROAM_RSO_STOPPED,
 					  REASON_DISCONNECTED);
-	}
-
 	policy_mgr_check_concurrent_intf_and_restart_sap(psoc,
 			wlan_util_vdev_mgr_get_acs_mode_for_vdev(cm_ctx->vdev));
 
@@ -1924,7 +1947,6 @@ void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
 	struct wmi_unified *wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
 	const uint8_t *ext_cap_ie;
 	struct s_ext_cap *extcap;
-	bool twt_requestor = false, twt_req_support = false;
 
 	if (!wmi_handle)
 		return;
@@ -1938,11 +1960,5 @@ void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
 		return;
 
 	extcap = (struct s_ext_cap *)&ext_cap_ie[2];
-	/* MBSSID */
 	extcap->multi_bssid = 1;
-	/* TWT requestor */
-	wlan_twt_get_requestor_cfg(psoc, &twt_requestor);
-	wlan_twt_cfg_get_req_flag(psoc, &twt_req_support);
-	extcap->twt_requestor_support = twt_requestor && twt_req_support;
-
 }

@@ -25,9 +25,6 @@
 #include "dp_internal.h"
 #include <qdf_tracepoint.h>
 #include "dp_ipa.h"
-#ifdef FEATURE_WDS
-#include "dp_txrx_wds.h"
-#endif
 
 #ifdef RXDMA_OPTIMIZATION
 #ifndef RX_DATA_BUFFER_ALIGNMENT
@@ -649,6 +646,20 @@ struct dp_rx_desc *dp_rx_cookie_2_va_rxdma_buf(struct dp_soc *soc,
 	return dp_get_rx_desc_from_cookie(soc, &soc->rx_desc_buf[0], cookie);
 }
 
+/**
+ * dp_rx_cookie_2_va_mon_buf() - Converts cookie to a virtual address of
+ *			 the Rx descriptor on monitor ring buffer
+ * @soc: core txrx main context
+ * @cookie: cookie used to lookup virtual address
+ *
+ * Return: Pointer to the Rx descriptor
+ */
+static inline
+struct dp_rx_desc *dp_rx_cookie_2_va_mon_buf(struct dp_soc *soc,
+					     uint32_t cookie)
+{
+	return dp_get_rx_desc_from_cookie(soc, &soc->rx_desc_mon[0], cookie);
+}
 
 /**
  * dp_rx_cookie_2_va_mon_status() - Converts cookie to a virtual address of
@@ -696,6 +707,24 @@ void *dp_rx_cookie_2_va_rxdma_buf(struct dp_soc *soc, uint32_t cookie)
 		return NULL;
 
 	return &rx_desc_pool->array[index].rx_desc;
+}
+
+/**
+ * dp_rx_cookie_2_va_mon_buf() - Converts cookie to a virtual address of
+ *			 the Rx descriptor on monitor ring buffer
+ * @soc: core txrx main context
+ * @cookie: cookie used to lookup virtual address
+ *
+ * Return: void *: Virtual Address of the Rx descriptor
+ */
+static inline
+void *dp_rx_cookie_2_va_mon_buf(struct dp_soc *soc, uint32_t cookie)
+{
+	uint8_t pool_id = DP_RX_DESC_COOKIE_POOL_ID_GET(cookie);
+	uint16_t index = DP_RX_DESC_COOKIE_INDEX_GET(cookie);
+	/* TODO */
+	/* Add sanity for pool_id & index */
+	return &(soc->rx_desc_mon[pool_id].array[index].rx_desc);
 }
 
 /**
@@ -4130,9 +4159,6 @@ dp_rx_page_pool_get_buf_params(size_t *buf_size, int *align)
 	*align = 0;
 }
 #else
-/* This is the final size of the RX buffer after adding metadata sizes */
-#define RX_DATA_BUFFER_SIZE_MAX	2048
-
 static inline void
 dp_rx_page_pool_get_buf_params(size_t *buf_size, int *align)
 {
@@ -4142,19 +4168,6 @@ dp_rx_page_pool_get_buf_params(size_t *buf_size, int *align)
 	*buf_size = QDF_NBUF_ALIGN(*buf_size);
 
 	*align = RX_DATA_BUFFER_OPT_ALIGNMENT;
-
-	/* Size of SKB shared info when added to the buffer size
-	 * is not matching to RX_DATA_BUFFER_SIZE_MAX (2048) on
-	 * certain host machines, this will result in the buffer
-	 * address not matching with the alignment requirement
-	 * of the hardware resulting in degraded performance.
-	 * Therefore do the below math to match the alignment
-	 * requirement of the hardware.
-	 */
-	if (*buf_size < RX_DATA_BUFFER_SIZE_MAX &&
-	    *buf_size % RX_DATA_BUFFER_ALIGNMENT) {
-		*buf_size += (RX_DATA_BUFFER_SIZE_MAX - *buf_size);
-	}
 }
 #endif
 #endif /* DP_FEATURE_RX_BUFFER_RECYCLE */

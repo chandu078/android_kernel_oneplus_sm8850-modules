@@ -49,6 +49,10 @@ bool dp_rx_buffer_pool_refill(struct dp_soc *soc, qdf_nbuf_t nbuf, u8 mac_id)
 	if (!bufpool->is_initialized || !pdev)
 		return consumed;
 
+	/* process only buffers of RXDMA ring */
+	if (soc->wlan_cfg_ctx->rxdma1_enable)
+		return consumed;
+
 	first_nbuf = nbuf;
 
 	while (nbuf) {
@@ -418,6 +422,23 @@ void dp_rx_buffer_pool_deinit(struct dp_soc *soc, u8 mac_id)
 #endif /* WLAN_FEATURE_RX_PREALLOC_BUFFER_POOL */
 
 #ifdef DP_FEATURE_RX_BUFFER_RECYCLE
+
+#if PAGE_SIZE == 4096
+#define DP_RX_PP_PAGE_SIZE_HIGHER_ORDER		(2 * DP_RX_PP_PAGE_SIZE_MIDDLE_ORDER)
+#define DP_RX_PP_PAGE_SIZE_MIDDLE_ORDER		(4 * DP_RX_PP_PAGE_SIZE_LOWER_ORDER)
+#define DP_RX_PP_PAGE_SIZE_LOWER_ORDER		PAGE_SIZE
+#elif PAGE_SIZE == 16384
+#define DP_RX_PP_PAGE_SIZE_HIGHER_ORDER		(2 * DP_RX_PP_PAGE_SIZE_MIDDLE_ORDER)
+#define DP_RX_PP_PAGE_SIZE_MIDDLE_ORDER		DP_RX_PP_PAGE_SIZE_LOWER_ORDER
+#define DP_RX_PP_PAGE_SIZE_LOWER_ORDER		PAGE_SIZE
+#else
+#error "Unsupported kernel PAGE_SIZE"
+#endif
+
+#define DP_RX_PP_POOL_SIZE_THRES	 4096
+#define DP_RX_PP_AUX_POOL_SIZE           2048
+#define DP_RX_PP_INACTIVE_WORK_DELAY_MS	10000
+
 static struct dp_rx_pp_params *
 dp_rx_get_base_pp(struct dp_rx_page_pool *rx_pp)
 {
@@ -549,8 +570,6 @@ nbuf_alloc:
 		goto out_fail;
 	}
 
-	qdf_nbuf_rx_pp_track_id_set(nbuf, pp_params->pp_track_id);
-
 	page = qdf_virt_to_head_page(nbuf->data);
 	nbuf_frag_info->paddr = QDF_NBUF_CB_PADDR(nbuf) =
 		qdf_page_pool_get_dma_addr(page) + offset +
@@ -558,9 +577,7 @@ nbuf_alloc:
 
 	(nbuf_frag_info->virt_addr).nbuf = nbuf;
 
-	ret = qdf_nbuf_map_nbytes_single(soc->osdev, nbuf,
-					 QDF_DMA_FROM_DEVICE,
-					 rx_desc_pool->buf_size);
+	ret = qdf_nbuf_track_map_single(soc->osdev, nbuf, QDF_DMA_FROM_DEVICE);
 	if (!QDF_IS_STATUS_SUCCESS(ret)) {
 		qdf_nbuf_free(nbuf);
 		goto out_fail;
@@ -587,7 +604,7 @@ out_fail:
 
 static qdf_page_pool_t
 dp_rx_pp_prealloc_get(struct dp_soc *soc, size_t *pp_size,
-		      size_t *page_size, uint32_t pool_size, int *pp_track_id)
+		      size_t *page_size, uint32_t pool_size)
 {
 	struct dp_page_pool_t *pool_t = NULL;
 
@@ -595,23 +612,10 @@ dp_rx_pp_prealloc_get(struct dp_soc *soc, size_t *pp_size,
 		return NULL;
 
 	pool_t = soc->cdp_soc.ol_ops->dp_get_page_pool(QDF_DP_PAGE_POOL_RX,
-						       pool_size,
-						       pp_track_id);
+						       pool_size);
 	if (pool_t && pool_t->pp && pool_t->pp_size == *pp_size &&
 	    pool_t->page_size == *page_size)
 		return pool_t->pp;
-
-	/*
-	 * Since the prealloc entry has already been marked as in_use,
-	 * return this entry back to prealloc, since this won't be used due to
-	 * size mismatch in pool_size
-	 */
-	if (pool_t && pool_t->pp && soc->cdp_soc.ol_ops->dp_put_page_pool) {
-		dp_info("return: pool size mismatch req_size %lu got_size %lu",
-			*pp_size, pool_t->pp_size);
-		soc->cdp_soc.ol_ops->dp_put_page_pool(pool_t->pp,
-						      QDF_DP_PAGE_POOL_RX);
-	}
 
 	return NULL;
 }
@@ -647,8 +651,7 @@ static void dp_rx_page_pool_inactive_work(void *arg)
 		if (!curr->pp)
 			continue;
 
-		if (qdf_page_pool_check_inflight_buffers(curr->pp,
-							 curr->pp_track_id))
+		if (!qdf_page_pool_full_bh(curr->pp))
 			continue;
 
 		qdf_list_remove_node(&rx_pp->inactive_list, &curr->node);
@@ -785,8 +788,6 @@ void dp_rx_page_pool_deinit(struct dp_soc *soc, uint32_t pool_id)
 	rx_pp->aux_pool.pp_size = 0;
 	qdf_spin_unlock(&rx_pp->pp_lock);
 
-	qdf_spinlock_destroy(&rx_pp->pp_lock);
-
 	qdf_list_for_each_del(&rx_pp->inactive_list, curr, next, node) {
 		if (!curr->pp)
 			continue;
@@ -824,7 +825,6 @@ QDF_STATUS dp_rx_page_pool_init(struct dp_soc *soc, uint32_t pool_id)
 		return QDF_STATUS_E_RESOURCES;
 	}
 
-	qdf_spinlock_create(&rx_pp->pp_lock);
 	rx_pp->page_pool_init = true;
 
 	return QDF_STATUS_SUCCESS;
@@ -856,19 +856,19 @@ void dp_rx_page_pool_free(struct dp_soc *soc, uint32_t pool_id)
 		rx_pp->aux_pool.pp = NULL;
 	}
 
+	qdf_spinlock_destroy(&rx_pp->pp_lock);
 }
 
 static qdf_page_pool_t
 __dp_rx_page_pool_create(struct dp_soc *soc, uint32_t pool_size,
 			 size_t buf_size, size_t *page_size,
-			 size_t *pp_size, uint8_t *prealloc, int *pp_track_id)
+			 size_t *pp_size, uint8_t *prealloc)
 {
 	qdf_page_pool_t pp;
 	size_t bufs_per_page;
 	QDF_STATUS status;
 
-	*prealloc = 0;
-	*page_size = DP_PP_PAGE_SIZE_HIGHER_ORDER;
+	*page_size = DP_RX_PP_PAGE_SIZE_HIGHER_ORDER;
 alloc_page_pool:
 	bufs_per_page = *page_size / buf_size;
 	*pp_size = pool_size / bufs_per_page;
@@ -876,15 +876,14 @@ alloc_page_pool:
 		*pp_size = (*pp_size + 1);
 
 	/* Try to allocate from prealloc pool first */
-	pp = dp_rx_pp_prealloc_get(soc, pp_size, page_size,
-				   pool_size, pp_track_id);
+	pp = dp_rx_pp_prealloc_get(soc, pp_size, page_size, pool_size);
 	if (pp) {
 		*prealloc = 1;
 		return pp;
 	}
 
 	pp = qdf_page_pool_create(soc->osdev, *pp_size,
-				  *page_size, QDF_DMA_FROM_DEVICE, pp_track_id);
+				  *page_size, QDF_DMA_FROM_DEVICE);
 	if (!pp) {
 		dp_err("Failed to create page pool");
 		return NULL;
@@ -898,16 +897,16 @@ alloc_page_pool:
 		qdf_page_pool_destroy(pp);
 		pp = NULL;
 
-		if (*page_size == DP_PP_PAGE_SIZE_HIGHER_ORDER) {
-			if (DP_PP_PAGE_SIZE_MIDDLE_ORDER ==
-			    DP_PP_PAGE_SIZE_LOWER_ORDER)
-				*page_size = DP_PP_PAGE_SIZE_LOWER_ORDER;
+		if (*page_size == DP_RX_PP_PAGE_SIZE_HIGHER_ORDER) {
+			if (DP_RX_PP_PAGE_SIZE_MIDDLE_ORDER ==
+			    DP_RX_PP_PAGE_SIZE_LOWER_ORDER)
+				*page_size = DP_RX_PP_PAGE_SIZE_LOWER_ORDER;
 			else
-				*page_size = DP_PP_PAGE_SIZE_MIDDLE_ORDER;
+				*page_size = DP_RX_PP_PAGE_SIZE_MIDDLE_ORDER;
 			goto alloc_page_pool;
-		} else if (*page_size == DP_PP_PAGE_SIZE_MIDDLE_ORDER &&
+		} else if (*page_size == DP_RX_PP_PAGE_SIZE_MIDDLE_ORDER &&
 			   PAGE_SIZE == 4096) {
-			*page_size = DP_PP_PAGE_SIZE_LOWER_ORDER;
+			*page_size = DP_RX_PP_PAGE_SIZE_LOWER_ORDER;
 			goto alloc_page_pool;
 		}
 	}
@@ -976,6 +975,7 @@ QDF_STATUS dp_rx_page_pool_alloc(struct dp_soc *soc, uint32_t pool_id,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	qdf_spinlock_create(&rx_pp->pp_lock);
 	rx_pp->page_pool_init = false;
 	rx_pp->soc = soc;
 
@@ -991,8 +991,7 @@ QDF_STATUS dp_rx_page_pool_alloc(struct dp_soc *soc, uint32_t pool_id,
 
 		pp = __dp_rx_page_pool_create(soc, pool_size,
 					      buf_size, &page_size,
-					      &pp_size, &prealloc,
-					      &pp_params->pp_track_id);
+					      &pp_size, &prealloc);
 		if (!pp)
 			goto out_pp_fail;
 
@@ -1010,8 +1009,7 @@ QDF_STATUS dp_rx_page_pool_alloc(struct dp_soc *soc, uint32_t pool_id,
 	rx_pp->aux_pool.pp = __dp_rx_page_pool_create(soc,
 						      rx_pp->aux_pool.pool_size,
 						      buf_size, &page_size,
-						      &pp_size, &prealloc,
-						      &rx_pp->aux_pool.pp_track_id);
+						      &pp_size, &prealloc);
 	if (!rx_pp->aux_pool.pp)
 		goto out_pp_fail;
 
@@ -1114,8 +1112,7 @@ dp_rx_page_pool_upsize(struct dp_soc *soc, struct dp_rx_page_pool *rx_pp,
 
 		pp = __dp_rx_page_pool_create(soc, pool_size,
 					      buf_size, &page_size,
-					      &pp_size, &prealloc,
-					      &pp_params->pp_track_id);
+					      &pp_size, &prealloc);
 		if (!pp)
 			goto out_pp_fail;
 
@@ -1189,9 +1186,9 @@ QDF_STATUS dp_rx_page_pool_resize(struct dp_soc *soc, uint32_t pool_id,
 			continue;
 
 		/* Immediately destroy the page pool if there
-		 * are no inflight buffers.
+		 * are no inflight pages.
 		 */
-		if (!qdf_page_pool_check_inflight_buffers(pp_params->pp, pp_params->pp_track_id)) {
+		if (qdf_page_pool_full_bh(pp_params->pp)) {
 			qdf_list_insert_back(&destroy_list, &pp_params->node);
 			continue;
 		}

@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -495,19 +494,6 @@ static inline bool util_mdie_match(uint16_t mobility_domain,
 	   mdie->mobility_domain[0];
 
 	if (md == mobility_domain)
-		return true;
-
-	return false;
-}
-
-static inline bool
-util_is_local_generated_entry(bool is_local_gen,
-			      struct scan_cache_entry *scan_entry)
-{
-	if (!is_local_gen)
-		return true;
-
-	if (scan_entry->is_gen_entry)
 		return true;
 
 	return false;
@@ -1804,6 +1790,17 @@ util_scan_entry_fils_indication(struct scan_cache_entry *scan_entry)
 }
 
 /**
+ * util_get_last_scan_time() - function to get last scan time on this pdev
+ * @vdev: vdev object
+ *
+ * API, function to read last scan time on this pdev
+ *
+ * Return: qdf_time_t
+ */
+qdf_time_t
+util_get_last_scan_time(struct wlan_objmgr_vdev *vdev);
+
+/**
  * util_scan_is_hidden_ssid() - function to check if ssid is hidden
  * @ssid: struct ie_ssid object
  *
@@ -2064,22 +2061,6 @@ util_scan_get_phymode(struct wlan_objmgr_pdev *pdev,
  */
 bool util_is_bssid_non_tx(struct wlan_objmgr_psoc *psoc,
 			  struct qdf_mac_addr *bssid, qdf_freq_t freq);
-
-/**
- * util_is_scan_entry_non_tx_bssid - Check if a scan entry corresponds to a
- * non-transmitting BSSID
- *
- * @scan_entry: Pointer to the scan cache entry to be checked
- *
- * This function determines whether a given scan cache entry represents a
- * non-transmitting BSSID (NTB) based on the BSSID index information stored
- * within the entry. A non-transmitting BSSID is typically part of a MBSSID
- * setup where the BSSID is advertised but does not actively transmit frames.
- *
- * Return: true if the scan entry represents a non-transmitting BSSID,
- * false otherwise
- */
-bool util_is_scan_entry_non_tx_bssid(struct scan_cache_entry *scan_entry);
 
 /**
  * util_scan_entry_renew_timestamp() - function to renew timestamp of scan entry

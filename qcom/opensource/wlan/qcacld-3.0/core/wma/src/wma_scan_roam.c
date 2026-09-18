@@ -183,11 +183,10 @@ QDF_STATUS wma_update_channel_list(WMA_HANDLE handle,
 		wma_handle->saved_chan.ch_freq_list[i] =
 					chan_list->chanParam[i].freq;
 
-		if (chan_list->chanParam[i].dfsSet)
-			chan_p->dfs_set = 1;
-
-		if (chan_list->chanParam[i].is_passive)
+		if (chan_list->chanParam[i].dfsSet) {
 			chan_p->is_chan_passive = 1;
+			chan_p->dfs_set = 1;
+		}
 
 		if (chan_list->chanParam[i].nan_disabled)
 			chan_p->nan_disabled = 1;
@@ -300,7 +299,6 @@ cm_handle_auth_offload(struct auth_offload_event *auth_event)
 	wlan_cm_set_sae_auth_ta(mac_ctx->pdev,
 				auth_event->vdev_id,
 				auth_event->ta);
-	wlan_set_log_instance_id(mac_ctx->pdev, auth_event->vdev_id);
 
 	wlan_cm_store_mlo_roam_peer_address(mac_ctx->pdev, auth_event);
 
@@ -2832,12 +2830,6 @@ wma_update_pdev_hw_mode_trans_ind(tp_wma_handle wma,
 				  struct cm_hw_mode_trans_ind *trans_ind)
 {
 	uint32_t i;
-
-	if (!trans_ind ||
-	    trans_ind->num_vdev_mac_entries > MAX_VDEV_SUPPORTED) {
-		wma_err("Inval trans_ind param");
-		return;
-	}
 
 	/* Store the vdev-mac map in WMA and send to policy manager */
 	for (i = 0; i < trans_ind->num_vdev_mac_entries; i++)

@@ -133,73 +133,53 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 	    qdf_atomic_dec_and_test(&tdls_soc->timer_cnt)) {
 		tdls_process_mlo_cal_tdls_link_score(vdev);
 		select_vdev = tdls_process_mlo_choice_tdls_vdev(vdev);
-
-		/*
-		 * If select vdev is present, then TDLS discovery response is
-		 * received and one of the link will be used for TDLS connection
-		 *
-		 * If there is no discovery response on both the vdev, then the
-		 * select_vdev will be NULL & the TDLS link should be set to
-		 * unforce. When the TDLS discovery response is retried, the
-		 * link will be forced to active again.
-		 */
-		if (!select_vdev) {
-			tdls_debug("no discovery response");
-			goto update_link_status_and_unforce;
-		}
-
-		tdls_debug("Choose vdev %d as tdls vdev",
-			   wlan_vdev_get_id(select_vdev));
-
-		tdls_vdev = wlan_vdev_get_tdls_vdev_obj(select_vdev);
-		if (!tdls_vdev)
-			return;
-
 		tdls_link_vdev = tdls_mlo_get_tdls_link_vdev(vdev);
 		if (!tdls_link_vdev) {
 			tdls_err("tdls link vdev is null");
-			goto cleanup;
-		}
-
-		/*
-		 * TDLS connection already present on other vdev.
-		 * Ignore this TDLS discovery.
-		 */
-		if (tdls_link_vdev != select_vdev) {
-			tdls_debug("tdls link created on vdev %d",
-				   wlan_vdev_get_id(tdls_link_vdev));
-			goto cleanup;
-		}
-
-		if (!tdls_vdev->rx_mgmt) {
-			tdls_debug("vdev %d doesn't have discovery response cached",
-				   wlan_vdev_get_id(tdls_link_vdev));
 			return;
 		}
 
-		rx_mgmt = tdls_vdev->rx_mgmt;
-		mac = &rx_mgmt->buf[TDLS_80211_PEER_ADDR_OFFSET];
+		if (select_vdev) {
+			tdls_vdev = wlan_vdev_get_tdls_vdev_obj(select_vdev);
+			if (!tdls_vdev)
+				return;
 
-		tdls_notice("[TDLS] vdev:%d TDLS Discovery Response, " QDF_MAC_ADDR_FMT " RSSI[%d]<---OTA",
-			    wlan_vdev_get_id(tdls_vdev->vdev),
-			    QDF_MAC_ADDR_REF(mac), rx_mgmt->rx_rssi);
+			if (tdls_link_vdev != select_vdev) {
+				tdls_debug("tdls link created on vdev %d",
+					   wlan_vdev_get_id(tdls_link_vdev));
+				goto exit;
+			}
 
-		if (tdls_soc && tdls_soc->tdls_rx_cb)
-			tdls_soc->tdls_rx_cb(tdls_soc->tdls_rx_cb_data,
-					     rx_mgmt);
-		tdls_recv_discovery_resp(tdls_vdev, mac);
-		tdls_set_rssi(tdls_vdev->vdev, mac, rx_mgmt->rx_rssi);
+			if (!tdls_vdev->rx_mgmt) {
+				tdls_debug("vdev %d doesn't have discovery response cached",
+					   wlan_vdev_get_id(tdls_link_vdev));
+				return;
+			}
 
-cleanup:
-		qdf_mem_free(tdls_vdev->rx_mgmt);
-		tdls_vdev->rx_mgmt = NULL;
-		tdls_vdev->link_score = 0;
+			rx_mgmt = tdls_vdev->rx_mgmt;
+			mac = &rx_mgmt->buf[TDLS_80211_PEER_ADDR_OFFSET];
 
-		return;
+			tdls_notice("[TDLS] vdev:%d TDLS Discovery Response, " QDF_MAC_ADDR_FMT " RSSI[%d]<---OTA",
+				    wlan_vdev_get_id(tdls_vdev->vdev),
+				    QDF_MAC_ADDR_REF(mac), rx_mgmt->rx_rssi);
 
+			if (tdls_soc && tdls_soc->tdls_rx_cb)
+				tdls_soc->tdls_rx_cb(tdls_soc->tdls_rx_cb_data,
+						     rx_mgmt);
+			tdls_recv_discovery_resp(tdls_vdev, mac);
+			tdls_set_rssi(tdls_vdev->vdev, mac, rx_mgmt->rx_rssi);
+
+exit:
+			qdf_mem_free(tdls_vdev->rx_mgmt);
+			tdls_vdev->rx_mgmt = NULL;
+			tdls_vdev->link_score = 0;
+
+			return;
+		}
+
+		tdls_debug("no discovery response");
 	}
 
-update_link_status_and_unforce:
 	tdls_vdev = wlan_vdev_get_tdls_vdev_obj(vdev);
 	if (!tdls_vdev)
 		return;
@@ -233,7 +213,8 @@ update_link_status_and_unforce:
 	}
 
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev) && unforce) {
-		tdls_debug("Set vdev %d to unforce", wlan_vdev_get_id(vdev));
+		tdls_debug("try to set vdev %d to unforce",
+			   wlan_vdev_get_id(vdev));
 		tdls_set_link_unforce(vdev);
 	}
 
@@ -1374,12 +1355,6 @@ int tdls_set_tdls_offchannelmode(struct wlan_objmgr_vdev *vdev,
 		return -EPERM;
 	}
 
-	if (offchanmode == ENABLE_CHANSWITCH &&
-	    !tdls_check_if_offchannel_allowed(vdev)) {
-		tdls_err("TDLS Offchannel is not allowed");
-		return -EPERM;
-	}
-
 	tdls_feature_flags = tdls_soc->tdls_configs.tdls_feature_flags;
 	if (!TDLS_IS_OFF_CHANNEL_ENABLED(tdls_feature_flags) ||
 	    TDLS_SUPPORT_SUSPENDED >= tdls_soc->tdls_current_mode) {
@@ -1680,58 +1655,6 @@ void tdls_disable_offchan_and_teardown_links(struct wlan_objmgr_vdev *vdev)
 	}
 }
 
-#ifdef WLAN_FEATURE_11BE_MLO
-static void
-tdls_teardown_connections_for_ml_vdev(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_mlo_dev_context *ml_dev_ctx;
-	struct wlan_objmgr_vdev *vdev_iter;
-	QDF_STATUS status;
-	uint8_t i;
-
-	ml_dev_ctx = vdev->mlo_dev_ctx;
-	if (!ml_dev_ctx)
-		return;
-
-	for (i =  0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
-		struct tdls_vdev_priv_obj *tdls_vdev_obj;
-
-		if (!ml_dev_ctx->wlan_vdev_list[i])
-			continue;
-
-		vdev_iter = ml_dev_ctx->wlan_vdev_list[i];
-		status = wlan_objmgr_vdev_try_get_ref(vdev_iter,
-						      WLAN_TDLS_NB_ID);
-		if (QDF_IS_STATUS_ERROR(status))
-			continue;
-
-		tdls_debug("vdev:%d teardown TDLS connections",
-			   wlan_vdev_get_id(vdev_iter));
-		wlan_vdev_mlme_feat_ext2_cap_clear(vdev_iter,
-						   WLAN_VDEV_FEXT2_MLO_STA_TDLS);
-
-		tdls_disable_offchan_and_teardown_links(vdev_iter);
-
-		tdls_vdev_obj = wlan_vdev_get_tdls_vdev_obj(vdev_iter);
-		if (!tdls_vdev_obj) {
-			wlan_objmgr_vdev_release_ref(vdev_iter,
-						     WLAN_TDLS_NB_ID);
-			tdls_err("vdev priv is NULL");
-			continue;
-		}
-		tdls_timers_stop(tdls_vdev_obj);
-		qdf_event_set(&tdls_vdev_obj->tdls_teardown_comp);
-
-		wlan_objmgr_vdev_release_ref(vdev_iter, WLAN_TDLS_NB_ID);
-	}
-}
-#else
-static inline
-void tdls_teardown_connections_for_ml_vdev(struct wlan_objmgr_vdev *vdev)
-{
-}
-#endif
-
 void tdls_teardown_connections(struct tdls_link_teardown *tdls_teardown)
 {
 	struct tdls_vdev_priv_obj *tdls_vdev_obj;
@@ -1741,18 +1664,13 @@ void tdls_teardown_connections(struct tdls_link_teardown *tdls_teardown)
 	tdls_vdev = tdls_get_vdev(tdls_teardown->psoc, WLAN_TDLS_SB_ID);
 	if (!tdls_vdev) {
 		tdls_err("Unable get the vdev");
-		goto release_psoc;
-	}
-
-	if (wlan_vdev_mlme_is_mlo_vdev(tdls_vdev)) {
-		tdls_teardown_connections_for_ml_vdev(tdls_vdev);
-		goto release_vdev_and_psoc;
+		goto fail_vdev;
 	}
 
 	tdls_vdev_obj = wlan_vdev_get_tdls_vdev_obj(tdls_vdev);
 	if (!tdls_vdev_obj) {
 		tdls_err("vdev priv is NULL");
-		goto release_vdev_and_psoc;
+		goto fail_tdls_vdev;
 	}
 
 	tdls_debug("tdls teardown connections");
@@ -1762,9 +1680,9 @@ void tdls_teardown_connections(struct tdls_link_teardown *tdls_teardown)
 	tdls_disable_offchan_and_teardown_links(tdls_vdev);
 	tdls_timers_stop(tdls_vdev_obj);
 	qdf_event_set(&tdls_vdev_obj->tdls_teardown_comp);
-release_vdev_and_psoc:
+fail_tdls_vdev:
 	wlan_objmgr_vdev_release_ref(tdls_vdev, WLAN_TDLS_SB_ID);
-release_psoc:
+fail_vdev:
 	wlan_objmgr_psoc_release_ref(tdls_teardown->psoc, WLAN_TDLS_SB_ID);
 	qdf_mem_free(tdls_teardown);
 }

@@ -527,9 +527,8 @@ static bool sap_chan_sel_init(struct mac_context *mac,
 			}
 		}
 
-		if (!policy_mgr_is_unsafe_freq_allowed(mac->psoc,
-						       sap_ctx->vdev_id,
-						       *ch_list)) {
+		if (!policy_mgr_is_sap_freq_allowed(mac->psoc,
+						    mode, *ch_list)) {
 			if (sap_acs_is_puncture_applicable(sap_ctx->acs_cfg)) {
 				ch_support_puncture = true;
 				len += qdf_scnprintf(
@@ -2159,9 +2158,8 @@ sap_sort_chl_weight_80_mhz(struct mac_context *mac_ctx,
 			if (chan_info[j + i].valid)
 				has_valid = true;
 
-			if (!policy_mgr_is_unsafe_freq_allowed(mac_ctx->psoc,
-							       sap_ctx->vdev_id,
-						chan_info[j + i].chan_freq))
+			if (!policy_mgr_is_sap_freq_allowed(mac_ctx->psoc, mode,
+							    chan_info[j + i].chan_freq))
 				all_ch_safe = false;
 
 			is_acs_channel =
@@ -2372,9 +2370,8 @@ sap_sort_chl_weight_160_mhz(struct mac_context *mac_ctx,
 			if (chan_info[j + i].valid)
 				has_valid = true;
 
-			if (!policy_mgr_is_unsafe_freq_allowed(mac_ctx->psoc,
-							       sap_ctx->vdev_id,
-						chan_info[j + i].chan_freq))
+			if (!policy_mgr_is_sap_freq_allowed(mac_ctx->psoc, mode,
+							    chan_info[j + i].chan_freq))
 				all_ch_safe = false;
 
 			is_acs_channel = wlansap_is_channel_present_in_acs_list(
@@ -2674,9 +2671,8 @@ sap_sort_chl_weight_320_mhz(struct mac_context *mac_ctx,
 			if (chan_info[j + i].valid)
 				has_valid = true;
 
-			if (!policy_mgr_is_unsafe_freq_allowed(mac_ctx->psoc,
-							       sap_ctx->vdev_id,
-						chan_info[j + i].chan_freq))
+			if (!policy_mgr_is_sap_freq_allowed(mac_ctx->psoc, mode,
+							    chan_info[j + i].chan_freq))
 				all_ch_safe = false;
 
 			is_acs_channel = wlansap_is_channel_present_in_acs_list(
@@ -3063,9 +3059,8 @@ sap_sort_chl_weight_40_mhz(struct mac_context *mac_ctx,
 			if (chan_info[j + i].valid)
 				has_valid = true;
 
-			if (!policy_mgr_is_unsafe_freq_allowed(mac_ctx->psoc,
-							       sap_ctx->vdev_id,
-						chan_info[j + i].chan_freq))
+			if (!policy_mgr_is_sap_freq_allowed(mac_ctx->psoc, mode,
+							    chan_info[j + i].chan_freq))
 				all_ch_safe = false;
 
 			is_acs_channel = wlansap_is_channel_present_in_acs_list(

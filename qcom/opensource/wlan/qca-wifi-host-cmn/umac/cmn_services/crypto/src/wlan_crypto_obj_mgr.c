@@ -270,10 +270,8 @@ QDF_STATUS crypto_add_entry(struct crypto_psoc_priv_obj *psoc,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t igtk_key_idx, bigtk_key_idx;
 
-	crypto_debug("crypto add entry link id %d mac_addr " QDF_MAC_ADDR_FMT
-		     " key index %d psoc key cnt %d",
-		     link_id, QDF_MAC_ADDR_REF(mac_addr),
-		     key_index, qdf_atomic_read(&psoc->crypto_key_cnt));
+	crypto_debug("crypto add entry link id %d mac_addr: " QDF_MAC_ADDR_FMT,
+		     link_id, QDF_MAC_ADDR_REF(mac_addr));
 
 	qdf_mutex_acquire(&psoc->crypto_key_lock);
 
@@ -415,10 +413,8 @@ static void crypto_free_list(struct crypto_psoc_priv_obj *psoc, void *ptr)
 	TAILQ_FOREACH_SAFE(crypto_entry, free_list, hash_list_elem,
 			   hash_entry_next) {
 		crypto_debug("crypto delete for link_id %d mac_addr "
-			     QDF_MAC_ADDR_FMT " psoc key cnt %d",
-			     crypto_entry->link_id,
-			     QDF_MAC_ADDR_REF(crypto_entry->mac_addr.raw),
-			     qdf_atomic_read(&psoc->crypto_key_cnt));
+			     QDF_MAC_ADDR_FMT, crypto_entry->link_id,
+			     QDF_MAC_ADDR_REF(crypto_entry->mac_addr.raw));
 		qdf_mem_free(crypto_entry);
 		if (!qdf_atomic_read(&psoc->crypto_key_cnt))
 			crypto_debug("Invalid crypto_key_cnt");

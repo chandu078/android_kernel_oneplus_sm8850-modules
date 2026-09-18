@@ -75,7 +75,7 @@
 		"twt_responder", \
 		0, \
 		0xFF, \
-		0x07, \
+		0x06, \
 		CFG_VALUE_OR_DEFAULT, \
 		"TWT responder")
 
@@ -162,7 +162,7 @@
 		"twt_bcast_req_resp_config", \
 		0, \
 		3, \
-		3, \
+		1, \
 		CFG_VALUE_OR_DEFAULT, \
 		"BROADCAST TWT CAPABILITY")
 

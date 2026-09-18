@@ -248,12 +248,6 @@ static struct dp_prealloc_context g_dp_context_allocs[] = {
 	{DP_MON_STATUS_BUF_HIST_TYPE, sizeof(struct dp_mon_status_ring_history),
 	 false, false, NULL},
 #endif
-#ifdef WLAN_FEATURE_DP_MON_DEST_RING_HISTORY
-	{DP_MON_DEST_BUF_HIST_TYPE, sizeof(struct dp_mon_dest_ring_history),
-	 false, false, NULL},
-	{DP_MON_DEST_BUF_HIST_TYPE, sizeof(struct dp_mon_dest_ring_history),
-	 false, false, NULL},
-#endif
 #ifdef DP_TX_MON_BUF_RING_HISTORY
 	{DP_TX_MON_BUF_HIST_TYPE, sizeof(struct dp_tx_mon_buf_ring_history),
 	 false, false, NULL},
@@ -370,11 +364,7 @@ static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
 };
 
 /* Number of HW link descriptors needed (rounded to power of 2) */
-#ifndef WLAN_SOFTUMAC_SUPPORT
 #define NUM_HW_LINK_DESCS (32 * 1024)
-#else
-#define NUM_HW_LINK_DESCS (32 * 64)
-#endif
 
 /* Size in bytes of HW LINK DESC */
 #define HW_LINK_DESC_SIZE 128
@@ -519,92 +509,59 @@ static struct dp_consistent_prealloc_unaligned
 
 #if defined(DP_FEATURE_TX_PAGE_POOL) || defined(DP_FEATURE_RX_BUFFER_RECYCLE)
 #define DP_TX_PAGE_POOL_SIZE 10240
-#define DP_TX_PAGE_POOL_BUFSIZE 2048
+#define DP_TX_PAGE_POOL_BUF_SIZE 2048
 
-static struct dp_page_pool_t g_dp_rx_pp_allocs[] = {
-	/* Keep RX AUX pool always at the top */
-	{QDF_DP_PAGE_POOL_RX, NULL, DP_RX_PP_AUX_POOL_SIZE, 0, 0, false, 0},
-	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false, 0},
-	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false, 0},
-	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false, 0},
-	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false, 0},
-};
+#define DP_RX_AUX_PAGE_POOL_SIZE 2048
+#ifdef WLAN_DP_DYNAMIC_RESOURCE_MGMT
+#define DP_RX_PAGE_POOL_SIZE 6144
+#else
+#define DP_RX_PAGE_POOL_SIZE 4096
+#endif
 
-static struct dp_page_pool_t g_dp_tx_pp_allocs[] = {
-	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false, 0},
-	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false, 0},
-	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false, 0},
+static struct dp_page_pool_t g_dp_page_pool_allocs[] = {
+#ifdef WLAN_DP_DYNAMIC_RESOURCE_MGMT
+	{QDF_DP_PAGE_POOL_RX, NULL, DP_RX_PAGE_POOL_SIZE, 0, 0, false},
+#else
+	{QDF_DP_PAGE_POOL_RX, NULL, DP_RX_PAGE_POOL_SIZE, 0, 0, false},
+	{QDF_DP_PAGE_POOL_RX, NULL, DP_RX_PAGE_POOL_SIZE, 0, 0, false},
+	{QDF_DP_PAGE_POOL_RX, NULL, DP_RX_PAGE_POOL_SIZE, 0, 0, false},
+	{QDF_DP_PAGE_POOL_RX, NULL, DP_RX_PAGE_POOL_SIZE, 0, 0, false},
+#endif
+	{QDF_DP_PAGE_POOL_RX, NULL, DP_RX_AUX_PAGE_POOL_SIZE, 0, 0, false},
+	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false},
+	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false},
+	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false},
 };
 
 struct dp_page_pool_t*
-dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size,
-			  int *pp_track_id)
+dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size)
 {
-	struct dp_page_pool_t *base_pp;
 	struct dp_page_pool_t *pp_t;
-	int arr_size;
 	int i;
-	int pools_allocated = 0;
-	int pools_in_use = 0;
 
-	if (type == QDF_DP_PAGE_POOL_RX) {
-		base_pp = g_dp_rx_pp_allocs;
-		arr_size = QDF_ARRAY_SIZE(g_dp_rx_pp_allocs);
-	} else if (type == QDF_DP_PAGE_POOL_TX) {
-		base_pp = g_dp_tx_pp_allocs;
-		arr_size = QDF_ARRAY_SIZE(g_dp_tx_pp_allocs);
-	} else {
-		return NULL;
-	}
+	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_page_pool_allocs); i++) {
+		pp_t = &g_dp_page_pool_allocs[i];
 
-	for (i = 0; i < arr_size; i++) {
-		pp_t = &base_pp[i];
-
-		if (pp_t->in_use)
-			pools_in_use++;
-
-		if (pp_t->pp)
-			pools_allocated++;
-
-		if (pp_t->pp && type == pp_t->type && !pp_t->in_use &&
+		if (type == pp_t->type && !pp_t->in_use &&
 		    pool_size == pp_t->pool_size) {
 			pp_t->in_use = true;
-			if (pp_track_id)
-				*pp_track_id = pp_t->pp_track_id;
-
 			dp_info("get page pool %d type %d size %d success",
 				i, type, pp_t->pool_size);
 			return pp_t;
 		}
 	}
 
-	if (pools_in_use == pools_allocated)
-		dp_info("No free page pool available for type %d size %d", type, pool_size);
-	else
-		dp_err("get page pool %d type %d size %d failed", i, type, pool_size);
-
+	dp_err("get page pool %d type %d size %d failed", i, type, pool_size);
 	return NULL;
 }
 
 void dp_prealloc_put_page_pool(qdf_page_pool_t pp, enum qdf_dp_tx_pp_type type)
 {
-	struct dp_page_pool_t *base_pp;
 	struct dp_page_pool_t *pp_t;
-	int arr_size;
 	int i;
 
-	if (type == QDF_DP_PAGE_POOL_RX) {
-		base_pp = g_dp_rx_pp_allocs;
-		arr_size = QDF_ARRAY_SIZE(g_dp_rx_pp_allocs);
-	} else if (type == QDF_DP_PAGE_POOL_TX) {
-		base_pp = g_dp_tx_pp_allocs;
-		arr_size = QDF_ARRAY_SIZE(g_dp_tx_pp_allocs);
-	} else {
-		return;
-	}
-
-	for (i = 0; i < arr_size; i++) {
-		pp_t = &base_pp[i];
+	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_page_pool_allocs); i++) {
+		pp_t = &g_dp_page_pool_allocs[i];
 
 		if (type == pp_t->type && pp == pp_t->pp) {
 			pp_t->in_use = false;
@@ -616,6 +573,18 @@ void dp_prealloc_put_page_pool(qdf_page_pool_t pp, enum qdf_dp_tx_pp_type type)
 
 	dp_err("put page pool type %d failed", type);
 }
+
+#if PAGE_SIZE == 4096
+#define DP_TX_PP_PAGE_SIZE_HIGHER_ORDER	(2 * DP_TX_PP_PAGE_SIZE_MIDDLE_ORDER)
+#define DP_TX_PP_PAGE_SIZE_MIDDLE_ORDER	(4 * DP_TX_PP_PAGE_SIZE_LOWER_ORDER)
+#define DP_TX_PP_PAGE_SIZE_LOWER_ORDER	PAGE_SIZE
+#elif PAGE_SIZE == 16384
+#define DP_TX_PP_PAGE_SIZE_HIGHER_ORDER	(2 * DP_TX_PP_PAGE_SIZE_MIDDLE_ORDER)
+#define DP_TX_PP_PAGE_SIZE_MIDDLE_ORDER	DP_TX_PP_PAGE_SIZE_LOWER_ORDER
+#define DP_TX_PP_PAGE_SIZE_LOWER_ORDER	PAGE_SIZE
+#else
+#error "Unsupported kernel PAGE_SIZE"
+#endif
 
 static QDF_STATUS
 dp_page_pool_check_pages_availability(qdf_page_pool_t pp,
@@ -661,45 +630,44 @@ out_put_page:
 static qdf_page_pool_t
 dp_prealloc_page_pool_create(qdf_device_t osdev, uint32_t pool_size,
 			     size_t buf_size, size_t *page_size,
-			     size_t *pp_size, qdf_dma_dir_t dir,
-			     int *pp_track_id)
+			     size_t *pp_size, qdf_dma_dir_t dir)
 {
 	qdf_page_pool_t pp;
 	size_t bufs_per_page;
 	QDF_STATUS status;
 
-	*page_size = DP_PP_PAGE_SIZE_HIGHER_ORDER;
+	*page_size = DP_TX_PP_PAGE_SIZE_HIGHER_ORDER;
 alloc_page_pool:
 	bufs_per_page = *page_size / buf_size;
 	*pp_size = pool_size / bufs_per_page;
 	if (pool_size % bufs_per_page)
 		*pp_size = (*pp_size + 1);
 
-	pp = qdf_page_pool_create(osdev, *pp_size,
-				  *page_size, dir, pp_track_id);
+	pp = qdf_page_pool_create(osdev, *pp_size, *page_size, dir);
+
 	if (!pp) {
-		dp_err("Failed to create page pool");
+		dp_err("Failed to create Tx page pool");
 		return NULL;
 	}
 
 	status = dp_page_pool_check_pages_availability(pp, *pp_size,
 						       *page_size);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_info("Page pool resource not available for page_size:%lu",
+		dp_info("Tx page pool resource not available for page_size:%lu",
 			*page_size);
 		qdf_page_pool_destroy(pp);
 		pp = NULL;
 
-		if (*page_size == DP_PP_PAGE_SIZE_HIGHER_ORDER) {
-			if (DP_PP_PAGE_SIZE_MIDDLE_ORDER ==
-			    DP_PP_PAGE_SIZE_LOWER_ORDER)
-				*page_size = DP_PP_PAGE_SIZE_LOWER_ORDER;
+		if (*page_size == DP_TX_PP_PAGE_SIZE_HIGHER_ORDER) {
+			if (DP_TX_PP_PAGE_SIZE_MIDDLE_ORDER ==
+			    DP_TX_PP_PAGE_SIZE_LOWER_ORDER)
+				*page_size = DP_TX_PP_PAGE_SIZE_LOWER_ORDER;
 			else
-				*page_size = DP_PP_PAGE_SIZE_MIDDLE_ORDER;
+				*page_size = DP_TX_PP_PAGE_SIZE_MIDDLE_ORDER;
 			goto alloc_page_pool;
-		} else if (*page_size == DP_PP_PAGE_SIZE_MIDDLE_ORDER &&
+		} else if (*page_size == DP_TX_PP_PAGE_SIZE_MIDDLE_ORDER &&
 			   PAGE_SIZE == 4096) {
-			*page_size = DP_PP_PAGE_SIZE_LOWER_ORDER;
+			*page_size = DP_TX_PP_PAGE_SIZE_LOWER_ORDER;
 			goto alloc_page_pool;
 		}
 	}
@@ -707,127 +675,64 @@ alloc_page_pool:
 	return pp;
 }
 
-#ifdef WLAN_DP_DYNAMIC_RESOURCE_MGMT
-static bool
-dp_prealloc_is_dynamic_rsc_mgmt_enabled(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
-{
-	return cfg_get(ctrl_psoc, CFG_DP_DYNAMIC_RESOURCE_MGMT_ENABLE);
-}
-#else
-static inline bool
-dp_prealloc_is_dynamic_rsc_mgmt_enabled(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
-{
-	return false;
-}
-#endif
-
 void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 {
 	struct dp_page_pool_t *pp_t;
 	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+	qdf_dma_dir_t dir;
+	size_t buf_size;
 	size_t rx_buf_size = 0;
-	uint32_t rx_pool_size;
 	bool rx_pp_en = false;
-	bool rx_pp_prealloc_en = false;
 	bool tx_pp_en = false;
-	bool tx_pp_prealloc_en = false;
-	bool dyn_rx_buf_alloc = false;
-	int base_pool_size;
-	int max_rx_pp_alloc;
 	int align;
 	int i;
 
 	if (!qdf_ctx)
 		return;
 
-	wlan_cfg_get_rx_pp_cfg(ctrl_psoc, &rx_pp_en, &rx_buf_size,
-			       &rx_pool_size, &rx_pp_prealloc_en);
-	if (!rx_pp_en || !rx_pp_prealloc_en)
-		goto tx_pp_alloc;
-
-	dyn_rx_buf_alloc = dp_prealloc_is_dynamic_rsc_mgmt_enabled(ctrl_psoc);
+	wlan_cfg_get_tx_pp_cfg(ctrl_psoc, &tx_pp_en);
+	wlan_cfg_get_rx_pp_cfg(ctrl_psoc, &rx_pp_en, &rx_buf_size);
 	dp_rx_page_pool_get_buf_params(&rx_buf_size, &align);
 
-	if (dyn_rx_buf_alloc) {
-		/* One base pool with RESOURCE_LVL_1_RX_BUFFERS,
-		 * one additional aux pool, together 2 pools are
-		 * required when dynamic rx buffer allocation is
-		 * enabled.
-		 */
-		max_rx_pp_alloc = 2;
-		base_pool_size = RESOURCE_LVL_1_RX_BUFFERS;
-	} else {
-		max_rx_pp_alloc = rx_pool_size / DP_RX_PP_POOL_SIZE_THRES;
-		if (rx_pool_size % DP_RX_PP_POOL_SIZE_THRES)
-			max_rx_pp_alloc++;
-		/* One additional RX aux pool */
-		max_rx_pp_alloc += 1;
-		base_pool_size = DP_RX_PP_POOL_SIZE_THRES;
-	}
-
-	if (max_rx_pp_alloc > QDF_ARRAY_SIZE(g_dp_rx_pp_allocs)) {
-		dp_warn("No space in the prealloc RX pool, actual size %lu required size %d",
-			QDF_ARRAY_SIZE(g_dp_rx_pp_allocs), max_rx_pp_alloc);
-		goto tx_pp_alloc;
-	}
-
-	for (i = 0; i < max_rx_pp_alloc; i++) {
-		pp_t = &g_dp_rx_pp_allocs[i];
+	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_page_pool_allocs); i++) {
+		pp_t = &g_dp_page_pool_allocs[i];
+		pp_t->in_use = 0;
 
 		if (pp_t->pp) {
-			dp_info("RX page pool %d already initialized", i);
+			dp_info("page pool %d type %d already initialized",
+				i, pp_t->type);
 			continue;
 		}
 
-		if (!pp_t->pool_size)
-			pp_t->pool_size = base_pool_size;
+		if (pp_t->type == QDF_DP_PAGE_POOL_RX) {
+			if (!rx_pp_en)
+				continue;
 
-		pp_t->pp = dp_prealloc_page_pool_create(qdf_ctx,
-							pp_t->pool_size,
-							rx_buf_size,
-							&pp_t->page_size,
-							&pp_t->pp_size,
-							QDF_DMA_FROM_DEVICE,
-							&pp_t->pp_track_id);
-		if (pp_t->pp) {
-			dp_info("RX page pool %d pre-alloc succ pool_size %u pp_size %zu page_size %zu",
-				i, pp_t->pool_size, pp_t->pp_size,
-				pp_t->page_size);
+			buf_size = rx_buf_size;
+			dir = QDF_DMA_FROM_DEVICE;
+		} else if (pp_t->type == QDF_DP_PAGE_POOL_TX) {
+			if (!tx_pp_en)
+				continue;
+
+			buf_size = DP_TX_PAGE_POOL_BUF_SIZE;
+			dir = QDF_DMA_BIDIRECTIONAL;
 		} else {
-			dp_err("failed to pre-alloc RX page pool %d size %u", i,
-			       pp_t->pool_size);
-			pp_t->page_size = 0;
-			pp_t->pp_size = 0;
-		}
-	}
-
-tx_pp_alloc:
-	wlan_cfg_get_tx_pp_cfg(ctrl_psoc, &tx_pp_en, &tx_pp_prealloc_en);
-	if (!tx_pp_en || !tx_pp_prealloc_en)
-		return;
-
-	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_tx_pp_allocs); i++) {
-		pp_t = &g_dp_tx_pp_allocs[i];
-
-		if (pp_t->pp) {
-			dp_info("TX page pool %d already initialized", i);
+			dp_err("invalid page pool %d type %d", i, pp_t->type);
 			continue;
 		}
 
 		pp_t->pp = dp_prealloc_page_pool_create(qdf_ctx,
 							pp_t->pool_size,
-							DP_TX_PAGE_POOL_BUFSIZE,
+							buf_size,
 							&pp_t->page_size,
-							&pp_t->pp_size,
-							QDF_DMA_BIDIRECTIONAL,
-							NULL);
+							&pp_t->pp_size, dir);
 		if (pp_t->pp) {
-			dp_info("TX page pool %d pre-alloc succ pool_size %u pp_size %zu page_size %zu",
-				i, pp_t->pool_size, pp_t->pp_size,
-				pp_t->page_size);
+			dp_info("page pool %d type %d pre-alloc succ pool_size %u pp_size %zu page_size %zu",
+				i, pp_t->type, pp_t->pool_size,
+				pp_t->pp_size, pp_t->page_size);
 		} else {
-			dp_err("failed to pre-alloc TX page pool %d size %u", i,
-			       pp_t->pool_size);
+			dp_err("failed to pre-allocate pool %d type %d size %u",
+			       i, pp_t->type, pp_t->pool_size);
 			pp_t->page_size = 0;
 			pp_t->pp_size = 0;
 		}
@@ -839,31 +744,19 @@ static void dp_prealloc_page_pool_deinit(void)
 	struct dp_page_pool_t *pp_t;
 	int i;
 
-	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_rx_pp_allocs); i++) {
-		pp_t = &g_dp_rx_pp_allocs[i];
+	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_page_pool_allocs); i++) {
+		pp_t = &g_dp_page_pool_allocs[i];
 
 		if (pp_t->in_use)
-			dp_warn("RX page pool %d in use while free", i);
+			dp_warn("page pool %d mem type %d in use while free",
+				i, pp_t->type);
 
 		if (pp_t->pp) {
 			qdf_page_pool_destroy(pp_t->pp);
 			pp_t->in_use = false;
 			pp_t->pp = NULL;
-			dp_info("RX page pool %d pre-alloc pool free succ", i);
-		}
-	}
-
-	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_tx_pp_allocs); i++) {
-		pp_t = &g_dp_tx_pp_allocs[i];
-
-		if (pp_t->in_use)
-			dp_warn("TX page pool %d in use while free", i);
-
-		if (pp_t->pp) {
-			qdf_page_pool_destroy(pp_t->pp);
-			pp_t->in_use = false;
-			pp_t->pp = NULL;
-			dp_info("TX page pool %d pre-alloc pool free succ", i);
+			dp_info("page pool %d type %d pre-alloc pool free succ",
+				i, pp_t->type);
 		}
 	}
 }
@@ -1100,11 +993,8 @@ dp_prealloc_rx_iova_refcnt_mem_required(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 {
 	size_t rx_buf_size;
 	bool rx_pp_enable = 0;
-	bool rx_pp_prealloc_en = false;
-	uint32_t rx_pool_size;
 
-	wlan_cfg_get_rx_pp_cfg(ctrl_psoc, &rx_pp_enable, &rx_buf_size,
-			       &rx_pool_size, &rx_pp_prealloc_en);
+	wlan_cfg_get_rx_pp_cfg(ctrl_psoc, &rx_pp_enable, &rx_buf_size);
 
 	return rx_pp_enable;
 }
