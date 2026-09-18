@@ -611,11 +611,6 @@ int btfmcodec_hwep_prepare(struct btfmcodec_data *btfmcodec, uint32_t sampling_r
 						      direction, id);
 		BTFMCODEC_ERR("%s: hwep info %ld", __func__, hwep_info->flags);
 		if (ret == 0 && test_bit(BTADV_AUDIO_MASTER_CONFIG, &hwep_info->flags)) {
-			/* Don't send request to cp for fm as it is non cp */
-			if (id == 0) {
-				btfmcodec_set_current_state(state, BT_Connected);
-				return  ret;
-			}
 			ret = btfmcodec_configure_master(btfmcodec, (uint8_t)id);
 			if (ret < 0) {
 				BTFMCODEC_ERR("failed to configure master error %d", ret);
@@ -625,10 +620,8 @@ int btfmcodec_hwep_prepare(struct btfmcodec_data *btfmcodec, uint32_t sampling_r
 			}
 		} else if (ret == 0 && test_bit(BTADV_CONFIGURE_DMA, &hwep_info->flags)) {
                         /* Don't send request to cp for fm as it is non cp */
-			if (id == 0) {
-				btfmcodec_set_current_state(state, BT_Connected);
+			if (id == 0)
 				return  ret;
-			}
 			ret  = btfmcodec_configure_dma(btfmcodec, (uint8_t)id);
 			if (ret < 0) {
 				BTFMCODEC_ERR("failed to configure Codec DMA %d", ret);
@@ -895,19 +888,9 @@ static int btfmcodec_adsp_ssr_notify(struct notifier_block *nb,
 	switch (action) {
 	case QCOM_SSR_BEFORE_SHUTDOWN: {
 		BTFMCODEC_WARN("LPASS SSR triggered");
-		state_ind.opcode = BTM_BTFMCODEC_ADSP_STATE_IND;
-		state_ind.len = BTM_ADSP_STATE_IND_LEN;
-		state_ind.action = (uint32_t)action;
-		btfmcodec_dev_enqueue_pkt(btfmcodec_dev, &state_ind,
-				(state_ind.len + BTM_HEADER_LEN));
 		break;
 	} case QCOM_SSR_AFTER_SHUTDOWN: {
 		BTFMCODEC_WARN("LPASS SSR Completed");
-		state_ind.opcode = BTM_BTFMCODEC_ADSP_STATE_IND;
-		state_ind.len = BTM_ADSP_STATE_IND_LEN;
-		state_ind.action = (uint32_t)action;
-		btfmcodec_dev_enqueue_pkt(btfmcodec_dev, &state_ind,
-				(state_ind.len + BTM_HEADER_LEN));
 		break;
 	} case QCOM_SSR_BEFORE_POWERUP: {
 		BTFMCODEC_WARN("LPASS booted up after SSR");

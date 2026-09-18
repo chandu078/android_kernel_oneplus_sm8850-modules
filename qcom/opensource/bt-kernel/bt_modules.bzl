@@ -1,4 +1,3 @@
-load(":repo_paths.bzl", "modules_label")
 PWR_PATH = "pwr"
 SLIMBUS_PATH = "slimbus"
 FMRTC_PATH = "rtc6226"
@@ -61,19 +60,19 @@ register_bt_modules(
     srcs = ["btpower.c"],
     config_deps = {
 		    "CONFIG_BT_HW_SECURE_DISABLE": [ ":smcinvoke_kernel_headers",
-            modules_label("qcom/opensource/securemsm-kernel:%b_smcinvoke_dlkm"),
-        ],
-        "CONFIG_FMD_ENABLE": [modules_label("qcom/opensource/wlan/platform:%b_cnss_utils")],
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:%b_smcinvoke_dlkm",
+        ]
     },
     deps = [
-        modules_label("qcom/opensource/wlan/platform:all-wlan-platform-headers")
+        "//vendor/qcom/sm8850-modules/qcom/opensource/wlan/platform:all-wlan-platform-headers",
+        "//vendor/qcom/sm8850-modules/qcom/opensource/wlan/platform:%b_cnss_utils",
     ],
 )
 
 register_bt_modules(
     name = "bt_fm_slim",
     path = SLIMBUS_PATH,
-    config_opt = "CONFIG_BTFM_SLIM",
+    # config_opt = "CONFIG_BTFM_SLIM",
     srcs = [
         "btfm_slim.c",
         "btfm_slim.h",
@@ -137,8 +136,8 @@ register_bt_modules(
     ],
     deps = [
         ":%b_btpower", ":%b_btfmcodec", ":btfmcodec_headers",
-        modules_label("qcom/opensource/audio-kernel:audio_headers"),
-        modules_label("qcom/opensource/audio-kernel:%b_swr_dlkm"),
+        "//vendor/qcom/sm8850-modules/qcom/opensource/audio-kernel:audio_headers",
+        "//vendor/qcom/sm8850-modules/qcom/opensource/audio-kernel:%b_swr_dlkm",
     ],
 )
 register_bt_modules(

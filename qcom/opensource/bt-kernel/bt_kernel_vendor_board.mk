@@ -4,18 +4,11 @@ ifeq ($(TARGET_USES_QMAA),true)
   ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH), true)
      ifeq ($(call is-board-platform-in-list,$(TARGET_BOARD_PLATFORM)),true)
            BT_KERNEL_DRIVER := $(KERNEL_MODULES_OUT)/btpower.ko
-           ifeq (,$(filter seraph, $(TARGET_BOARD_PLATFORM)))
-             BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/radio-i2c-rtc6226-qca.ko
-           endif
+           BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/radio-i2c-rtc6226-qca.ko
            ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
-             ifeq ($(call is-board-platform-in-list, sun canoe chora malabar), true)
+             ifeq ($(call is-board-platform-in-list, sun canoe), true)
                BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/btfmcodec.ko
                BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/btfm_slim_codec.ko
-               ifneq ($(call is-board-platform-in-list, malabar), true)
-                 BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
-               endif
-             else ifeq ($(call is-board-platform-in-list, seraph), true)
-               BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/btfmcodec.ko
                BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
              else
                BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
@@ -33,16 +26,12 @@ ifeq ($(TARGET_USES_QMAA),true)
 else
   ifeq ($(call is-board-platform-in-list,$(TARGET_BOARD_PLATFORM)),true)
      BT_KERNEL_DRIVER := $(KERNEL_MODULES_OUT)/btpower.ko
-     ifeq (,$(filter seraph, $(TARGET_BOARD_PLATFORM)))
-       BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/radio-i2c-rtc6226-qca.ko
-     endif
+     BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/radio-i2c-rtc6226-qca.ko
      ifeq ($(TARGET_USES_QMAA_OVERRIDE_BLUETOOTH_AUDIO), true)
-       ifeq ($(call is-board-platform-in-list, sun canoe chora seraph malabar), true)
+       ifeq ($(call is-board-platform-in-list, sun canoe), true)
          BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/btfmcodec.ko
          BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/btfm_slim_codec.ko
-         ifneq ($(call is-board-platform-in-list, malabar), true)
-           BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
-         endif
+         BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_swr.ko
        else
          BT_KERNEL_DRIVER += $(KERNEL_MODULES_OUT)/bt_fm_slim.ko
        endif

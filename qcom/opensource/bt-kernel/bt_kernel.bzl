@@ -1,4 +1,3 @@
-load(":repo_paths.bzl", "soc_label")
 load(":target_variants.bzl", "get_all_variants")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
@@ -57,19 +56,19 @@ def define_target_variant_modules(target, variant, modules, config_options = [])
     """
     kernel_build = "{}_{}".format(target, variant)
     kernel_build_label = select({
-        "//build/kernel/kleaf:socrepo_true": soc_label("{}_base_kernel".format(kernel_build)),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build),
     })
     deps = select({
             "//build/kernel/kleaf:socrepo_true": [
-              soc_label("all_headers"),
-              soc_label("{}/drivers/remoteproc/rproc_qcom_common".format(kernel_build)),
-              soc_label("{}/kernel/trace/qcom_ipc_logging".format(kernel_build)),
-              soc_label("{}/drivers/soc/qcom/qcom_aoss".format(kernel_build)),
-              soc_label("{}/drivers/slimbus/slimbus".format(kernel_build)),
-              soc_label("{}/drivers/pinctrl/qcom/pinctrl-msm".format(kernel_build)),
+              "//vendor/qcom/kernel:all_headers",
+              "//vendor/qcom/kernel:{}/drivers/remoteproc/rproc_qcom_common".format(kernel_build),
+              "//vendor/qcom/kernel:{}/kernel/trace/qcom_ipc_logging".format(kernel_build),
+              "//vendor/qcom/kernel:{}/drivers/soc/qcom/qcom_aoss".format(kernel_build),
+              "//vendor/qcom/kernel:{}/drivers/slimbus/slimbus".format(kernel_build),
+              "//vendor/qcom/kernel:{}/drivers/pinctrl/qcom/pinctrl-msm".format(kernel_build),
             ],
-            "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+            "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
 
     modules = [bt_modules.get(module_name) for module_name in modules]
