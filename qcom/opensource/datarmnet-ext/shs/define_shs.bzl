@@ -1,4 +1,3 @@
-load(":repo_paths.bzl", "modules_label", "soc_label")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 
@@ -7,16 +6,16 @@ def define_shs(target, variant):
     include_base = "../../../{}".format(native.package_name())
 
     deps_shs = select({
-	"//build/qcom_build_extensions:qtisocrepo_true": [
-		soc_label("all_headers"),
-		soc_label("{}/kernel/sched/walt/sched-walt".format(kernel_build_variant)),
+	"//build/kernel/kleaf:socrepo_true": [
+		"//vendor/qcom/kernel:all_headers",
+		"//vendor/qcom/kernel:{}/kernel/sched/walt/sched-walt".format(kernel_build_variant),
 	],
-	"//build/qcom_build_extensions:qtisocrepo_false": ["//msm-kernel:all_headers"],
+	"//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
 
     kernel_build = select({
-	"//build/qcom_build_extensions:qtisocrepo_true": soc_label("{}_base_kernel".format(kernel_build_variant)),
-	"//build/qcom_build_extensions:qtisocrepo_false": "//msm-kernel:{}".format(kernel_build_variant),
+	"//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build_variant),
+	"//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build_variant),
     })
 
 
@@ -46,8 +45,8 @@ def define_shs(target, variant):
 	kernel_build = kernel_build,
 	deps = deps_shs + [
 		":include_headers",
-		modules_label("qcom/opensource/datarmnet:{}_rmnet_core".format(kernel_build_variant)),
-		modules_label("qcom/opensource/datarmnet:rmnet_core_headers"),
+		"//vendor/qcom/sm8850-modules/qcom/opensource/datarmnet:{}_rmnet_core".format(kernel_build_variant),
+		"//vendor/qcom/sm8850-modules/qcom/opensource/datarmnet:rmnet_core_headers",
         ],
         copts = ["-Wno-misleading-indentation"],
     )

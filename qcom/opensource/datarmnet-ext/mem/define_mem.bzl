@@ -1,4 +1,3 @@
-load(":repo_paths.bzl", "soc_label")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 
@@ -6,20 +5,14 @@ def define_mem(target, variant):
     kernel_build_variant = "{}_{}".format(target, variant)
     include_base = "../../../{}".format(native.package_name())
 
-    target_copts = []
-
-    # Enable C define only for selected target
-    if target == "malabar":
-        target_copts.append("-DRMNET_LOWMEM_TARGET")
-
     deps_mem = select({
-        "//build/qcom_build_extensions:qtisocrepo_true": [soc_label("all_headers")],
-        "//build/qcom_build_extensions:qtisocrepo_false": ["//msm-kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_true": ["//vendor/qcom/kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
     })
 
     kernel_build = select({
-        "//build/qcom_build_extensions:qtisocrepo_true": soc_label("{}_base_kernel".format(kernel_build_variant)),
-        "//build/qcom_build_extensions:qtisocrepo_false": "//msm-kernel:{}".format(kernel_build_variant),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(kernel_build_variant),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(kernel_build_variant),
     })
 
     ddk_module(
@@ -35,8 +28,8 @@ def define_mem(target, variant):
             "rmnet_mem_priv.h",
          ],
         kernel_build = kernel_build,
-        deps = deps_mem + [":rmnet_mem_uapi_headers"],
-        copts = ["-Wno-misleading-indentation"] + target_copts,
+        deps = deps_mem + [":rmnet_mem_headers"],
+        copts = ["-Wno-misleading-indentation"]
     )
 
     copy_to_dist_dir(
