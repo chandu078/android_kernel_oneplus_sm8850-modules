@@ -31,7 +31,6 @@
  * PHY index at which CPAS_SEC_LANE_CP_CTRL register mask
  * changes depending on PHY HW version
  */
-#define CAM_MAX_PHYS_PER_CP_CTRL_REG 4
 
 #define CSIPHY_POLL_DELAY_US 500
 #define CSIPHY_POLL_TIMEOUT_US 10000
@@ -585,7 +584,7 @@ int cam_csiphy_release_from_reset_state(struct csiphy_device *csiphy_dev,
 					csiphy_reset_release_reg->delay + 5);
 			}
 
-			break;
+			config_found = false;
 		}
 
 	}
@@ -826,6 +825,11 @@ static int cam_csiphy_update_secure_info(struct csiphy_device *csiphy_dev, int32
 	}
 
 	switch (cpas_version) {
+	case CAM_CPAS_TITAN_662_V100:
+	case CAM_CPAS_TITAN_640_V210:
+		bit_offset_bet_phys_in_cp_ctrl =
+			CAM_CSIPHY_MAX_DPHY_LANES + CAM_CSIPHY_MAX_CPHY_LANES + 1;
+		break;
 	case CAM_CPAS_TITAN_580_V100:
 	case CAM_CPAS_TITAN_680_V100:
 	case CAM_CPAS_TITAN_780_V100:
@@ -1732,6 +1736,14 @@ static int cam_csiphy_cphy_data_rate_config(struct csiphy_device *csiphy_device,
 				cam_io_w_mb((settle_cnt >> 8) & 0xFF,
 					csiphybase + reg_addr);
 			break;
+			case CSIPHY_EDGE_CASE_REG_ADDR_SETTING:
+				if (csiphy_device->ctrl_reg->csiphy_reg_addr_func) {
+					reg_addr = csiphy_device->ctrl_reg->csiphy_reg_addr_func(
+						config_params[i].reg_addr, lane_reg_offset);
+					cam_io_w_mb(reg_data,
+						csiphybase + reg_addr);
+				}
+			break;
 			default:
 				CAM_DBG(CAM_CSIPHY, "Do Nothing");
 			break;
@@ -1856,6 +1868,14 @@ static int cam_csiphy_program_lane_settings(struct csiphy_device *csiphy_dev,
 		case CSIPHY_2PH_SEC_CLK_LN_SETTINGS:
 			if (csiphy_dev->csiphy_info[index].use_sec_dphy_clk_lane)
 				cam_io_w_mb((CLK_SEC_SEL | BIST_CLK_SEL), csiphybase + reg_addr);
+		break;
+		case CSIPHY_EDGE_CASE_REG_ADDR_SETTING:
+			if (csiphy_dev->ctrl_reg->csiphy_reg_addr_func) {
+				reg_addr = csiphy_dev->ctrl_reg->csiphy_reg_addr_func(
+					reg_array[i].reg_addr, lane_reg_offset);
+				cam_io_w_mb(reg_array[i].reg_data,
+					csiphybase + reg_addr);
+			 }
 		break;
 		default:
 			CAM_DBG(CAM_CSIPHY, "Do Nothing");
@@ -2078,8 +2098,14 @@ int32_t cam_csiphy_config_dev(struct csiphy_device *csiphy_dev,
 	lane_assign = csiphy_dev->csiphy_info[index].lane_assign;
 
 	while (lane_cnt--) {
-		cam_csiphy_get_lane_enable(csiphy_dev, index, lane_assign & 0xF,
+		rc = cam_csiphy_get_lane_enable(csiphy_dev, index, lane_assign & 0xF,
 			&lane_idx, NULL);
+		if (rc) {
+			CAM_ERR(CAM_CSIPHY,
+				"Failed to get lane_idx: 0x%x, lane_assign: 0x%x, rc: %d",
+				lane_idx, lane_assign, rc);
+			return rc;
+		}
 
 		lane_idx = ffs(lane_idx) - 1;
 

@@ -256,7 +256,7 @@ static void createOrDestroyMemPools(void) {
 							break; /* Success, exit retry loop */
 						}
 						retry_count++;
-						CAM_WARN(CAM_UTIL, "common Memory pool, Memory allocation failed, retry %d/%d for block %d in pool %d (size: %zu), free_mem: %luKB", 
+						CAM_WARN(CAM_UTIL, "common Memory pool, Memory allocation failed, retry %d/%d for block %d in pool %d (size: %zu), free_mem: %luKB",
 							retry_count, MEMORY_ALLOC_RETRY_COUNT, j, i, current_block_size,
 							si_mem_available());
 						if (retry_count < MEMORY_ALLOC_RETRY_COUNT) {
@@ -266,7 +266,7 @@ static void createOrDestroyMemPools(void) {
 					} while (retry_count < MEMORY_ALLOC_RETRY_COUNT);
 
 					if (!mem_pools[i][j].address) {
-						CAM_ERR(CAM_UTIL, "common Memory pool, Failed to allocate memory block %d in pool %d (size: %zu) after %d retries, keeping existing blocks for next allocation", 
+						CAM_ERR(CAM_UTIL, "common Memory pool, Failed to allocate memory block %d in pool %d (size: %zu) after %d retries, keeping existing blocks for next allocation",
 								j, i, current_block_size, MEMORY_ALLOC_RETRY_COUNT);
 						/* Keep existing memory blocks for next allocation attempt */
 						memory_pool_state = MEMORY_POOL_STATE_DESTROYED;
@@ -283,7 +283,7 @@ static void createOrDestroyMemPools(void) {
 			}
 
 			memory_pool_state = MEMORY_POOL_STATE_CREATED;
-			CAM_INFO(CAM_UTIL, "common Memory pool, All memory pools created successfully - new allocated: %d blocks, existing: %d blocks, state changed to CREATED", 
+			CAM_INFO(CAM_UTIL, "common Memory pool, All memory pools created successfully - new allocated: %d blocks, existing: %d blocks, state changed to CREATED",
 					total_new_allocated, total_existing);
 		} else {
 			CAM_DBG(CAM_UTIL, "common Memory pool, Memory pools already created, no action needed, state: 0x%02x", memory_pool_state);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include "cam_cci_dev.h"
@@ -12,6 +12,7 @@
 #include "uapi/linux/sched/types.h"
 #include "linux/sched/types.h"
 #include "linux/sched.h"
+#include <linux/pm_runtime.h>
 
 #define CCI_MAX_DELAY 1000000
 #define QUEUE_SIZE 100
@@ -63,7 +64,7 @@ static long cam_cci_subdev_ioctl(struct v4l2_subdev *sd,
 
 	switch (cmd) {
 	case VIDIOC_MSM_CCI_CFG:
-		rc = cam_cci_core_cfg(sd, arg);
+		rc = -EOPNOTSUPP;
 		break;
 	case VIDIOC_CAM_CONTROL:
 		break;
@@ -91,7 +92,7 @@ irqreturn_t cam_cci_irq(int irq_num, void *data)
 	struct cam_hw_soc_info *soc_info =
 		&cci_dev->soc_info;
 	void __iomem *base = soc_info->reg_map[0].mem_base;
-	unsigned long flags;
+	unsigned long flags = 0;
 	bool rd_done_th_assert = false;
 	struct cam_cci_master_info *cci_master_info;
 	irqreturn_t rc = IRQ_HANDLED;
@@ -574,7 +575,7 @@ irqreturn_t cam_cci_threaded_irq(int irq_num, void *data)
 	struct cam_hw_soc_info *soc_info =
 		&cci_dev->soc_info;
 	struct cci_irq_data cci_data;
-	unsigned long flags;
+	unsigned long flags = 0;
 	uint32_t triggerHalfQueue = 1;
 	struct task_struct *task = current;
 
@@ -664,7 +665,8 @@ DEFINE_DEBUGFS_ATTRIBUTE(cam_cci_debug,
 
 static int cam_cci_create_debugfs_entry(struct cci_device *cci_dev)
 {
-	int rc = 0, idx;
+	int rc = 0;
+	uint32_t idx;
 	struct dentry *dbgfileptr = NULL;
 	static char * const filename[] = { "en_dump_cci0", "en_dump_cci1", "en_dump_cci2"};
 
@@ -837,6 +839,7 @@ static int cam_cci_platform_probe(struct platform_device *pdev)
 	CAM_DBG(CAM_CCI, "Adding CCI component");
 
 	cam_soc_util_initialize_power_domain(&pdev->dev);
+	pm_suspend_ignore_children(&pdev->dev, true);
 
 	rc = component_add(&pdev->dev, &cam_cci_component_ops);
 	if (rc)

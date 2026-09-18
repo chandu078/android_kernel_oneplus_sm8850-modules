@@ -32,7 +32,3 @@ struct camera_cci_transfer {
 };
 
 #endif /* _CAM_CCI_CTRL_INTERFACE_H_ */
-
-
-
-

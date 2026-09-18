@@ -7,6 +7,8 @@
 #include "cam_vfe_top_common.h"
 #include "cam_debug_util.h"
 
+int g_cam_tfe_clk_lvl[CAM_IFE_HW_CORE_NUM_MAX] = {-1, -1, -1, -1, -1, -1, -1, -1};
+
 static const char *cam_vfe_top_clk_bw_state_to_string(uint32_t state)
 {
 	switch (state) {
@@ -574,7 +576,8 @@ int cam_vfe_top_apply_clk_bw_update(struct cam_vfe_top_priv_common *top_common,
 	unsigned long                      final_clk_rate = 0;
 	uint64_t                           total_camnoc_bw_new_vote = 0, total_mnoc_bw_new_vote = 0;
 	uint64_t                           request_id;
-	int rc = 0;
+	int rc = 0, level = -1;
+	struct cam_hw_soc_info *soc_info;
 
 	if (arg_size != sizeof(struct cam_isp_apply_clk_bw_args)) {
 		CAM_ERR(CAM_ISP, "Invalid arg size: %u", arg_size);
@@ -589,6 +592,11 @@ int cam_vfe_top_apply_clk_bw_update(struct cam_vfe_top_priv_common *top_common,
 		return -EINVAL;
 	}
 
+	soc_info = top_common->soc_info;
+	if (!soc_info) {
+		CAM_ERR(CAM_ISP, "Invalid soc_info");
+		return -EINVAL;
+	}
 	hw_info = hw_intf->hw_priv;
 	if (hw_info->hw_state != CAM_HW_STATE_POWER_UP) {
 		CAM_DBG(CAM_PERF|CAM_ISP,
@@ -726,6 +734,13 @@ int cam_vfe_top_apply_clk_bw_update(struct cam_vfe_top_priv_common *top_common,
 		clk_bw_args->clock_updated = true;
 
 end:
+	rc = cam_soc_util_get_clk_level(soc_info, final_clk_rate, soc_info->src_clk_idx, &level);
+	if (rc)
+		CAM_ERR(CAM_ISP, "Failed to get clock level for rate %llu", final_clk_rate);
+
+	g_cam_tfe_clk_lvl[top_common->hw_idx] = level;
+	CAM_DBG(CAM_ISP, "IFE:%d  mc_tfe_clk_lvl =%d", top_common->hw_idx, level);
+
 	top_common->clk_state = CAM_CLK_BW_STATE_INIT;
 	top_common->bw_state = CAM_CLK_BW_STATE_INIT;
 	return rc;
@@ -775,7 +790,7 @@ int cam_vfe_top_apply_bw_start_stop(struct cam_vfe_top_priv_common *top_common)
 		goto end;
 	}
 
-	if (top_common->bw_state == CAM_CLK_BW_STATE_UNCHANGED)
+	if ((!to_be_applied_axi_vote) || (top_common->bw_state == CAM_CLK_BW_STATE_UNCHANGED))
 		goto end;
 
 	rc = cam_vfe_top_set_axi_bw_vote(top_common, to_be_applied_axi_vote,
@@ -791,5 +806,35 @@ int cam_vfe_top_apply_bw_start_stop(struct cam_vfe_top_priv_common *top_common)
 end:
 	top_common->bw_state = CAM_CLK_BW_STATE_INIT;
 	return rc;
+}
+
+int cam_vfe_top_print_error_info(struct cam_vfe_top_err_irq_desc *err_desc,
+	uint32_t status, uint32_t num_errors, uint32_t index)
+{
+	uint32_t i;
+
+	if (!err_desc) {
+		CAM_ERR(CAM_ISP, "Invalid error description params, status:0x%x", status);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < num_errors; i++) {
+		if (status & err_desc[i].bitmask) {
+			if (err_desc[i].err_name)
+				CAM_ERR(CAM_ISP,
+					"VFE[%u] ERROR: %s status:0x%x",
+					index, err_desc[i].err_name, status);
+			else
+				CAM_ERR(CAM_ISP, "VFE[%u] status:0x%x",
+					index, status);
+
+			if (err_desc[i].desc)
+				CAM_ERR(CAM_ISP, "VFE[%u] DESC: %s", index, err_desc[i].desc);
+			if (err_desc[i].debug)
+				CAM_ERR(CAM_ISP, "VFE[%u] %s", index, err_desc[i].debug);
+		}
+	}
+
+	return 0;
 }
 

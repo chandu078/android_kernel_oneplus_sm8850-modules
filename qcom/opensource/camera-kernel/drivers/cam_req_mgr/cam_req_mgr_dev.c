@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -543,13 +543,21 @@ static long cam_private_ioctl(struct file *file, void *fh,
 			return -ENOMEM;
 		}
 
+		/* Copy full struct (header + link_hdls[]) from userspace */
 		if (copy_from_user(sched_req, u64_to_user_ptr(k_ioctl->handle), sched_req_size)) {
 			CAM_MEM_FREE(sched_req);
 			sched_req = NULL;
 			return -EFAULT;
 		}
 
-		crm_sched_req.num_links = num_links;
+		/* Reject if header num_links mismatches validated value */
+		if (sched_req->num_links != num_links) {
+			CAM_ERR(CAM_CRM, "num_links mismatch: hdr:%d body:%d",
+				num_links, sched_req->num_links);
+			CAM_MEM_FREE(sched_req);
+			sched_req = NULL;
+			return -EINVAL;
+		}
 
 		rc = cam_req_mgr_schedule_request_v3(sched_req);
 		CAM_MEM_FREE(sched_req);
@@ -1154,12 +1162,19 @@ static int cam_req_mgr_component_master_bind(struct device *dev)
 	if (rc < 0) {
 		CAM_ERR(CAM_CPAS,
 			"Failed to create debug attribute, rc=%d\n", rc);
-		goto sysfs_fail;
+		goto req_mgr_device_deinit;
+	}
+
+	/* Set up debugfs and worker for thread property update */
+	rc = cam_worker_wrapper_prop_update_init();
+	if (rc) {
+		CAM_ERR(CAM_CRM, "Failed at setting up prop update debugfs, rc: %d", rc);
+		goto sysfs_remove;
 	}
 
 	return rc;
 
-sysfs_fail:
+sysfs_remove:
 	sysfs_remove_file(&dev->kobj, &camera_debug_sysfs_attr.attr);
 req_mgr_device_deinit:
 	cam_req_mgr_destroy_timer_slab();
@@ -1193,6 +1208,7 @@ static void cam_req_mgr_component_master_unbind(struct device *dev)
 	component_unbind_all(dev, NULL);
 
 	/* Now proceed with unbinding master */
+	cam_worker_wrapper_prop_update_deinit();
 	sysfs_remove_file(&dev->kobj, &camera_debug_sysfs_attr.attr);
 	cam_req_mgr_core_device_deinit();
 	cam_req_mgr_util_deinit();

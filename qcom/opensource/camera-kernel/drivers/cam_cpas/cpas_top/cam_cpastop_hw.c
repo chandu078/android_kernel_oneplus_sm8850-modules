@@ -31,18 +31,19 @@
 #include "cpastop_v545_100.h"
 #include "cpastop_v570_100.h"
 #include "cpastop_v570_200.h"
+#include "cpastop_v662_100.h"
 #include "cpastop_v680_100.h"
 #include "cpastop_v680_110.h"
 #include "cpastop_v165_100.h"
 #include "cpastop_v780_100.h"
 #include "cpastop_v640_200.h"
+#include "cpastop_v640_210.h"
 #include "cpastop_v880_100.h"
 #include "cpastop_v975_100.h"
 #include "cpastop_v970_110.h"
 #include "cpastop_v980_100.h"
 #include "cpastop_v1080_100.h"
 #include "cpastop_v1077_100.h"
-#include "cam_req_mgr_workq.h"
 #include "cam_common_util.h"
 #include "cam_vmrm_interface.h"
 #include "cam_mem_mgr_api.h"
@@ -82,6 +83,7 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		0,
+		0,
 	},
 	/* for camera_170 */
 	{
@@ -91,6 +93,7 @@ static const uint32_t cam_cpas_hw_version_map
 		CAM_CPAS_TITAN_170_V120,
 		0,
 		CAM_CPAS_TITAN_170_V200,
+		0,
 	},
 	/* for camera_175 */
 	{
@@ -100,10 +103,12 @@ static const uint32_t cam_cpas_hw_version_map
 		CAM_CPAS_TITAN_175_V120,
 		CAM_CPAS_TITAN_175_V130,
 		0,
+		0,
 	},
 	/* for camera_480 */
 	{
 		CAM_CPAS_TITAN_480_V100,
+		0,
 		0,
 		0,
 		0,
@@ -118,6 +123,7 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		0,
+		0,
 	},
 	/* for camera_520 */
 	{
@@ -127,11 +133,12 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		0,
-
+		0,
 	},
 	/* for camera_540 */
 	{
 		CAM_CPAS_TITAN_540_V100,
+		0,
 		0,
 		0,
 		0,
@@ -146,6 +153,7 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		0,
+		0,
 	},
 	/* for camera_570 */
 	{
@@ -155,6 +163,7 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		CAM_CPAS_TITAN_570_V200,
+		0,
 	},
 	/* for camera_680 */
 	{
@@ -164,10 +173,12 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		0,
+		0,
 	},
 	/* for camera_165 */
 	{
 		CAM_CPAS_TITAN_165_V100,
+		0,
 		0,
 		0,
 		0,
@@ -182,6 +193,7 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		0,
+		0,
 	},
 	/* for camera_640 */
 	{
@@ -191,10 +203,12 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		CAM_CPAS_TITAN_640_V200,
+		CAM_CPAS_TITAN_640_V210,
 	},
 	/* for camera_880 */
 	{
 		CAM_CPAS_TITAN_880_V100,
+		0,
 		0,
 		0,
 		0,
@@ -209,10 +223,12 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		0,
+		0,
 	},
 	/* for camera_1080 */
 	{
 		CAM_CPAS_TITAN_1080_V100,
+		0,
 		0,
 		0,
 		0,
@@ -227,10 +243,12 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		0,
+		0,
 	},
 	/* for camera_1077 */
 	{
 		CAM_CPAS_TITAN_1077_V100,
+		0,
 		0,
 		0,
 		0,
@@ -242,6 +260,15 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		CAM_CPAS_TITAN_970_V110,
+		0,
+		0,
+		0,
+	},
+	{
+	/* for camera_662 */
+		CAM_CPAS_TITAN_662_V100,
+		0,
+		0,
 		0,
 		0,
 		0,
@@ -325,6 +352,9 @@ static int cam_cpas_translate_camera_cpas_version_id(
 	case CAM_CPAS_CAMERA_VERSION_1077:
 		*cam_version_id = CAM_CPAS_CAMERA_VERSION_ID_1077;
 		break;
+	case CAM_CPAS_CAMERA_VERSION_662:
+		*cam_version_id = CAM_CPAS_CAMERA_VERSION_ID_662;
+		break;
 	default:
 		CAM_ERR(CAM_CPAS, "Invalid cam version %u",
 			cam_version);
@@ -354,6 +384,10 @@ static int cam_cpas_translate_camera_cpas_version_id(
 
 	case CAM_CPAS_VERSION_200:
 		*cpas_version_id = CAM_CPAS_VERSION_ID_200;
+		break;
+
+	case CAM_CPAS_VERSION_210:
+		*cpas_version_id = CAM_CPAS_VERSION_ID_210;
 		break;
 
 	default:
@@ -906,7 +940,7 @@ static void cam_cpastop_notify_clients(struct cam_cpas *cpas_core,
 	}
 }
 
-static void cam_cpastop_work(struct work_struct *work)
+static int cam_cpastop_work(void *priv, void *data)
 {
 	struct cam_cpas_work_payload *payload;
 	struct cam_hw_info *cpas_hw;
@@ -918,17 +952,17 @@ static void cam_cpastop_work(struct work_struct *work)
 	enum cam_camnoc_hw_type camnoc_type;
 	struct cam_camnoc_info *curr_camnoc_info;
 
-	payload = container_of(work, struct cam_cpas_work_payload, work);
+	payload = (struct cam_cpas_work_payload *)priv;
 	if (!payload) {
 		CAM_ERR(CAM_CPAS, "NULL payload");
-		return;
+		return -EINVAL;
 	}
 
 	camnoc_type = payload->camnoc_type;
 	cam_common_util_thread_switch_delay_detect(
-		"cam_cpas_workq", "schedule", cam_cpastop_work,
-		payload->workq_scheduled_ts,
-		CAM_WORKQ_SCHEDULE_TIME_THRESHOLD);
+		"cam_cpas_worker", "schedule", cam_cpastop_work,
+		payload->worker_scheduled_ts,
+		CAM_WORKER_SCHEDULE_TIME_THRESHOLD);
 
 	cpas_hw = payload->hw;
 	cpas_core = (struct cam_cpas *) cpas_hw->core_info;
@@ -937,7 +971,7 @@ static void cam_cpastop_work(struct work_struct *work)
 
 	if (!atomic_inc_not_zero(&cpas_core->soc_access_count)) {
 		CAM_ERR(CAM_CPAS, "CPAS off");
-		return;
+		return -EIO;
 	}
 
 	for (i = 0; i < curr_camnoc_info->irq_err_size; i++) {
@@ -1001,6 +1035,8 @@ static void cam_cpastop_work(struct work_struct *work)
 			g_camnoc_names[camnoc_type], payload->irq_status);
 
 	CAM_MEM_FREE(payload);
+
+	return 0;
 }
 
 static irqreturn_t cam_cpastop_handle_irq(int irq_num, void *data)
@@ -1009,11 +1045,12 @@ static irqreturn_t cam_cpastop_handle_irq(int irq_num, void *data)
 	struct cam_hw_info *cpas_hw = soc_irq_data->cpas_hw;
 	struct cam_cpas *cpas_core = (struct cam_cpas *) cpas_hw->core_info;
 	struct cam_hw_soc_info *soc_info = &cpas_hw->soc_info;
-	int regbase_idx, slave_err_irq_idx;
+	int regbase_idx, slave_err_irq_idx, rc;
 	struct cam_cpas_work_payload *payload;
 	struct cam_cpas_irq_data irq_data;
 	enum cam_camnoc_hw_type camnoc_type;
 	struct cam_camnoc_info *curr_camnoc_info;
+	struct cam_worker_wrapper_taskdata_args task = {0};
 
 	if (!atomic_inc_not_zero(&cpas_core->soc_access_count)) {
 		CAM_ERR(CAM_CPAS, "CPAS off");
@@ -1087,11 +1124,22 @@ static irqreturn_t cam_cpastop_handle_irq(int irq_num, void *data)
 		}
 	}
 
-	payload->hw = cpas_hw;
-	INIT_WORK((struct work_struct *)&payload->work, cam_cpastop_work);
+	rc = cam_worker_wrapper_get(cpas_core->worker_ctx, &task);
+	if (rc) {
+		CAM_ERR(CAM_CPAS, "Failed at getting a task from worker");
+		CAM_MEM_FREE(payload);
+		goto done;
+	}
 
-	payload->workq_scheduled_ts = ktime_get_boottime();
-	queue_work(cpas_core->work_queue, &payload->work);
+	payload->hw = cpas_hw;
+	payload->worker_scheduled_ts = ktime_get_boottime();
+	rc = cam_worker_wrapper_enqueue(cpas_core->worker_ctx, &task,
+		payload, NULL, cam_cpastop_work);
+	if (rc) {
+		CAM_ERR(CAM_CPAS, "Failed at enqueuing a task to worker");
+		CAM_MEM_FREE(payload);
+		goto done;
+	}
 
 done:
 	atomic_dec(&cpas_core->soc_access_count);
@@ -1756,6 +1804,9 @@ static int cam_cpastop_init_hw_version(struct cam_hw_info *cpas_hw,
 	case CAM_CPAS_TITAN_640_V200:
 		cpas_core->hw_info = &cam640_cpas200_hw_info;
 		break;
+	case CAM_CPAS_TITAN_640_V210:
+		cpas_core->hw_info = &cam640_cpas210_hw_info;
+		break;
 	case CAM_CPAS_TITAN_880_V100:
 		cpas_core->hw_info = &cam880_cpas100_hw_info;
 		break;
@@ -1773,6 +1824,9 @@ static int cam_cpastop_init_hw_version(struct cam_hw_info *cpas_hw,
 		break;
 	case CAM_CPAS_TITAN_1077_V100:
 		cpas_core->hw_info = &cam1077_cpas100_hw_info;
+		break;
+	case CAM_CPAS_TITAN_662_V100:
+		cpas_core->hw_info = &cam662_cpas100_hw_info;
 		break;
 	default:
 		CAM_ERR(CAM_CPAS, "Camera Version not supported %d.%d.%d",

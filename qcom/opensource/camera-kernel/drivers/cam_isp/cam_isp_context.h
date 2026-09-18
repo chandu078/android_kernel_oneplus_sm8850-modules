@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_ISP_CONTEXT_H_
@@ -15,7 +15,6 @@
 
 #include "cam_context.h"
 #include "cam_isp_hw_mgr_intf.h"
-#include "cam_req_mgr_workq.h"
 
 #define CAM_IFE_QTIMER_MUL_FACTOR        10000
 #define CAM_IFE_QTIMER_DIV_FACTOR        192
@@ -396,7 +395,7 @@ struct cam_isp_fcg_prediction_tracker {
  * @isp_device_type:           ISP device type
  * @rxd_epoch:                 Indicate whether epoch has been received. Used to
  *                             decide whether to apply request in offline ctx
- * @workq:                     Worker thread for offline ife
+ * @worker_ctx:                Worker thread for offline ife
  * @trigger_id:                ID provided by CRM for each ctx on the link
  * @last_bufdone_err_apply_req_id:  last bufdone error apply request id
  * @v4l2_event_sub_ids         contains individual bits representing subscribed v4l2 ids
@@ -437,6 +436,9 @@ struct cam_isp_fcg_prediction_tracker {
  * @frmhdr_verify_buf_done:    Indicates if frameheader is used to verify buf done
  * @init_pending_req_cnt:      Count of the init pending reqs received before stream on
  * @max_delay:                 The max pipeline delay
+ * @last_sent_sof_timestamp:   SOF timestamp of the last sent SOF timestamp frame
+ * @isp_mutex:                 isp context mutex to protect req lists
+ * @ife_hw_mgr_worker_type:    IFE HW manager worker type
  *
  */
 struct cam_isp_context {
@@ -475,7 +477,7 @@ struct cam_isp_context {
 	unsigned int                          init_timestamp;
 	uint32_t                              isp_device_type;
 	atomic_t                              rxd_epoch;
-	struct cam_req_mgr_core_workq        *workq;
+	void                                 *worker_ctx;
 	int32_t                               trigger_id;
 	int64_t                               last_bufdone_err_apply_req_id;
 	uint32_t                              v4l2_event_sub_ids;
@@ -510,6 +512,9 @@ struct cam_isp_context {
 	bool                                  frmhdr_verify_buf_done;
 	uint32_t                              init_pending_req_cnt;
 	enum cam_pipeline_delay               max_delay;
+	uint64_t                              last_sent_sof_timestamp;
+	struct mutex                          isp_mutex;
+	enum cam_worker_wrapper_type          ife_hw_mgr_worker_type;
 };
 
 /**
@@ -603,6 +608,7 @@ struct cam_isp_ctx_req_mini_dump {
  * @use_frame_header_ts:       Use frame header for qtimer ts
  * @support_consumed_addr:     Indicate whether HW has last consumed addr reg
  * @use_default_apply:         Use default settings in case of frame skip
+ * @last_sent_sof_timestamp:   SOF timestamp of the last sent SOF timestamp frame
  *
  */
 struct cam_isp_ctx_mini_dump_info {
@@ -642,6 +648,7 @@ struct cam_isp_ctx_mini_dump_info {
 	bool                                   use_frame_header_ts;
 	bool                                   support_consumed_addr;
 	bool                                   use_default_apply;
+	uint64_t                               last_sent_sof_timestamp;
 };
 
 /**

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _CAM_CSIPHY_SOC_H_
@@ -39,14 +39,16 @@
 #define CSIPHY_VERSION_V221                       0x221
 #define CSIPHY_VERSION_V230                       0x230
 #define CSIPHY_VERSION_V240                       0x240
+#define CSIPHY_VERSION_V241                       0x241
+#define CSIPHY_VERSION_V242                       0x242
 #ifdef OPLUS_FEATURE_CAMERA_COMMON
-#define CSIPHY_VERSION_V240_INFINITI_MAIN         0x241
-#define CSIPHY_VERSION_V240_INFINITI_TELE         0x242
-#define CSIPHY_VERSION_V240_LAFA_MAIN             0x243
-#define CSIPHY_VERSION_V240_LAFA_WIDE             0x244
-#define CSIPHY_VERSION_V240_LAFA_FRONT            0x245
-#define CSIPHY_VERSION_V240_LAFA_TELE             0x246
-#define CSIPHY_VERSION_V240_MACAN_MAIN            0x247
+#define CSIPHY_VERSION_V240_INFINITI_MAIN         0x1241
+#define CSIPHY_VERSION_V240_INFINITI_TELE         0x1242
+#define CSIPHY_VERSION_V240_LAFA_MAIN             0x1243
+#define CSIPHY_VERSION_V240_LAFA_WIDE             0x1244
+#define CSIPHY_VERSION_V240_LAFA_FRONT            0x1245
+#define CSIPHY_VERSION_V240_LAFA_TELE             0x1246
+#define CSIPHY_VERSION_V240_MACAN_MAIN            0x1247
 #endif
 
 /**

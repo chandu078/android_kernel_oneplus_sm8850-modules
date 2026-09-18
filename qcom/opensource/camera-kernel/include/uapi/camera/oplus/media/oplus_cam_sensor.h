@@ -50,4 +50,3 @@ struct check_eeprom_data_t{
     unsigned int    startAddr;
     unsigned int    eepromData_checksum;
 } __attribute__ ((packed));
-

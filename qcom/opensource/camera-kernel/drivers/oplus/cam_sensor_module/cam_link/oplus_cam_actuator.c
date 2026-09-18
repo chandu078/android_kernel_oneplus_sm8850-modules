@@ -187,4 +187,3 @@ int oplus_cam_actuator_read_current(void *arg)
 #ifdef OPLUS_FEATURE_CAMERA_COMMON
 EXPORT_SYMBOL(oplus_cam_actuator_read_current);
 #endif
-
