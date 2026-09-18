@@ -11,6 +11,7 @@
 #include "adreno_trace.h"
 #include "kgsl_eventlog.h"
 #include "kgsl_trace.h"
+#include "kgsl_pwrctrl.h"
 #include <linux/msm_kgsl.h>
 #include <linux/sched/clock.h>
 #include <soc/qcom/msm_performance.h>
@@ -94,7 +95,8 @@ static int alloc_map_preempt_record(struct adreno_device *adreno_dev,
 	u64 flags, u32 priv)
 {
 	u64 ctxt_record_size = adreno_dev->total_ctxt_record_sz;
-	u32 md_size = ctxt_record_size - adreno_dev->gpucore->gmem_size;
+	u64 curr_gmem_size =  adreno_gmem_size(adreno_dev);
+	u64 md_size = ctxt_record_size - curr_gmem_size;
 	struct hfi_mem_alloc_desc *desc = &entry->desc;
 
 	if (*md)
@@ -131,12 +133,13 @@ static int alloc_map_non_gmem(struct adreno_device *adreno_dev,
 {
 	struct adreno_hwsched *hwsched = &adreno_dev->hwsched;
 	u64 ctxt_record_sz = adreno_dev->total_ctxt_record_sz, offset = 0;
+	u64 curr_gmem_size = adreno_gmem_size(adreno_dev);
 	bool no_rb0_gmem = false;
 	int i;
 
 	/* Check whether GMU has removed GMEM size from RB0 context record */
 	if (entry->desc.size == ((ctxt_record_sz * KGSL_PRIORITY_MAX_RB_LEVELS) -
-		adreno_dev->gpucore->gmem_size))
+		curr_gmem_size))
 		no_rb0_gmem = true;
 
 	for (i = 0; i < KGSL_PRIORITY_MAX_RB_LEVELS; i++) {
@@ -149,7 +152,7 @@ static int alloc_map_non_gmem(struct adreno_device *adreno_dev,
 
 		offset += ctxt_record_sz;
 		if ((i == 0) && no_rb0_gmem)
-			offset -= adreno_dev->gpucore->gmem_size;
+			offset -= curr_gmem_size;
 	}
 
 	return 0;
@@ -322,6 +325,16 @@ done:
 	return entry;
 }
 
+void adreno_hwsched_retire_cmdlist_obj(struct adreno_device *adreno_dev,
+				       struct cmd_list_obj *obj)
+{
+	struct adreno_hwsched *hwsched = &adreno_dev->hwsched;
+
+	list_del_init(&obj->node);
+	kmem_cache_free(obj_cache, obj);
+	hwsched->inflight--;
+}
+
 int adreno_hwsched_process_mem_alloc(struct adreno_device *adreno_dev,
 	struct hfi_mem_alloc_desc *mad)
 {
@@ -372,6 +385,7 @@ static int adreno_hwsched_alloc_preempt_record_gmem(struct adreno_device *adreno
 	struct hfi_mem_alloc_entry *entry = NULL;
 	struct kgsl_memdesc *pr_md, **md = NULL;
 	u32 priv = 0, level = adreno_get_level(context);
+	u64 curr_gmem_size = adreno_gmem_size(adreno_dev);
 	u64 flags = 0;
 	int ret = 0;
 
@@ -410,7 +424,7 @@ static int adreno_hwsched_alloc_preempt_record_gmem(struct adreno_device *adreno
 	pr_md = context->flags & KGSL_CONTEXT_SECURE ?
 		hwsched->secure_preempt_rec[level] : hwsched->preempt_rec[level];
 
-	if ((pr_md->gpuaddr + pr_md->size + adreno_dev->gpucore->gmem_size) >
+	if ((pr_md->gpuaddr + pr_md->size + curr_gmem_size) >
 		(entry->md->gpuaddr + entry->md->size)) {
 		ret = -ENOSPC;
 		goto unlock;
@@ -420,7 +434,7 @@ static int adreno_hwsched_alloc_preempt_record_gmem(struct adreno_device *adreno
 
 	/* gmem section only needs to be mapped to gpu */
 	*md = kgsl_alloc_map_gpu_global(device, pr_md->gpuaddr + pr_md->size,
-			adreno_dev->gpucore->gmem_size, 0, flags, priv,
+			curr_gmem_size, 0, flags, priv,
 			(entry->desc.mem_kind == HFI_MEMKIND_CSW_PRIV_SECURE) ?
 			"sec_preempt_record_gmem" : "preempt_record_gmem");
 	if (!*md) {
@@ -1103,7 +1117,7 @@ static void adreno_hwsched_issuecmds(struct adreno_device *adreno_dev)
 	spin_unlock(&device->submit_lock);
 
 	/* If the dispatcher is busy then schedule the work for later */
-	if (!mutex_trylock(&hwsched->mutex)) {
+	if (!kgsl_mutex_trylock(&hwsched->mutex)) {
 		_decrement_submit_now(device);
 		goto done;
 	}
@@ -1118,7 +1132,7 @@ static void adreno_hwsched_issuecmds(struct adreno_device *adreno_dev)
 		kgsl_mutex_unlock(&device->mutex);
 	}
 
-	mutex_unlock(&hwsched->mutex);
+	kgsl_mutex_unlock(&hwsched->mutex);
 	_decrement_submit_now(device);
 	return;
 
@@ -1833,9 +1847,7 @@ void adreno_hwsched_replay(struct adreno_device *adreno_dev)
 
 		retired++;
 
-		list_del_init(&obj->node);
-		kmem_cache_free(obj_cache, obj);
-		hwsched->inflight--;
+		adreno_hwsched_retire_cmdlist_obj(adreno_dev, obj);
 	}
 
 	if (hwsched->recurring_cmdobj) {
@@ -1873,7 +1885,8 @@ static void do_fault_header(struct adreno_device *adreno_dev,
 	u32 ctxt_id = 0, ts = 0;
 	int rb_id = -1;
 
-	dev_err(device->dev, "Fault id:%d and GX is %s\n", fault, gx_on ? "ON" : "OFF");
+	dev_err(device->dev, "Fault id:%d and GX is %s with Curr GPU freq:%ld\n",
+			fault, gx_on ? "ON" : "OFF", kgsl_pwrctrl_active_freq(&device->pwrctrl));
 
 	if (!gx_on && !drawobj)
 		return;
@@ -1931,7 +1944,7 @@ static struct cmd_list_obj *get_active_cmdobj_lpac(
 	list_for_each_entry_safe(obj, tmp, &hwsched->cmd_list, node) {
 		drawobj = obj->drawobj;
 
-		if (!(kgsl_context_is_lpac(drawobj->context)))
+		if (!is_cmdobj(drawobj) || !kgsl_context_is_lpac(drawobj->context))
 			continue;
 
 		kgsl_readtimestamp(device, drawobj->context,
@@ -2363,10 +2376,6 @@ static bool adreno_hwsched_do_fault(struct adreno_device *adreno_dev)
 
 	kgsl_mutex_lock(&device->mutex);
 
-#ifdef CONFIG_OPLUS_GPU_MINIDUMP
-	device->snapshotfault = fault;
-#endif /*CONFIG_OPLUS_GPU_MINIDUMP*/
-
 	if (device->state == KGSL_STATE_ACTIVE) {
 		/*
 		 * Halt CP for page faults here. CP is halted from GMU when required,
@@ -2402,10 +2411,9 @@ static void adreno_hwsched_work(struct kthread_work *work)
 	struct adreno_hwsched *hwsched = &adreno_dev->hwsched;
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 
-	mutex_lock(&hwsched->mutex);
-
+	kgsl_mutex_lock(&hwsched->mutex);
 	if (adreno_hwsched_do_fault(adreno_dev)) {
-		mutex_unlock(&hwsched->mutex);
+		kgsl_mutex_unlock(&hwsched->mutex);
 		return;
 	}
 
@@ -2430,7 +2438,7 @@ static void adreno_hwsched_work(struct kthread_work *work)
 		kgsl_mutex_unlock(&device->mutex);
 	}
 
-	mutex_unlock(&hwsched->mutex);
+	kgsl_mutex_unlock(&hwsched->mutex);
 }
 
 static void adreno_hwsched_create_hw_fence(struct adreno_device *adreno_dev,
@@ -2509,7 +2517,7 @@ int adreno_hwsched_init(struct adreno_device *adreno_dev,
 		return PTR_ERR(adreno_dev->scheduler_worker);
 	}
 
-	mutex_init(&hwsched->mutex);
+	kgsl_mutex_init(&hwsched->mutex);
 
 	kthread_init_work(&adreno_dev->scheduler_work, adreno_hwsched_work);
 
@@ -2837,14 +2845,18 @@ int adreno_hwsched_wait_ack_completion(struct adreno_device *adreno_dev,
 
 int adreno_hwsched_ctxt_unregister_wait_completion(
 	struct adreno_device *adreno_dev,
-	struct device *dev, struct pending_cmd *ack,
+	struct device *dev, struct kgsl_context *context, struct pending_cmd *ack,
 	void (*process_msgq)(struct adreno_device *adreno_dev),
 	struct hfi_unregister_ctxt_cmd *cmd)
 {
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	const struct adreno_gpudev *gpudev = ADRENO_GPU_DEVICE(adreno_dev);
+	struct adreno_context *drawctxt = ADRENO_CONTEXT(context);
+	int rb = adreno_get_level(context);
 	int ret;
+	bool fast = adreno_is_fast_context_destroy_enabled(adreno_dev);
 	u64 start, end;
+	char prefix[60];
 
 	start = gpudev->read_alwayson(adreno_dev);
 	kgsl_mutex_unlock(&device->mutex);
@@ -2864,15 +2876,20 @@ int adreno_hwsched_ctxt_unregister_wait_completion(
 	end = gpudev->read_alwayson(adreno_dev);
 
 	if (completion_done(&ack->complete)) {
+		snprintf(prefix, sizeof(prefix),
+			"Ack unprocessed for %scontext unregister", fast ? "fast " : "");
 		dev_err_ratelimited(dev,
-			"Ack unprocessed for context unregister seq: %d ctx: %u ts: %u ticks=0x%llx/0x%llx\n",
-			MSG_HDR_GET_SEQNUM(ack->sent_hdr), cmd->ctxt_id,
-			cmd->ts, start, end);
+			"%s type: %s rb: %d seq: %d ctx: %u ts: %u ticks=0x%llx/0x%llx\n",
+			prefix, kgsl_context_type(drawctxt->type), rb,
+			MSG_HDR_GET_SEQNUM(ack->sent_hdr), cmd->ctxt_id, cmd->ts, start, end);
 		return 0;
 	}
 
+	snprintf(prefix, sizeof(prefix),
+		"Ack timeout for %scontext unregister", fast ? "fast " : "");
 	dev_err_ratelimited(dev,
-		"Ack timeout for context unregister seq: %d ctx: %u ts: %u ticks=0x%llx/0x%llx\n",
+		"%s type: %s rb: %d seq: %d ctx: %u ts: %u ticks=0x%llx/0x%llx\n",
+		prefix, kgsl_context_type(drawctxt->type), rb,
 		MSG_HDR_GET_SEQNUM(ack->sent_hdr), cmd->ctxt_id, cmd->ts, start, end);
 	return -ETIMEDOUT;
 }
@@ -3042,6 +3059,9 @@ bool adreno_hwsched_log_nonfatal_gpu_fault(struct adreno_device *adreno_dev,
 		break;
 	case GMU_RBBM_ATB_BUF_OVERFLOW:
 		dev_crit_ratelimited(dev, "RBBM: ATB bus overflow\n");
+		break;
+	case GMU_UCHE_OOB_ACCESS:
+		dev_crit_ratelimited(dev, "UCHE: Out of bounds access\n");
 		break;
 	case GMU_UCHE_TRAP_INTR:
 		dev_crit_ratelimited(dev, "UCHE: Trap interrupt\n");

@@ -35,6 +35,14 @@ struct kgsl_sync_timeline {
 	struct kgsl_context *context;
 };
 
+/*
+ * Set this flag for a kgsl hardware fence to indicate that the hardware fence refcount for
+ * this fence is incremented if the corresponding dma fence is not signaled at the time of
+ * creation of this hardware fence. This hardware fence refcount is put back when the
+ * corresponding dma fence is signaled.
+ */
+#define KGSL_FENCE_FLAG_SIGNAL_REFCOUNT 0
+
 /**
  * struct kgsl_sync_fence - A struct containing a fence and other data
  *				associated with it
@@ -61,6 +69,7 @@ struct kgsl_sync_fence {
 	 * this fence and the sw dma fence has also been signaled
 	 */
 	struct kref hw_refcount;
+	/** @flags: kgsl sync fence specific flags */
 	unsigned long flags;
 };
 

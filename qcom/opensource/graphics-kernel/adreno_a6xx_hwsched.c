@@ -840,7 +840,7 @@ static int a6xx_hwsched_pm_suspend(struct adreno_device *adreno_dev)
 {
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	struct a6xx_gmu_device *gmu = to_a6xx_gmu(adreno_dev);
-	int ret;
+	int ret, active_count;
 
 	if (test_bit(GMU_PRIV_PM_SUSPEND, &gmu->flags))
 		return 0;
@@ -850,6 +850,16 @@ static int a6xx_hwsched_pm_suspend(struct adreno_device *adreno_dev)
 	ret = adreno_hwsched_drain_and_idle(adreno_dev);
 	if (ret)
 		goto err;
+
+	active_count = atomic_read(&device->active_cnt);
+
+	if (active_count > 0) {
+		ret = -ETIMEDOUT;
+		dev_err_ratelimited(GMU_PDEV_DEV(device),
+			"Aborting suspend because of active count:%d\n",
+			active_count);
+		goto err;
+	}
 
 	a6xx_hwsched_power_off(adreno_dev);
 
@@ -1070,13 +1080,15 @@ int a6xx_hwsched_add_to_minidump(struct adreno_device *adreno_dev)
 	for (i = 0; i < hwsched->mem_alloc_entries; i++) {
 		struct hfi_mem_alloc_entry *entry = &hwsched->mem_alloc_table[i];
 		char hfi_minidump_str[MAX_VA_MINIDUMP_STR_LEN] = {0};
+		char name[MAX_VA_MINIDUMP_STR_LEN];
 		u32 rb_id = 0;
 
 		if (!hfi_get_minidump_string(entry->desc.mem_kind,
 					     &hfi_minidump_str[0],
 					     sizeof(hfi_minidump_str), &rb_id)) {
+			snprintf(name, sizeof(name), "kgsl_global_%s", hfi_minidump_str);
 			ret = kgsl_add_va_to_minidump(adreno_dev->dev.dev,
-						      hfi_minidump_str,
+						      name,
 						      entry->md->hostptr,
 						      entry->md->size);
 			if (ret)

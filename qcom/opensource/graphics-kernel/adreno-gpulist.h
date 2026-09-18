@@ -937,6 +937,66 @@ static const struct adreno_a6xx_core adreno_gpu_core_a619_variant = {
 	.highest_bank_bit = 14,
 };
 
+/* a619_malabar, a619_bourtzi, a620, a621, a622 and a650 */
+static const struct kgsl_regmap_list a650_gbif_regs[] = {
+	{A6XX_GBIF_QSB_SIDE0, 0x00071620},
+	{A6XX_GBIF_QSB_SIDE1, 0x00071620},
+	{A6XX_GBIF_QSB_SIDE2, 0x00071620},
+	{A6XX_GBIF_QSB_SIDE3, 0x00071620},
+	{A6XX_RBBM_GBIF_CLIENT_QOS_CNTL, 0x3},
+};
+
+static const struct adreno_a6xx_core adreno_gpu_core_a619_malabar = {
+	.base = {
+		DEFINE_ADRENO_REV(ADRENO_REV_A619, 6, 1, 9, ANY_ID),
+		.compatible = "qcom,adreno-gpu-a619-malabar",
+		.features =  ADRENO_PREEMPTION | ADRENO_CONTENT_PROTECTION,
+		.gpudev = &adreno_a6xx_gpudev,
+		.perfcounters = &adreno_a6xx_legacy_perfcounters,
+		.uche_gmem_alignment = SZ_1M,
+		.gmem_size = SZ_512K,
+		.bus_width = 32,
+		.snapshot_size = SZ_2M,
+	},
+	.prim_fifo_threshold = 0x0018000,
+	.sqefw_name = "a630_sqe.fw",
+	.zap_name = "gen6_3_25_0_zap.mbn",
+	.hwcg = a615_hwcg_regs,
+	.hwcg_count = ARRAY_SIZE(a615_hwcg_regs),
+	.vbif = a650_gbif_regs,
+	.vbif_count = ARRAY_SIZE(a650_gbif_regs),
+	.hang_detect_cycles = 0x3fffff,
+	.protected_regs = a630_protected_regs,
+	.gx_cpr_toggle = true,
+	.highest_bank_bit = 14,
+};
+
+static const struct adreno_a6xx_core adreno_gpu_core_a619_bourtzi = {
+	.base = {
+		DEFINE_ADRENO_REV(ADRENO_REV_A619, 6, 1, 9, ANY_ID),
+		.compatible = "qcom,adreno-gpu-a619-bourtzi",
+		.features =  ADRENO_PREEMPTION | ADRENO_CONTENT_PROTECTION |
+			ADRENO_IOCOHERENT,
+		.gpudev = &adreno_a6xx_gpudev,
+		.perfcounters = &adreno_a6xx_legacy_perfcounters,
+		.uche_gmem_alignment = SZ_1M,
+		.gmem_size = SZ_512K,
+		.bus_width = 32,
+		.snapshot_size = SZ_2M,
+	},
+	.prim_fifo_threshold = 0x0018000,
+	.sqefw_name = "a630_sqe.fw",
+	.zap_name = "gen6_3_33_0_zap.mbn",
+	.hwcg = a615_hwcg_regs,
+	.hwcg_count = ARRAY_SIZE(a615_hwcg_regs),
+	.vbif = a650_gbif_regs,
+	.vbif_count = ARRAY_SIZE(a650_gbif_regs),
+	.hang_detect_cycles = 0x3fffff,
+	.protected_regs = a630_protected_regs,
+	.gx_cpr_toggle = true,
+	.highest_bank_bit = 15,
+};
+
 static const struct kgsl_regmap_list a620_hwcg_regs[] = {
 	{A6XX_RBBM_CLOCK_CNTL_SP0, 0x02222222},
 	{A6XX_RBBM_CLOCK_CNTL2_SP0, 0x02222220},
@@ -987,15 +1047,6 @@ static const struct kgsl_regmap_list a620_hwcg_regs[] = {
 	{A6XX_RBBM_CLOCK_CNTL_GMU_GX, 0x00000222},
 	{A6XX_RBBM_CLOCK_DELAY_GMU_GX, 0x00000111},
 	{A6XX_RBBM_CLOCK_HYST_GMU_GX, 0x00000555},
-};
-
-/* a620, a621, a622 and a650 */
-static const struct kgsl_regmap_list a650_gbif_regs[] = {
-	{A6XX_GBIF_QSB_SIDE0, 0x00071620},
-	{A6XX_GBIF_QSB_SIDE1, 0x00071620},
-	{A6XX_GBIF_QSB_SIDE2, 0x00071620},
-	{A6XX_GBIF_QSB_SIDE3, 0x00071620},
-	{A6XX_RBBM_GBIF_CLIENT_QOS_CNTL, 0x3},
 };
 
 /* These are for a620, a621, a622 and a650 */
@@ -1112,7 +1163,7 @@ static const struct adreno_a6xx_core adreno_gpu_core_a622 = {
 		.compatible = "qcom,adreno-gpu-a622",
 		.features = ADRENO_CONTENT_PROTECTION | ADRENO_IOCOHERENT |
 			ADRENO_APRIV | ADRENO_PREEMPTION | ADRENO_BCL |
-			ADRENO_IFPC,
+			ADRENO_IFPC | ADRENO_ACD,
 		.gpudev = &adreno_a6xx_hwsched_gpudev.base,
 		.perfcounters = &adreno_a6xx_perfcounters,
 		.uche_gmem_alignment = 0,
@@ -1135,7 +1186,7 @@ static const struct adreno_a6xx_core adreno_gpu_core_a622 = {
 	.hang_detect_cycles = 0x3ffff,
 	.protected_regs = a620_protected_regs,
 	.disable_tseskip = true,
-	.highest_bank_bit = 13,
+	.highest_bank_bit = 14,
 	.gmu_hub_clk_freq = 200000000,
 };
 
@@ -1984,6 +2035,29 @@ static const struct adreno_a6xx_core adreno_gpu_core_a702 = {
 	.highest_bank_bit = 14,
 };
 
+static const struct adreno_a6xx_core adreno_gpu_core_a704 = {
+	.base = {
+		DEFINE_ADRENO_REV(ADRENO_REV_A704, 7, 0, 4, ANY_ID),
+		.features = ADRENO_CONTENT_PROTECTION |
+					ADRENO_APRIV | ADRENO_PREEMPTION,
+		.gpudev = &adreno_a6xx_gpudev,
+		.perfcounters = &adreno_a6xx_legacy_perfcounters,
+		.gmem_size = SZ_128K,
+		.bus_width = 16,
+		.snapshot_size = SZ_1M,
+	},
+	.prim_fifo_threshold = 0x0000c000,
+	.sqefw_name = "a702_sqe.fw",
+	.zap_name = "a704_zap.mdt",
+	.hwcg = a702_hwcg_regs,
+	.hwcg_count = ARRAY_SIZE(a702_hwcg_regs),
+	.vbif = a640_vbif_regs,
+	.vbif_count = ARRAY_SIZE(a640_vbif_regs),
+	.hang_detect_cycles = 0x3ffff,
+	.protected_regs = a620_protected_regs,
+	.highest_bank_bit = 14,
+};
+
 static const struct kgsl_regmap_list gen7_0_0_hwcg_regs[] = {
 	{ GEN7_RBBM_CLOCK_CNTL_SP0, 0x02222222 },
 	{ GEN7_RBBM_CLOCK_CNTL2_SP0, 0x02022222 },
@@ -1991,7 +2065,7 @@ static const struct kgsl_regmap_list gen7_0_0_hwcg_regs[] = {
 	{ GEN7_RBBM_CLOCK_DELAY_SP0, 0x00000080 },
 	{ GEN7_RBBM_CLOCK_CNTL_TP0, 0x22222220 },
 	{ GEN7_RBBM_CLOCK_CNTL2_TP0, 0x22222222 },
-	{ GEN7_RBBM_CLOCK_CNTL3_TP0, 0x22222222 },
+	{ GEN7_RBBM_CLOCK_CNTL3_TP0, 0x22220222 },
 	{ GEN7_RBBM_CLOCK_CNTL4_TP0, 0x00222222 },
 	{ GEN7_RBBM_CLOCK_HYST_TP0, 0x77777777 },
 	{ GEN7_RBBM_CLOCK_HYST2_TP0, 0x77777777 },
@@ -2193,7 +2267,7 @@ static const struct kgsl_regmap_list gen7_2_0_hwcg_regs[] = {
 	{ GEN7_RBBM_CLOCK_DELAY_SP0, 0x00000080 },
 	{ GEN7_RBBM_CLOCK_CNTL_TP0, 0x22222220 },
 	{ GEN7_RBBM_CLOCK_CNTL2_TP0, 0x22222222 },
-	{ GEN7_RBBM_CLOCK_CNTL3_TP0, 0x22222222 },
+	{ GEN7_RBBM_CLOCK_CNTL3_TP0, 0x22220222 },
 	{ GEN7_RBBM_CLOCK_CNTL4_TP0, 0x00222222 },
 	{ GEN7_RBBM_CLOCK_HYST_TP0, 0x77777777 },
 	{ GEN7_RBBM_CLOCK_HYST2_TP0, 0x77777777 },
@@ -2250,7 +2324,7 @@ static const struct kgsl_regmap_list gen7_3_0_hwcg_regs[] = {
 	{ GEN7_RBBM_CLOCK_DELAY_SP0, 0x00000080 },
 	{ GEN7_RBBM_CLOCK_CNTL_TP0, 0x22222220 },
 	{ GEN7_RBBM_CLOCK_CNTL2_TP0, 0x22222222 },
-	{ GEN7_RBBM_CLOCK_CNTL3_TP0, 0x22222222 },
+	{ GEN7_RBBM_CLOCK_CNTL3_TP0, 0x22220222 },
 	{ GEN7_RBBM_CLOCK_CNTL4_TP0, 0x00222222 },
 	{ GEN7_RBBM_CLOCK_HYST_TP0, 0x77777777 },
 	{ GEN7_RBBM_CLOCK_HYST2_TP0, 0x77777777 },
@@ -2604,7 +2678,7 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_9_0 = {
 			ADRENO_CONTENT_PROTECTION | ADRENO_LPAC | ADRENO_IFPC |
 			ADRENO_L3_VOTE | ADRENO_BCL | ADRENO_DMS |
 			ADRENO_HW_FENCE | ADRENO_PREEMPTION | ADRENO_ACD |
-			ADRENO_GMU_WARMBOOT,
+			ADRENO_GMU_WARMBOOT | ADRENO_GMU_AB,
 		.gpudev = &adreno_gen7_9_0_hwsched_gpudev.base,
 		.perfcounters = &adreno_gen7_9_0_perfcounters,
 		.uche_gmem_alignment = SZ_16M,
@@ -2643,7 +2717,7 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_9_1 = {
 			ADRENO_CONTENT_PROTECTION | ADRENO_LPAC | ADRENO_IFPC |
 			ADRENO_L3_VOTE | ADRENO_BCL | ADRENO_DMS |
 			ADRENO_HW_FENCE | ADRENO_PREEMPTION | ADRENO_ACD |
-			ADRENO_GMU_WARMBOOT,
+			ADRENO_GMU_WARMBOOT | ADRENO_GMU_AB,
 		.gpudev = &adreno_gen7_9_0_hwsched_gpudev.base,
 		.perfcounters = &adreno_gen7_9_0_perfcounters,
 		.uche_gmem_alignment = SZ_16M,
@@ -2715,7 +2789,7 @@ static const struct adreno_gen7_core adreno_gpu_core_gen7_11_0 = {
 		.compatible = "qcom,adreno-gpu-gen7-11-0",
 		.features = ADRENO_APRIV | ADRENO_IOCOHERENT | ADRENO_CONTENT_PROTECTION |
 			ADRENO_IFPC | ADRENO_PREEMPTION | ADRENO_L3_VOTE |
-			ADRENO_DMS,
+			ADRENO_DMS | ADRENO_GMU_AB,
 		.gpudev = &adreno_gen7_hwsched_gpudev.base,
 		.perfcounters = &adreno_gen7_2_0_perfcounters,
 		.uche_gmem_alignment = SZ_16M,
@@ -3087,10 +3161,9 @@ static const struct kgsl_regmap_list gen8_ao_hwcg_regs[] = {
 	{ GEN8_GMUAO_CGC_HYST_CNTL, 0x00005555 },
 };
 
-static const struct hfi_therm_profile_ctrl therm_profile_8_0_0 = {
+static struct hfi_therm_profile_ctrl therm_profile_8_0_0 = {
 	.feature_en = 1,
 	.feature_rev = 1,
-	.tsens_en = 0xFF,
 	.tj_limit = 900,
 	.tskin_addr = 0,
 	.tskin_limit = 0,
@@ -3104,6 +3177,18 @@ static const struct hfi_therm_profile_ctrl therm_profile_8_0_0 = {
 	.throttle_cfg.throttle_lvls[0] = 50,
 	.throttle_cfg.throttle_lvls[1] = 37,
 	.throttle_cfg.throttle_lvls[2] = 20,
+};
+
+static const struct therm_tsens_en_cfg tsens_en_cfg_8_0_0 = {
+	/* 3 GPU slices, each with 2 tsens bits */
+	.tsens_sl_cnt = 2,
+	/* GPU unslice with 2 tsens bits */
+	.tsens_us_cnt = 2,
+};
+
+static struct gen8_thermal_mit_cfg therm_mit_cfg_8_0_0 = {
+	.therm = &therm_profile_8_0_0,
+	.tsens_en_cfg = &tsens_en_cfg_8_0_0,
 };
 
 static const struct hfi_clx_table_v2_cmd gen8_0_0_clx_table = {
@@ -3139,7 +3224,8 @@ static const struct adreno_gen8_core adreno_gpu_core_gen8_0_0 = {
 			ADRENO_CONTENT_PROTECTION | ADRENO_LPAC | ADRENO_AQE |
 			ADRENO_GMU_WARMBOOT | ADRENO_L3_VOTE | ADRENO_BCL |
 			ADRENO_IFPC | ADRENO_HW_FENCE | ADRENO_PREEMPTION |
-			ADRENO_ACD | ADRENO_CLX | ADRENO_GMU_THERMAL_MITIGATION,
+			ADRENO_ACD | ADRENO_CLX | ADRENO_GMU_THERMAL_MITIGATION |
+			ADRENO_GMU_AB,
 		.gpudev = &adreno_gen8_hwsched_gpudev.base,
 		.perfcounters = &adreno_gen8_perfcounters,
 		.uche_gmem_alignment = SZ_64M,
@@ -3169,7 +3255,7 @@ static const struct adreno_gen8_core adreno_gpu_core_gen8_0_0 = {
 	.ctxt_record_size = (13536 * SZ_1K),
 	.preempt_level = 1,
 	.cl_no_ft_timeout_ms = 6500,
-	.therm_profile = &therm_profile_8_0_0,
+	.therm_cfg = &therm_mit_cfg_8_0_0,
 	.clx_tbl = &gen8_0_0_clx_table,
 };
 
@@ -3182,7 +3268,8 @@ static const struct adreno_gen8_core adreno_gpu_core_gen8_0_1 = {
 			ADRENO_CONTENT_PROTECTION | ADRENO_LPAC | ADRENO_AQE |
 			ADRENO_GMU_WARMBOOT | ADRENO_L3_VOTE | ADRENO_BCL |
 			ADRENO_IFPC | ADRENO_HW_FENCE | ADRENO_PREEMPTION |
-			ADRENO_ACD | ADRENO_CLX | ADRENO_GMU_THERMAL_MITIGATION,
+			ADRENO_ACD | ADRENO_CLX | ADRENO_GMU_THERMAL_MITIGATION |
+			ADRENO_GMU_AB,
 		.gpudev = &adreno_gen8_hwsched_gpudev.base,
 		.perfcounters = &adreno_gen8_perfcounters,
 		.uche_gmem_alignment = SZ_64M,
@@ -3212,7 +3299,7 @@ static const struct adreno_gen8_core adreno_gpu_core_gen8_0_1 = {
 	.ctxt_record_size = (13536 * SZ_1K),
 	.preempt_level = 1,
 	.cl_no_ft_timeout_ms = 6500,
-	.therm_profile = &therm_profile_8_0_0,
+	.therm_cfg = &therm_mit_cfg_8_0_0,
 	.clx_tbl = &gen8_0_0_clx_table,
 };
 
@@ -3266,7 +3353,7 @@ static const struct hfi_limits_mit_tbl gen8_2_0_limits_mit_tbl[] = {
 			.msg_path = 0,
 			.lkgen = 0,
 			.mode = 0,
-			.sid_val = 0x12,
+			.sid_val = 0x9,
 			.mit_time = 2000,
 			.curr_limit = 6000,
 		}
@@ -3412,10 +3499,8 @@ static const struct gen8_nonctxt_regs gen8_2_0_nonctxt_regs[] = {
 	{ GEN8_SP_SS_CHICKEN_BITS_0, BIT(3), BIT(PIPE_NONE) },
 	{ GEN8_SP_CHICKEN_BITS_1, BIT(3), BIT(PIPE_NONE) },
 	/* Disable PS out of order retire */
-	{ GEN8_SP_CHICKEN_BITS_2, 0xc21800, BIT(PIPE_NONE) },
+	{ GEN8_SP_CHICKEN_BITS_2, 0xc20800, BIT(PIPE_NONE) },
 	{ GEN8_SP_CHICKEN_BITS_3, 0x00300000, BIT(PIPE_NONE) },
-	/* Disable SP2TP info attribute */
-	{ GEN8_SP_CHICKEN_BITS_4, 0x00000002, BIT(PIPE_NONE) },
 	{ GEN8_SP_PERFCTR_SHADER_MASK, 0x0000003f, BIT(PIPE_NONE) },
 	{ GEN8_SP_HLSQ_DBG_ECO_CNTL, BIT(14),  BIT(PIPE_NONE) },
 	/* Ignore HLSQ shared constant feedback from SP */
@@ -3444,10 +3529,22 @@ static const struct gen8_nonctxt_regs gen8_2_0_nonctxt_regs[] = {
 	{ 0 },
 };
 
-static const struct hfi_therm_profile_ctrl therm_profile_8_2_0 = {
+static const struct therm_tsens_en_cfg tsens_en_cfg_8_2_0 = {
+	/* 3 GPU slices, each with 3 tsens bits */
+	.tsens_sl_cnt = 3,
+	/* GPU unslice with 2 tsens bits */
+	.tsens_us_cnt = 2,
+};
+
+static struct gen8_thermal_mit_cfg therm_mit_cfg_8_2_0 = {
+	.therm = &therm_profile_8_0_0,
+	.tsens_en_cfg = &tsens_en_cfg_8_2_0,
+};
+
+static const struct hfi_therm_profile_ctrl therm_profile_8_9_0 = {
 	.feature_en = 1,
 	.feature_rev = 1,
-	.tsens_en = 0x7FF,
+	.tsens_en = 0xFF,
 	.tj_limit = 900,
 	.tskin_addr = 0,
 	.tskin_limit = 0,
@@ -3463,6 +3560,9 @@ static const struct hfi_therm_profile_ctrl therm_profile_8_2_0 = {
 	.throttle_cfg.throttle_lvls[2] = 20,
 };
 
+/* Set the BCL throttle levels to 62/75/83 percent */
+#define GEN8_2_X_BCL_DATA ((62 << 15) | (75 << 8) | (83 << 1) | 0x1)
+
 static const struct adreno_gen8_core adreno_gpu_core_gen8_2_0 = {
 	.base = {
 		DEFINE_ADRENO_REV(ADRENO_REV_GEN8_2_0,
@@ -3472,8 +3572,9 @@ static const struct adreno_gen8_core adreno_gpu_core_gen8_2_0 = {
 			ADRENO_PREEMPTION | ADRENO_LPAC | ADRENO_AQE |
 			ADRENO_GMU_WARMBOOT | ADRENO_IFPC | ADRENO_CONTENT_PROTECTION |
 			ADRENO_HW_FENCE | ADRENO_BCL | ADRENO_ACD | ADRENO_GMU_BASED_DCVS |
-			ADRENO_GMU_THERMAL_MITIGATION | ADRENO_CLX |
-			ADRENO_GMU_MINBW | ADRENO_DCVS_PROFILE | ADRENO_TSENSE_DYNAMIC_PERIOD,
+			ADRENO_GMU_THERMAL_MITIGATION | ADRENO_CLX | ADRENO_DEFER_GMEM_ALLOC |
+			ADRENO_GMU_MINBW | ADRENO_DCVS_PROFILE | ADRENO_TSENSE_DYNAMIC_PERIOD |
+			ADRENO_GMU_AB | ADRENO_GMU_FAST_CONTEXT_DESTROY,
 		.gpudev = &adreno_gen8_hwsched_gpudev.base,
 		.perfcounters = &adreno_gen8_2_x_perfcounters,
 		.uche_gmem_alignment = SZ_64M,
@@ -3497,12 +3598,12 @@ static const struct adreno_gen8_core adreno_gpu_core_gen8_2_0 = {
 	.gmu_hub_clk_freq = 150000000,
 	.gen8_snapshot_block_list = &gen8_2_0_snapshot_block_list,
 	.fast_bus_hint = true,
-	.bcl_data = 1,
+	.bcl_data = GEN8_2_X_BCL_DATA,
 	.acv_perfmode_ddr_freq = MHZ_TO_KBPS(2736, 4),
 	.noc_timeout_us = 3410, /* 3.41 msec */
 	.cl_no_ft_timeout_ms = 6500,
 	.ctxt_record_size = (19708 * SZ_1K),
-	.therm_profile = &therm_profile_8_2_0,
+	.therm_cfg = &therm_mit_cfg_8_2_0,
 	.limits_mit_cfg = &gen8_2_0_limits_mit_cfg,
 	.preempt_level = 1,
 	.clx_tbl = &gen8_2_0_clx_table,
@@ -3517,8 +3618,9 @@ static const struct adreno_gen8_core adreno_gpu_core_gen8_2_1 = {
 			ADRENO_PREEMPTION | ADRENO_LPAC | ADRENO_AQE |
 			ADRENO_GMU_WARMBOOT | ADRENO_IFPC | ADRENO_CONTENT_PROTECTION |
 			ADRENO_HW_FENCE | ADRENO_BCL | ADRENO_ACD | ADRENO_GMU_BASED_DCVS |
-			ADRENO_GMU_THERMAL_MITIGATION | ADRENO_CLX |
-			ADRENO_GMU_MINBW | ADRENO_DCVS_PROFILE | ADRENO_TSENSE_DYNAMIC_PERIOD,
+			ADRENO_GMU_THERMAL_MITIGATION | ADRENO_CLX | ADRENO_DEFER_GMEM_ALLOC |
+			ADRENO_GMU_MINBW | ADRENO_DCVS_PROFILE | ADRENO_TSENSE_DYNAMIC_PERIOD |
+			ADRENO_GMU_AB | ADRENO_GMU_FAST_CONTEXT_DESTROY,
 		.gpudev = &adreno_gen8_hwsched_gpudev.base,
 		.perfcounters = &adreno_gen8_2_x_perfcounters,
 		.uche_gmem_alignment = SZ_64M,
@@ -3542,12 +3644,57 @@ static const struct adreno_gen8_core adreno_gpu_core_gen8_2_1 = {
 	.gmu_hub_clk_freq = 150000000,
 	.gen8_snapshot_block_list = &gen8_2_0_snapshot_block_list,
 	.fast_bus_hint = true,
-	.bcl_data = 1,
+	.bcl_data = GEN8_2_X_BCL_DATA,
 	.acv_perfmode_ddr_freq = MHZ_TO_KBPS(2736, 4),
 	.noc_timeout_us = 3410, /* 3.41 msec */
 	.cl_no_ft_timeout_ms = 6500,
 	.ctxt_record_size = (19708 * SZ_1K),
-	.therm_profile = &therm_profile_8_2_0,
+	.therm_cfg = &therm_mit_cfg_8_2_0,
+	.limits_mit_cfg = &gen8_2_0_limits_mit_cfg,
+	.preempt_level = 1,
+	.clx_tbl = &gen8_2_0_clx_table,
+};
+
+static const struct adreno_gen8_core adreno_gpu_core_gen8_5_0 = {
+	.base = {
+		DEFINE_ADRENO_REV(ADRENO_REV_GEN8_5_0,
+				  UINT_MAX, UINT_MAX, UINT_MAX, ANY_ID),
+		.compatible = "qcom,adreno-gpu-gen8-5-0",
+		.features = ADRENO_APRIV | ADRENO_IOCOHERENT | ADRENO_PREEMPTION |
+			ADRENO_LPAC | ADRENO_AQE | ADRENO_GMU_WARMBOOT | ADRENO_IFPC |
+			ADRENO_CONTENT_PROTECTION | ADRENO_HW_FENCE | ADRENO_BCL |
+			ADRENO_GMU_AB | ADRENO_GMU_BASED_DCVS | ADRENO_GMU_THERMAL_MITIGATION |
+			ADRENO_DEFER_GMEM_ALLOC | ADRENO_GMU_MINBW |
+			ADRENO_TSENSE_DYNAMIC_PERIOD | ADRENO_DCVS_PROFILE | ADRENO_ACD,
+		.gpudev = &adreno_gen8_hwsched_gpudev.base,
+		.perfcounters = &adreno_gen8_2_x_perfcounters,
+		.uche_gmem_alignment = SZ_64M,
+		.gmem_size = 18 * SZ_1M,
+		.bus_width = 32,
+		.snapshot_size = SZ_8M,
+		.num_ddr_channels = 4,
+	},
+	.aqefw_name = "gen80200_aqe.fw",
+	.sqefw_name = "gen80200_sqe.fw",
+	.gmufw_name = "gen80200_gmu.bin",
+	.zap_name = "gen80200_zap.mbn",
+	.ao_hwcg = gen8_2_0_ao_hwcg_regs,
+	.ao_hwcg_count = ARRAY_SIZE(gen8_2_0_ao_hwcg_regs),
+	.gbif = gen8_0_0_gbif_cx_regs,
+	.gbif_count = ARRAY_SIZE(gen8_0_0_gbif_cx_regs),
+	.hang_detect_cycles = 0xcfffff,
+	.protected_regs = gen8_2_0_protected_regs,
+	.nonctxt_regs = gen8_2_0_nonctxt_regs,
+	.highest_bank_bit = 16,
+	.gmu_hub_clk_freq = 150000000,
+	.gen8_snapshot_block_list = &gen8_2_0_snapshot_block_list,
+	.fast_bus_hint = true,
+	.bcl_data = GEN8_2_X_BCL_DATA,
+	.acv_perfmode_ddr_freq = MHZ_TO_KBPS(2736, 4),
+	.noc_timeout_us = 3410, /* 3.41 msec */
+	.cl_no_ft_timeout_ms = 6500,
+	.ctxt_record_size = (19708 * SZ_1K),
+	.therm_cfg = &therm_mit_cfg_8_2_0,
 	.limits_mit_cfg = &gen8_2_0_limits_mit_cfg,
 	.preempt_level = 1,
 	.clx_tbl = &gen8_2_0_clx_table,
@@ -3631,7 +3778,7 @@ static const struct adreno_gen8_core adreno_gpu_core_gen8_4_0 = {
 			ADRENO_CONTENT_PROTECTION | ADRENO_LPAC | ADRENO_AQE |
 			ADRENO_GMU_WARMBOOT | ADRENO_L3_VOTE | ADRENO_IFPC |
 			ADRENO_BCL | ADRENO_ACD | ADRENO_HW_FENCE |
-			ADRENO_PREEMPTION,
+			ADRENO_PREEMPTION | ADRENO_GMU_AB,
 		.gpudev = &adreno_gen8_hwsched_gpudev.base,
 		.perfcounters = &adreno_gen8_perfcounters,
 		.uche_gmem_alignment = SZ_64M,
@@ -3707,7 +3854,8 @@ static const struct gen8_nonctxt_regs gen8_3_0_nonctxt_regs[] = {
 	{ GEN8_SP_CHICKEN_BITS_3, 0x00300000, BIT(PIPE_NONE) },
 	{ GEN8_SP_PERFCTR_SHADER_MASK, 0x0000003f, BIT(PIPE_NONE) },
 	{ GEN8_SP_HLSQ_TIMEOUT_THRESHOLD_DP, 0x00000080, BIT(PIPE_NONE) },
-	{ GEN8_TPL1_DBG_ECO_CNTL, 0x10000000, BIT(PIPE_NONE) },
+	/* Bit(20) Disable alphaOnly feature in TP */
+	{ GEN8_TPL1_DBG_ECO_CNTL, 0x10100000, BIT(PIPE_NONE) },
 	/* BIT(26): Disable final clamp for bicubic filtering */
 	{ GEN8_TPL1_DBG_ECO_CNTL1, 0x04000724, BIT(PIPE_NONE) },
 	{ GEN8_UCHE_MODE_CNTL, 0x00020000, BIT(PIPE_NONE) },
@@ -3723,6 +3871,8 @@ static const struct gen8_nonctxt_regs gen8_3_0_nonctxt_regs[] = {
 	{ GEN8_VFD_CB_LP_REQ_CNT, 0x00100020, BIT(PIPE_BV) | BIT(PIPE_BR) },
 	{ GEN8_VPC_FLATSHADE_MODE_CNTL, 0x00000001, BIT(PIPE_BV) | BIT(PIPE_BR) },
 	{ GEN8_RB_GC_GMEM_PROTECT, 0x00900000, BIT(PIPE_BR) },
+	/* Partially enable perf clear, Disable the DINT data forwarding feature in CCU */
+	{ GEN8_RB_CCU_DBG_ECO_CNTL, 0x00002200, BIT(PIPE_BR) },
 	{ 0 },
 };
 
@@ -3732,7 +3882,8 @@ static const struct adreno_gen8_core adreno_gpu_core_gen8_3_0 = {
 				  UINT_MAX, UINT_MAX, UINT_MAX, ANY_ID),
 		.compatible = "qcom,adreno-gpu-gen8-3-0",
 		.features = ADRENO_APRIV | ADRENO_IOCOHERENT |
-			ADRENO_CONTENT_PROTECTION | ADRENO_IFPC | ADRENO_PREEMPTION,
+			ADRENO_CONTENT_PROTECTION | ADRENO_IFPC | ADRENO_PREEMPTION |
+			ADRENO_GMU_AB,
 		.gpudev = &adreno_gen8_hwsched_gpudev.base,
 		.perfcounters = &adreno_gen8_perfcounters,
 		.uche_gmem_alignment = SZ_64M,
@@ -3832,7 +3983,7 @@ static const struct adreno_gen8_core adreno_gpu_core_gen8_6_0 = {
 		.features = ADRENO_APRIV | ADRENO_IOCOHERENT |
 			ADRENO_CONTENT_PROTECTION | ADRENO_LPAC | ADRENO_AQE |
 			ADRENO_GMU_WARMBOOT | ADRENO_L3_VOTE | ADRENO_IFPC |
-			ADRENO_PREEMPTION | ADRENO_BCL | ADRENO_ACD,
+			ADRENO_PREEMPTION | ADRENO_BCL | ADRENO_ACD | ADRENO_GMU_AB,
 		.gpudev = &adreno_gen8_hwsched_gpudev.base,
 		.perfcounters = &adreno_gen8_perfcounters,
 		.uche_gmem_alignment = SZ_64M,
@@ -3869,7 +4020,7 @@ static const struct adreno_gen8_core adreno_gpu_core_gen8_8_0 = {
 		.compatible = "qcom,adreno-gpu-gen8-8-0",
 		.features = ADRENO_APRIV | ADRENO_IOCOHERENT |
 			ADRENO_CONTENT_PROTECTION | ADRENO_IFPC | ADRENO_PREEMPTION |
-			ADRENO_HW_FENCE | ADRENO_BCL,
+			ADRENO_HW_FENCE | ADRENO_BCL | ADRENO_GMU_AB,
 		.gpudev = &adreno_gen8_hwsched_gpudev.base,
 		.perfcounters = &adreno_gen8_perfcounters,
 		.uche_gmem_alignment = SZ_64M,
@@ -3902,8 +4053,11 @@ static const struct gen8_nonctxt_regs gen8_9_0_nonctxt_regs[] = {
 	{ GEN8_RBBM_GBIF_CLIENT_QOS_CNTL, 0x22122212, BIT(PIPE_NONE) },
 	{ GEN8_RBBM_WAIT_IDLE_CLOCKS_CNTL, 0x00000030, BIT(PIPE_NONE) },
 	{ GEN8_RBBM_WAIT_IDLE_CLOCKS_CNTL2, 0x00000030, BIT(PIPE_NONE) },
-	/* Disable Dead Draw Merge scheme on RB-HLSQ */
-	{ GEN8_RB_RBP_CNTL, BIT(5), BIT(PIPE_BV) | BIT(PIPE_BR) },
+	/*
+	 * BIT(5): Disable Dead Draw Merge scheme on RB-HLSQ
+	 * BIT(6): Disable pre-mvcc dead draw merge scheme on LRZ-RB
+	 */
+	{ GEN8_RB_RBP_CNTL, BIT(5) | BIT(6), BIT(PIPE_BV) | BIT(PIPE_BR) },
 	{ GEN8_RBBM_INTERFACE_HANG_INT_CNTL, 0x0fffffff, BIT(PIPE_NONE) },
 	{ GEN8_RBBM_POWER_UP_RESET_SW_OVERRIDE, 0x70809060, BIT(PIPE_NONE) },
 	{ GEN8_RBBM_POWER_UP_RESET_SW_BV_OVERRIDE, 0x30000000, BIT(PIPE_NONE) },
@@ -3912,10 +4066,10 @@ static const struct gen8_nonctxt_regs gen8_9_0_nonctxt_regs[] = {
 	{ GEN8_SP_CHICKEN_BITS, BIT(26), BIT(PIPE_NONE) },
 	/* Disable LPAC large-LM mode */
 	{ GEN8_SP_SS_CHICKEN_BITS_0, BIT(3), BIT(PIPE_NONE) },
+	{ GEN8_SP_CHICKEN_BITS_1, BIT(3), BIT(PIPE_NONE) },
 	/* Disable PS out of order retire */
 	{ GEN8_SP_CHICKEN_BITS_2, 0xc21800, BIT(PIPE_NONE) },
 	{ GEN8_RBBM_NC_MODE_CNTL, 0x00000001, BIT(PIPE_NONE) },
-	{ GEN8_RBBM_SLICE_PERFCTR_CNTL, BIT(0), BIT(PIPE_NONE) },
 	{ GEN8_RBBM_SLICE_NC_MODE_CNTL, 0x00000001, BIT(PIPE_NONE) },
 	{ GEN8_CP_SMMU_STREAM_ID_LPAC, 0x00000101, BIT(PIPE_NONE) },
 	{ GEN8_UCHE_MODE_CNTL, 0x80080000, BIT(PIPE_NONE) },
@@ -3946,7 +4100,6 @@ static const struct gen8_nonctxt_regs gen8_9_0_nonctxt_regs[] = {
 	{ GEN8_VFD_CB_BUSY_REQ_CNT, 0x00200020, BIT(PIPE_BR) | BIT(PIPE_BV) },
 	{ GEN8_VFD_CB_LP_REQ_CNT, 0x00000020, BIT(PIPE_BR) | BIT(PIPE_BV) },
 	{ GEN8_SP_CHICKEN_BITS_3, 0x00300000, BIT(PIPE_NONE) },
-	{ GEN8_SP_CHICKEN_BITS_4, 0x00000002, BIT(PIPE_NONE) },
 	{ GEN8_SP_PERFCTR_SHADER_MASK, 0x0000003f, BIT(PIPE_NONE) },
 	{ GEN8_SP_HLSQ_DBG_ECO_CNTL, BIT(14),  BIT(PIPE_NONE) },
 	/* Ignore HLSQ shared constant feedback from SP */
@@ -3955,7 +4108,7 @@ static const struct gen8_nonctxt_regs gen8_9_0_nonctxt_regs[] = {
 	{ GEN8_SP_HLSQ_DBG_ECO_CNTL_2, BIT(24), BIT(PIPE_NONE) },
 	{ GEN8_SP_HLSQ_TIMEOUT_THRESHOLD_DP, 0x00000080, BIT(PIPE_NONE) },
 	{ GEN8_SP_READ_SEL, 0x0001ff00, BIT(PIPE_NONE) },
-	{ GEN8_TPL1_DBG_ECO_CNTL, 0x10000000, BIT(PIPE_NONE) },
+	{ GEN8_TPL1_DBG_ECO_CNTL, 0x10100000, BIT(PIPE_NONE) },
 	{ GEN8_TPL1_DBG_ECO_CNTL1, 0x04000720, BIT(PIPE_NONE) },
 	/* Disable HLSQ stproc stc_buf_mode */
 	{ GEN8_SP_HLSQ_DBG_ECO_CNTL_3, BIT(7), BIT(PIPE_NONE) },
@@ -3972,7 +4125,10 @@ static const struct adreno_gen8_core adreno_gpu_core_gen8_9_0 = {
 		.features = ADRENO_APRIV | ADRENO_IOCOHERENT | ADRENO_LPAC |
 			ADRENO_GMU_WARMBOOT | ADRENO_AQE | ADRENO_IFPC |
 			ADRENO_CONTENT_PROTECTION | ADRENO_GMU_BASED_DCVS |
-			ADRENO_DEFER_GMEM_ALLOC | ADRENO_PREEMPTION,
+			ADRENO_DEFER_GMEM_ALLOC | ADRENO_PREEMPTION | ADRENO_GMU_AB |
+			ADRENO_GMU_THERMAL_MITIGATION | ADRENO_HW_FENCE |
+			ADRENO_DCVS_PROFILE | ADRENO_GMU_MINBW | ADRENO_DEFER_GMEM_ALLOC |
+			ADRENO_BCL | ADRENO_ACD,
 		.gpudev = &adreno_gen8_hwsched_gpudev.base,
 		.perfcounters = &adreno_gen8_perfcounters,
 		.uche_gmem_alignment = SZ_64M,
@@ -4001,6 +4157,44 @@ static const struct adreno_gen8_core adreno_gpu_core_gen8_9_0 = {
 	.cl_no_ft_timeout_ms = 6500,
 	.ctxt_record_size = (3708 * SZ_1K),
 	.preempt_level = 1,
+	.therm_cfg = &therm_mit_cfg_8_2_0,
+	.bcl_data = 1,
+};
+
+static const struct adreno_gen8_core adreno_gpu_core_gen8_17_0 = {
+	.base = {
+		DEFINE_ADRENO_REV(ADRENO_REV_GEN8_17_0,
+				  UINT_MAX, UINT_MAX, UINT_MAX, ANY_ID),
+		.compatible = "qcom,adreno-gpu-gen8-17-0",
+		.features = ADRENO_APRIV | ADRENO_IOCOHERENT |
+			ADRENO_CONTENT_PROTECTION | ADRENO_IFPC |
+			ADRENO_GMU_AB | ADRENO_PREEMPTION | ADRENO_BCL |
+			ADRENO_GMU_MINBW | ADRENO_ACD,
+		.gpudev = &adreno_gen8_hwsched_gpudev.base,
+		.perfcounters = &adreno_gen8_perfcounters,
+		.uche_gmem_alignment = SZ_64M,
+		.gmem_size = (SZ_512K + SZ_64K),
+		.bus_width = 32,
+		.snapshot_size = SZ_8M,
+		.num_ddr_channels = 2,
+	},
+	.sqefw_name = "gen80300_sqe.fw",
+	.gmufw_name = "gen81700_gmu.bin",
+	.zap_name = "gen80300_zap.mbn",
+	.ao_hwcg = gen8_ao_hwcg_regs,
+	.ao_hwcg_count = ARRAY_SIZE(gen8_ao_hwcg_regs),
+	.gbif = gen8_3_0_gbif_cx_regs,
+	.gbif_count = ARRAY_SIZE(gen8_3_0_gbif_cx_regs),
+	.hang_detect_cycles = 0xcfffff,
+	.protected_regs = gen8_0_0_protected_regs, /* Reuse the protected regs list from Gen8_0_0 */
+	.nonctxt_regs = gen8_3_0_nonctxt_regs,
+	.highest_bank_bit = 15,
+	.gmu_hub_clk_freq = 200000000,
+	.gen8_snapshot_block_list = &gen8_3_0_snapshot_block_list,
+	.ctxt_record_size = (1038 * SZ_1K),
+	.noc_timeout_us = 3410, /* 3.41 msec */
+	.preempt_level = 1,
+	.bcl_data = 1,
 };
 
 static const struct adreno_gpu_core *adreno_gpulist[] = {
@@ -4027,6 +4221,8 @@ static const struct adreno_gpu_core *adreno_gpulist[] = {
 	&adreno_gpu_core_a618.base,
 	&adreno_gpu_core_a619.base,
 	&adreno_gpu_core_a619_variant.base,
+	&adreno_gpu_core_a619_malabar.base,
+	&adreno_gpu_core_a619_bourtzi.base,
 	&adreno_gpu_core_a620.base,
 	&adreno_gpu_core_a621.base,
 	&adreno_gpu_core_a622.base,
@@ -4046,6 +4242,7 @@ static const struct adreno_gpu_core *adreno_gpulist[] = {
 	&adreno_gpu_core_a660_shima.base,
 	&adreno_gpu_core_gen6_3_26_0.base,
 	&adreno_gpu_core_a702.base,
+	&adreno_gpu_core_a704.base,
 	&adreno_gpu_core_gen7_0_0.base,
 	&adreno_gpu_core_gen7_0_1.base,
 	&adreno_gpu_core_a662.base,
@@ -4066,7 +4263,9 @@ static const struct adreno_gpu_core *adreno_gpulist[] = {
 	&adreno_gpu_core_gen8_2_1.base,
 	&adreno_gpu_core_gen8_3_0.base,
 	&adreno_gpu_core_gen8_4_0.base,
+	&adreno_gpu_core_gen8_5_0.base,
 	&adreno_gpu_core_gen8_6_0.base,
 	&adreno_gpu_core_gen8_8_0.base,
 	&adreno_gpu_core_gen8_9_0.base,
+	&adreno_gpu_core_gen8_17_0.base,
 };

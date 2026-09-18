@@ -140,6 +140,26 @@ struct gen8_limits_mit_cfg {
 };
 
 /**
+ * struct therm_tsens_en_cfg - Container for thermal tsense configuration
+ */
+struct therm_tsens_en_cfg {
+	/** @tsens_sl_cnt: Temperature sensor count per GPU slice */
+	u32 tsens_sl_cnt;
+	/** @tsens_us_cnt: Temperature sensor count per GPU unslice */
+	u32 tsens_us_cnt;
+};
+
+/**
+ * struct gen8_thermal_mit_cfg - Container for GPU thermal mitigation configuration
+ */
+struct gen8_thermal_mit_cfg {
+	/** @therm: Config for GPU thermal mitigation features */
+	struct hfi_therm_profile_ctrl *therm;
+	/** @tsens_en_cfg: Config for GPU thermal mitigation features */
+	const struct therm_tsens_en_cfg *tsens_en_cfg;
+};
+
+/**
  * struct adreno_gen8_core - gen8 specific GPU core definitions
  */
 struct adreno_gen8_core {
@@ -201,7 +221,7 @@ struct adreno_gen8_core {
 	/** @cl_no_ft_timeout_ms: Use this timeout for CL NO_FT instead of infinite */
 	u32 cl_no_ft_timeout_ms;
 	/** @therm_profile: GMU thermal mitigation profile */
-	const struct hfi_therm_profile_ctrl *therm_profile;
+	struct gen8_thermal_mit_cfg *therm_cfg;
 	/** @limits_mit_cfg: GPU limits mitigation configuration */
 	const struct gen8_limits_mit_cfg *limits_mit_cfg;
 	/** @clx_tbl: GPU CLX table */
@@ -662,6 +682,23 @@ void gen8_periph_regread(struct kgsl_device *device, u32 offsetwords,
  */
 void gen8_host_aperture_set(struct adreno_device *adreno_dev, u32 pipe_id,
 		u32 slice_id, u32 use_slice_id);
+
+/**
+ * gen8_host_aperture_clear - Clear the CP aperture register
+ * @adreno_dev: Handle to the adreno device
+ *
+ * This function clears the CP aperture register
+ */
+void gen8_host_aperture_clear(struct adreno_device *adreno_dev);
+
+/**
+ * gen8_host_aperture_pipe_clear - Clear the CP aperture register, using a pipe ID
+ * @adreno_dev: Handle to the adreno device
+ * @pipe_id: Pipe for which the register is to be cleared
+ *
+ * This function clears the CP aperture register and writes the provided pipe ID
+ */
+void gen8_host_aperture_pipe_clear(struct adreno_device *adreno_dev, u32 pipe_id);
 
 /**
  * gen8_set_gmem_protect - Program the RB_GC_GMEM_PROTECT

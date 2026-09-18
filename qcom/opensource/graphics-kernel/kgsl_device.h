@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2002,2007-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #ifndef __KGSL_DEVICE_H
 #define __KGSL_DEVICE_H
@@ -351,8 +351,10 @@ struct kgsl_device {
 	u32 speed_bin;
 	/** @debug_bus_bin: Debug bus bin for the GPU device if applicable */
 	u32 debug_bus_bin;
-	/** @cpr_rev: Cpr rev id for the soc if applicable */
-	u32 cpr_rev;
+	/** @debugbus_en: Debug bus debug capability */
+	u32 debugbus_en;
+	/** @gpu_niden_en: GPU NIDEN debug capability */
+	u32 gpu_niden_en;
 	/** @soc_code: Identifier containing product and feature code */
 	u32 soc_code;
 	/** @gmu_fault: Set when a gmu or rgmu fault is encountered */
@@ -365,10 +367,6 @@ struct kgsl_device {
 	spinlock_t timelines_lock;
 	/** @fence_trace_array: A local trace array for fence debugging */
 	struct trace_array *fence_trace_array;
-#ifdef CONFIG_OPLUS_GPU_MINIDUMP
-	bool snapshot_control;
-	int snapshotfault;
-#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
 	/** @l3_vote: Enable/Disable l3 voting */
 	bool l3_vote;
 	/** @pdev_loaded: Flag to test if platform driver is probed */
@@ -544,6 +542,14 @@ struct kgsl_dcvs_profile_private {
 	struct mutex profile_mutex;
 };
 
+/* Process state flags */
+/* Set if all the memdescs of this process are pinned */
+#define KGSL_PROC_PINNED_STATE 0
+/* Process foreground/background state. Set if process is in foreground */
+#define KGSL_PROC_STATE 1
+/* Process can migrate pages to shmem */
+#define KGSL_PROC_CAN_MIGRATE 2
+
 /**
  * struct kgsl_process_private -  Private structure for a KGSL process (across
  * all devices)
@@ -596,10 +602,14 @@ struct kgsl_process_private {
 	 * @unpinned_page_count: The number of pages unpinned for reclaim
 	 */
 	atomic_t unpinned_page_count;
+	/** @migrated_page_count: The number of pages migrated to shmem */
+	atomic_t migrated_page_count;
 	/**
 	 * @fg_work: Work struct to schedule foreground work
 	 */
 	struct work_struct fg_work;
+	/** @bg_work: Work struct to schedule background work */
+	struct work_struct bg_work;
 	/**
 	 * @reclaim_lock: Mutex lock to protect KGSL_PROC_PINNED_STATE
 	 */
@@ -696,9 +706,6 @@ struct kgsl_snapshot {
 	bool first_read;
 	bool recovered;
 	struct kgsl_device *device;
-#ifdef CONFIG_OPLUS_GPU_MINIDUMP
-	char snapshot_hashid[96];
-#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
 };
 
 /**
@@ -1073,27 +1080,28 @@ void kgsl_process_private_put(struct kgsl_process_private *private);
 
 struct kgsl_process_private *kgsl_process_private_find(pid_t pid);
 
-#ifdef CONFIG_OPLUS_GPU_MINIDUMP
-/**
- * kgsl_sysfs_store() - parse a string from a sysfs store function
- * @buf: Incoming string to parse
- * @ptr: Pointer to an unsigned int to store the value
- */
-static inline int kgsl_sysfs_store(const char *buf, unsigned int *ptr)
+static inline void kgsl_process_inc_cmd_count(struct kgsl_process_private *process)
 {
-	unsigned int val;
-	int rc;
-
-	rc = kstrtou32(buf, 0, &val);
-	if (rc)
-		return rc;
-
-	if (ptr)
-		*ptr = val;
-
-	return 0;
+	atomic_inc(&process->cmd_count);
 }
-#endif /* CONFIG_OPLUS_GPU_MINIDUMP */
+
+#if IS_ENABLED(CONFIG_QCOM_KGSL_HYBRID_ALLOCATION)
+static inline void kgsl_process_dec_cmd_count(struct kgsl_process_private *process)
+{
+	if (atomic_dec_return(&process->cmd_count))
+		return;
+
+	if (!test_bit(KGSL_PROC_STATE, &process->state) &&
+		test_bit(KGSL_PROC_CAN_MIGRATE, &process->state) &&
+		kgsl_process_private_get(process))
+		kgsl_schedule_work(&process->bg_work);
+}
+#else
+static inline void kgsl_process_dec_cmd_count(struct kgsl_process_private *process)
+{
+	atomic_dec(&process->cmd_count);
+}
+#endif
 
 /*
  * A helper macro to print out "not enough memory functions" - this

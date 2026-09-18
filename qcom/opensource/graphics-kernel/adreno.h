@@ -186,6 +186,10 @@
 #define ADRENO_DCVS_PROFILE BIT(26)
 /* Enable TSENSE power savings during sleep */
 #define ADRENO_TSENSE_DYNAMIC_PERIOD BIT(27)
+/* Enable GMU Based AB voting */
+#define ADRENO_GMU_AB BIT(28)
+/* Enable GMU Fast Context Destroy optimization */
+#define ADRENO_GMU_FAST_CONTEXT_DESTROY BIT(29)
 
 /*
  * Adreno GPU quirks - control bits for various workarounds
@@ -279,6 +283,7 @@ enum adreno_gpurev {
 	ADRENO_REV_A663 = 663,
 	ADRENO_REV_A680 = 680,
 	ADRENO_REV_A702 = 702,
+	ADRENO_REV_A704 = 704,
 	/*
 	 * Version numbers may exceed 1 digit
 	 * Bits 16-23: Major
@@ -305,9 +310,11 @@ enum adreno_gpurev {
 	ADRENO_REV_GEN8_2_1 = ADRENO_GPUREV_VALUE(8, 2, 1),
 	ADRENO_REV_GEN8_3_0 = ADRENO_GPUREV_VALUE(8, 3, 0),
 	ADRENO_REV_GEN8_4_0 = ADRENO_GPUREV_VALUE(8, 4, 0),
+	ADRENO_REV_GEN8_5_0 = ADRENO_GPUREV_VALUE(8, 5, 0),
 	ADRENO_REV_GEN8_6_0 = ADRENO_GPUREV_VALUE(8, 6, 0),
 	ADRENO_REV_GEN8_8_0 = ADRENO_GPUREV_VALUE(8, 8, 0),
 	ADRENO_REV_GEN8_9_0 = ADRENO_GPUREV_VALUE(8, 9, 0),
+	ADRENO_REV_GEN8_17_0 = ADRENO_GPUREV_VALUE(8, 17, 0),
 };
 
 #define ADRENO_SOFT_FAULT BIT(0)
@@ -728,6 +735,12 @@ struct adreno_device {
 	struct adreno_coresight_device cx_coresight;
 	/** @funnel_gfx:  A coresight instance for gfx funnel */
 	struct adreno_funnel_device funnel_gfx;
+	/**
+	 * @coresight_en_cnt: Retain mask if either coresight-gfx
+	 * or coresight-gfx-cx is enabled; remove only when both
+	 * are disabled
+	 */
+	u32 coresight_en_cnt;
 #endif
 
 	uint32_t gpmu_throttle_counters[ADRENO_GPMU_THROTTLE_COUNTERS];
@@ -891,6 +904,8 @@ enum adreno_device_flags {
 	ADRENO_DEVICE_RESET_RECOVERY = 18,
 	/** @ADRENO_DEVICE_FIRST_BOOT_DONE: Set if the ADRENO device first boot is done */
 	ADRENO_DEVICE_FIRST_BOOT_DONE = 19,
+	/** @ADRENO_DEVICE_FAST_CONTEXT_DESTROY: Set if fast context destroy is enabled on GMU */
+	ADRENO_DEVICE_FAST_CONTEXT_DESTROY = 20,
 };
 
 /**
@@ -1286,6 +1301,7 @@ ADRENO_TARGET(a663, ADRENO_REV_A663)
 ADRENO_TARGET(a680, ADRENO_REV_A680)
 ADRENO_TARGET(gen6_3_26_0, ADRENO_REV_GEN6_3_26_0)
 ADRENO_TARGET(a702, ADRENO_REV_A702)
+ADRENO_TARGET(a704, ADRENO_REV_A704)
 
 /* A642L and A643 is derived from A660 and shares same logic */
 static inline int adreno_is_a660(struct adreno_device *adreno_dev)
@@ -1342,6 +1358,18 @@ static inline int adreno_is_a619_holi(struct adreno_device *adreno_dev)
 {
 	return of_device_is_compatible(adreno_dev->dev.pdev->dev.of_node,
 		"qcom,adreno-gpu-a619-holi");
+}
+
+static inline int adreno_is_a619_malabar(struct adreno_device *adreno_dev)
+{
+	return of_device_is_compatible(adreno_dev->dev.pdev->dev.of_node,
+		"qcom,adreno-gpu-a619-malabar");
+}
+
+static inline int adreno_is_a619_bourtzi(struct adreno_device *adreno_dev)
+{
+        return of_device_is_compatible(adreno_dev->dev.pdev->dev.of_node,
+                "qcom,adreno-gpu-a619-bourtzi");
 }
 
 static inline int adreno_is_a620(struct adreno_device *adreno_dev)
@@ -1403,9 +1431,11 @@ ADRENO_TARGET(gen8_2_0, ADRENO_REV_GEN8_2_0)
 ADRENO_TARGET(gen8_2_1, ADRENO_REV_GEN8_2_1)
 ADRENO_TARGET(gen8_3_0, ADRENO_REV_GEN8_3_0)
 ADRENO_TARGET(gen8_4_0, ADRENO_REV_GEN8_4_0)
+ADRENO_TARGET(gen8_5_0, ADRENO_REV_GEN8_5_0)
 ADRENO_TARGET(gen8_6_0, ADRENO_REV_GEN8_6_0)
 ADRENO_TARGET(gen8_8_0, ADRENO_REV_GEN8_8_0)
 ADRENO_TARGET(gen8_9_0, ADRENO_REV_GEN8_9_0)
+ADRENO_TARGET(gen8_17_0, ADRENO_REV_GEN8_17_0)
 
 static inline int adreno_is_gen7_9_x(struct adreno_device *adreno_dev)
 {
@@ -1434,13 +1464,19 @@ static inline int adreno_is_gen7_2_x_family(struct adreno_device *adreno_dev)
 static inline int adreno_is_gen8_2_x(struct adreno_device *adreno_dev)
 {
 	return adreno_is_gen8_2_0(adreno_dev) || adreno_is_gen8_2_1(adreno_dev) ||
-		adreno_is_gen8_9_0(adreno_dev);
+		adreno_is_gen8_5_0(adreno_dev) || adreno_is_gen8_9_0(adreno_dev);
 }
 
 static inline int adreno_is_gen8_0_x_family(struct adreno_device *adreno_dev)
 {
 	return adreno_is_gen8_0_0(adreno_dev) || adreno_is_gen8_0_1(adreno_dev) ||
 		adreno_is_gen8_4_0(adreno_dev) || adreno_is_gen8_6_0(adreno_dev);
+}
+
+static inline int adreno_is_gen8_3_0_family(struct adreno_device *adreno_dev)
+{
+	return adreno_is_gen8_3_0(adreno_dev) || adreno_is_gen8_8_0(adreno_dev) ||
+		adreno_is_gen8_17_0(adreno_dev);
 }
 
 /* Gen7 targets which does not support concurrent binning */
@@ -1739,6 +1775,17 @@ static inline bool adreno_is_preemption_enabled(
 	return test_bit(ADRENO_DEVICE_PREEMPTION, &adreno_dev->priv);
 }
 
+/**
+ * adreno_is_fast_context_destroy_enabled() - Check whether the GMU fast context
+ * destroy optimization is statically enabled and if the GMU supports the
+ * capability.
+ * @adreno_dev: Pointer to the adreno_device struct
+ */
+static inline bool adreno_is_fast_context_destroy_enabled(
+				struct adreno_device *adreno_dev)
+{
+	return test_bit(ADRENO_DEVICE_FAST_CONTEXT_DESTROY, &adreno_dev->priv);
+}
 
 /**
  * adreno_preemption_feature_set() - Check whether adreno preemption feature is statically enabled

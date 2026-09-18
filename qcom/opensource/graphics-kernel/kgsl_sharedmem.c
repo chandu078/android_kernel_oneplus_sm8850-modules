@@ -18,10 +18,6 @@
 #include "kgsl_reclaim.h"
 #include "kgsl_sharedmem.h"
 
-#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_OSVELTE)
-#include <mm_osvelte/common.h>
-#endif /* CONFIG_OPLUS_FEATURE_MM_OSVELTE */
-
 /*
  * The user can set this from debugfs to force failed memory allocations to
  * fail without trying OOM first.  This is a debug setting useful for
@@ -533,8 +529,8 @@ static vm_fault_t kgsl_paged_vmfault(struct kgsl_memdesc *memdesc,
 		return VM_FAULT_SIGBUS;
 
 	pgoff = offset >> PAGE_SHIFT;
+	mutex_lock(&memdesc->lock);
 
-	spin_lock(&memdesc->lock);
 	if (memdesc->pages[pgoff]) {
 		page = memdesc->pages[pgoff];
 		get_page(page);
@@ -544,27 +540,28 @@ static vm_fault_t kgsl_paged_vmfault(struct kgsl_memdesc *memdesc,
 
 		/* We are here because page was reclaimed */
 		SET_FLAG(KGSL_MEMDESC_SKIP_RECLAIM, &memdesc->priv);
-		spin_unlock(&memdesc->lock);
+		mutex_unlock(&memdesc->lock);
 
 		page = shmem_read_mapping_page_gfp(
 			memdesc->shmem_filp->f_mapping, pgoff,
 			kgsl_gfp_mask(0));
 		if (IS_ERR(page))
 			return VM_FAULT_SIGBUS;
+
 		kgsl_page_sync(memdesc->dev, page, PAGE_SIZE, DMA_BIDIRECTIONAL);
 
-		spin_lock(&memdesc->lock);
 		/*
 		 * Update the pages array only if the page was
 		 * not already brought back.
 		 */
+		mutex_lock(&memdesc->lock);
 		if (!memdesc->pages[pgoff]) {
 			memdesc->pages[pgoff] = page;
 			atomic_dec(&priv->unpinned_page_count);
 			get_page(page);
 		}
 	}
-	spin_unlock(&memdesc->lock);
+	mutex_unlock(&memdesc->lock);
 
 	ret = vmf_insert_page(vma, vmf->address, page);
 	put_page(page);
@@ -840,11 +837,15 @@ void kgsl_memdesc_init(struct kgsl_device *device,
 		kgsl_memdesc_get_align(memdesc), ilog2(PAGE_SIZE));
 	kgsl_memdesc_set_align(memdesc, align);
 
-	spin_lock_init(&memdesc->lock);
+	mutex_init(&memdesc->lock);
+	idr_init(&memdesc->vma_idr);
 }
 
 void kgsl_sharedmem_free(struct kgsl_memdesc *memdesc)
 {
+	struct vm_area_struct *vma;
+	int vidx = 0;
+
 	if (!memdesc || !memdesc->size)
 		return;
 
@@ -857,6 +858,10 @@ void kgsl_sharedmem_free(struct kgsl_memdesc *memdesc)
 
 	if (memdesc->ops->free)
 		memdesc->ops->free(memdesc);
+
+	idr_for_each_entry(&memdesc->vma_idr, vma, vidx)
+		idr_remove(&memdesc->vma_idr, vidx);
+	idr_destroy(&memdesc->vma_idr);
 }
 
 int
@@ -1026,6 +1031,20 @@ static void kgsl_contiguous_free(struct kgsl_memdesc *memdesc)
 #include <linux/shmem_fs.h>
 #include <trace/hooks/mm.h>
 
+static u32 kgsl_get_alloc_page_size(size_t size, unsigned int align)
+{
+	u32 page_size;
+
+	if (!size)
+		return 0;
+
+	for (page_size = rounddown_pow_of_two(size); page_size > PAGE_SIZE; page_size >>= 1)
+		if ((align >= ilog2(page_size)) && (size >= page_size))
+			return page_size;
+
+	return PAGE_SIZE;
+}
+
 static int _kgsl_shmem_alloc_page(struct kgsl_memdesc *memdesc, u32 order)
 {
 	int pcount;
@@ -1051,7 +1070,13 @@ static int _kgsl_shmem_alloc_page(struct kgsl_memdesc *memdesc, u32 order)
 	split_page(page, order);
 
 	for (pcount = 0; pcount < (1 << order); pcount++) {
-		clear_highpage(&page[pcount]);
+		/*
+		 * In the hybrid allocation, shmem is used to replace pages allocated
+		 * from the kgsl pool. Since we're going to copy data into these pages,
+		 * don't clear them.
+		 */
+		if (!IS_ENABLED(CONFIG_QCOM_KGSL_HYBRID_ALLOCATION))
+			clear_highpage(&page[pcount]);
 		list_add_tail(&page[pcount].lru, &memdesc->shmem_page_list);
 	}
 
@@ -1063,7 +1088,7 @@ static int kgsl_shmem_alloc_pages(struct kgsl_memdesc *memdesc)
 	int ret, count = 0;
 	u32 size, align, order;
 	/* Length of remaining unallocated memdesc pages */
-	u64 len = memdesc->size - ((u64)memdesc->page_count << PAGE_SHIFT);
+	u64 len = memdesc->size - ((u64)memdesc->shmem_pages << PAGE_SHIFT);
 
 	/* 4k allocation managed by the SHMEM */
 	if (len == PAGE_SIZE)
@@ -1071,7 +1096,7 @@ static int kgsl_shmem_alloc_pages(struct kgsl_memdesc *memdesc)
 
 	/* Start with 1MB alignment to get the biggest page we can */
 	align = ilog2(SZ_1M);
-	size = kgsl_get_page_size(len, align);
+	size = kgsl_get_alloc_page_size(len, align);
 	order = get_order(size);
 
 	while (len) {
@@ -1079,7 +1104,7 @@ static int kgsl_shmem_alloc_pages(struct kgsl_memdesc *memdesc)
 
 		if (ret == -EAGAIN) {
 			size = PAGE_SIZE << --order;
-			size = kgsl_get_page_size(size, ilog2(size));
+			size = kgsl_get_alloc_page_size(size, ilog2(size));
 			align = ilog2(size);
 			continue;
 		} else if (ret <= 0) {
@@ -1088,7 +1113,7 @@ static int kgsl_shmem_alloc_pages(struct kgsl_memdesc *memdesc)
 
 		count += ret;
 		len -= size;
-		size = kgsl_get_page_size(len, align);
+		size = kgsl_get_alloc_page_size(len, align);
 		align = ilog2(size);
 		order = get_order(size);
 	}
@@ -1105,15 +1130,21 @@ static void kgsl_shmem_fill_page(void *ptr,
 	if (IS_ERR_OR_NULL(memdesc) || order)
 		return;
 
+	mutex_lock(&memdesc->lock);
 	if (list_empty(&memdesc->shmem_page_list)) {
 		int ret = kgsl_shmem_alloc_pages(memdesc);
 
-		if (ret <= 0)
+		if (ret <= 0) {
+			mutex_unlock(&memdesc->lock);
 			return;
+		}
 	}
 
-	*folio = list_first_entry(&memdesc->shmem_page_list, struct folio, lru);
-	list_del(&(*folio)->lru);
+	if (!list_empty(&memdesc->shmem_page_list)) {
+		*folio = list_first_entry(&memdesc->shmem_page_list, struct folio, lru);
+		list_del(&(*folio)->lru);
+	}
+	mutex_unlock(&memdesc->lock);
 }
 #else
 static void kgsl_shmem_fill_page(void *ptr,
@@ -1124,15 +1155,21 @@ static void kgsl_shmem_fill_page(void *ptr,
 	if (IS_ERR_OR_NULL(memdesc))
 		return;
 
+	mutex_lock(&memdesc->lock);
 	if (list_empty(&memdesc->shmem_page_list)) {
 		int ret = kgsl_shmem_alloc_pages(memdesc);
 
-		if (ret <= 0)
+		if (ret <= 0) {
+			mutex_unlock(&memdesc->lock);
 			return;
+		}
 	}
 
-	*folio = list_first_entry(&memdesc->shmem_page_list, struct folio, lru);
-	list_del(&(*folio)->lru);
+	if (!list_empty(&memdesc->shmem_page_list)) {
+		*folio = list_first_entry(&memdesc->shmem_page_list, struct folio, lru);
+		list_del(&(*folio)->lru);
+	}
+	mutex_unlock(&memdesc->lock);
 }
 #endif
 
@@ -1141,6 +1178,13 @@ void kgsl_register_shmem_callback(void)
 	register_trace_android_rvh_shmem_get_folio(kgsl_shmem_fill_page, NULL);
 }
 
+#ifdef CONFIG_QCOM_KGSL_POOL
+static int kgsl_alloc_secure(int *page_size, struct page **pages,
+		u32 *align, struct device *dev)
+{
+	return kgsl_pool_alloc_page(page_size, pages, *page_size >> PAGE_SHIFT, align, dev);
+}
+#else
 static int kgsl_alloc_secure(int *page_size, struct page **pages,
 		u32 *align, struct device *dev)
 {
@@ -1170,22 +1214,18 @@ static int kgsl_alloc_secure(int *page_size, struct page **pages,
 	return pcount;
 
 eagain:
-	*page_size = kgsl_get_page_size(size, ilog2(size));
+	*page_size = kgsl_get_alloc_page_size(size, ilog2(size));
 	*align = ilog2(*page_size);
 	return -EAGAIN;
 }
 
-static void kgsl_free_secure(struct page *p)
-{
-	__free_pages(p, compound_order(p));
-}
+#endif
 
-static int kgsl_alloc_page(struct kgsl_memdesc *memdesc, int *page_size,
-			struct page **pages, unsigned int pages_len,
-			unsigned int *align, unsigned int page_off)
+int kgsl_alloc_shmem_page(struct kgsl_memdesc *memdesc, struct file *shmem_filp, int *page_size,
+			struct page **pages, unsigned int *align, unsigned int page_off)
 {
 	struct page *page;
-	u32 pcount = (memdesc->size >> PAGE_SHIFT)  - memdesc->page_count;
+	u32 pcount = (memdesc->size >> PAGE_SHIFT) - memdesc->shmem_pages;
 
 	if (pages == NULL)
 		return -EINVAL;
@@ -1193,30 +1233,38 @@ static int kgsl_alloc_page(struct kgsl_memdesc *memdesc, int *page_size,
 	if (fatal_signal_pending(current))
 		return -EINTR;
 
-	if (!memdesc->shmem_filp)
+	if (!shmem_filp)
 		return kgsl_alloc_secure(page_size, pages, align, memdesc->dev);
 
-	page = shmem_read_mapping_page_gfp(memdesc->shmem_filp->f_mapping, page_off,
+	page = shmem_read_mapping_page_gfp(shmem_filp->f_mapping, page_off,
 			kgsl_gfp_mask(0));
 	if (IS_ERR(page))
 		return PTR_ERR(page);
 
-	/* Clear only shmem driver allocated pages */
-	if ((memdesc->size == PAGE_SIZE) ||
-	    (list_empty(&memdesc->shmem_page_list) && (pcount > 1)))
-		clear_highpage(page);
+	/*
+	 * In the hybrid allocation, shmem is used to replace pages allocated
+	 * from the kgsl pool. Since we're going to copy data into these pages,
+	 * don't clear them.
+	 */
+	if (!IS_ENABLED(CONFIG_QCOM_KGSL_HYBRID_ALLOCATION)) {
+		/* Clear only shmem driver allocated pages */
+		if ((memdesc->size == PAGE_SIZE) ||
+			(list_empty(&memdesc->shmem_page_list) && (pcount > 1)))
+			clear_highpage(page);
 
-	kgsl_page_sync(memdesc->dev, page, PAGE_SIZE, DMA_TO_DEVICE);
+		kgsl_page_sync(memdesc->dev, page, PAGE_SIZE, DMA_TO_DEVICE);
+	}
 
+	memdesc->shmem_pages++;
 	*page_size = PAGE_SIZE;
 	*pages = page;
 
 	return 1;
 }
 
-static int kgsl_memdesc_file_setup(struct kgsl_memdesc *memdesc)
+struct file *kgsl_memdesc_file_setup(struct kgsl_memdesc *memdesc)
 {
-	int ret;
+	struct file *shmem_filp;
 
 	/*
 	 * SHMEM pages are allocated in 4K chunks, which introduces higher
@@ -1227,43 +1275,60 @@ static int kgsl_memdesc_file_setup(struct kgsl_memdesc *memdesc)
 	if (kgsl_memdesc_is_secured(memdesc))
 		return 0;
 
-	memdesc->shmem_filp = shmem_file_setup("kgsl-3d0", memdesc->size,
+	shmem_filp = shmem_file_setup("kgsl-3d0", memdesc->size,
 			VM_NORESERVE);
-	if (IS_ERR(memdesc->shmem_filp)) {
-		ret = PTR_ERR(memdesc->shmem_filp);
-		memdesc->shmem_filp = NULL;
-		return ret;
-	}
+	if (IS_ERR(shmem_filp))
+		return shmem_filp;
 
+	memdesc->shmem_pages = 0;
 	INIT_LIST_HEAD(&memdesc->shmem_page_list);
-	SHMEM_I(memdesc->shmem_filp->f_mapping->host)->android_vendor_data1 = (u64)memdesc;
-	mapping_set_unevictable(memdesc->shmem_filp->f_mapping);
+	SHMEM_I(shmem_filp->f_mapping->host)->android_vendor_data1 = (u64)memdesc;
+	mapping_set_unevictable(shmem_filp->f_mapping);
 
-	return 0;
+	return shmem_filp;
 }
 
+#ifdef CONFIG_QCOM_KGSL_POOL
 static void kgsl_free_page(struct kgsl_memdesc *memdesc, struct page *p)
 {
-	if (!memdesc->shmem_filp)
-		return kgsl_free_secure(p);
+	if (memdesc->shmem_filp)
+		put_page(p);
+	else
+		kgsl_pool_free_page(p);
+}
+#else
+static void kgsl_free_page(struct kgsl_memdesc *memdesc, struct page *p)
+{
+	if (!memdesc->shmem_filp) {
+		__free_pages(p, compound_order(p));
+		return;
+	}
 
 	put_page(p);
 }
+#endif
 
-static void kgsl_memdesc_pagelist_cleanup(struct kgsl_memdesc *memdesc)
+void kgsl_memdesc_pagelist_cleanup(struct file *shmem_filp, struct kgsl_memdesc *memdesc)
 {
-	if (!memdesc->shmem_filp)
+	struct page *p, *tmp;
+	LIST_HEAD(page_list);
+
+	if (!shmem_filp)
 		return;
 
-	while (!list_empty(&memdesc->shmem_page_list)) {
-		struct page *page = list_first_entry(&memdesc->shmem_page_list, struct page, lru);
+	/* Detach page list under lock, free pages outside the lock */
+	mutex_lock(&memdesc->lock);
+	list_replace_init(&memdesc->shmem_page_list, &page_list);
+	memdesc->shmem_pages = 0;
+	mutex_unlock(&memdesc->lock);
 
-		list_del(&page->lru);
-		kgsl_free_page(memdesc, page);
+	list_for_each_entry_safe(p, tmp, &page_list, lru) {
+		list_del(&p->lru);
+		put_page(p);
 	}
 }
 
-static void _kgsl_free_pages(struct kgsl_memdesc *memdesc)
+static void kgsl_shmem_free_pages(struct kgsl_memdesc *memdesc)
 {
 	u32 i, n = 1;
 
@@ -1290,15 +1355,22 @@ static void _kgsl_free_pages(struct kgsl_memdesc *memdesc)
 	SHMEM_I(memdesc->shmem_filp->f_mapping->host)->android_vendor_data1 = 0;
 	fput(memdesc->shmem_filp);
 }
-
-/* If CONFIG_QCOM_KGSL_USE_SHMEM is defined we don't use compound pages */
-static u32 kgsl_get_page_order(struct page *page)
-{
-	return 0;
-}
 #else
-void kgsl_register_shmem_callback(void) { }
+void kgsl_register_shmem_callback(void)
+{
+}
 
+struct file *kgsl_memdesc_file_setup(struct kgsl_memdesc *memdesc)
+{
+	return NULL;
+}
+
+void kgsl_memdesc_pagelist_cleanup(struct file *shmem_filp, struct kgsl_memdesc *memdesc)
+{
+}
+#endif /* CONFIG_QCOM_KGSL_USE_SHMEM */
+
+#ifdef CONFIG_QCOM_KGSL_POOL
 static int kgsl_alloc_page(struct kgsl_memdesc *memdesc, int *page_size,
 			struct page **pages, unsigned int pages_len,
 			unsigned int *align, unsigned int page_off)
@@ -1310,15 +1382,26 @@ static int kgsl_alloc_page(struct kgsl_memdesc *memdesc, int *page_size,
 			pages_len, align, memdesc->dev);
 }
 
-static int kgsl_memdesc_file_setup(struct kgsl_memdesc *memdesc)
+static u32 kgsl_get_page_size(size_t size, unsigned int align)
 {
-	return 0;
+	return kgsl_pool_get_page_size(size, align);
 }
 
-static void kgsl_memdesc_pagelist_cleanup(struct kgsl_memdesc *memdesc)
+#ifdef CONFIG_QCOM_KGSL_USE_SHMEM
+static void _kgsl_free_pages(struct kgsl_memdesc *memdesc)
 {
+	if (memdesc->shmem_filp)
+		kgsl_shmem_free_pages(memdesc);
+	else
+		kgsl_pool_free_pages(memdesc->pages, memdesc->page_count);
+
+	memdesc->page_count = 0;
+	kvfree(memdesc->pages);
+
+	memdesc->pages = NULL;
 }
 
+#else
 static void kgsl_free_page(struct kgsl_memdesc *memdesc, struct page *p)
 {
 	kgsl_pool_free_page(p);
@@ -1334,11 +1417,32 @@ static void _kgsl_free_pages(struct kgsl_memdesc *memdesc)
 	memdesc->pages = NULL;
 }
 
-static u32 kgsl_get_page_order(struct page *page)
+#endif /* CONFIG_QCOM_KGSL_USE_SHMEM */
+
+#else
+static int kgsl_alloc_page(struct kgsl_memdesc *memdesc, int *page_size,
+			struct page **pages, unsigned int pages_len,
+			unsigned int *align, unsigned int page_off)
 {
-	return compound_order(page);
+	return kgsl_alloc_shmem_page(memdesc, memdesc->shmem_filp, page_size,
+					pages, align, page_off);
 }
-#endif
+
+static void _kgsl_free_pages(struct kgsl_memdesc *memdesc)
+{
+	kgsl_shmem_free_pages(memdesc);
+
+	memdesc->page_count = 0;
+	kvfree(memdesc->pages);
+
+	memdesc->pages = NULL;
+}
+
+static u32 kgsl_get_page_size(size_t size, unsigned int align)
+{
+	return kgsl_get_alloc_page_size(size, align);
+}
+#endif /* CONFIG_QCOM_KGSL_POOL */
 
 void kgsl_page_sync(struct device *dev, struct page *page,
 		size_t size, enum dma_data_direction dir)
@@ -1413,10 +1517,14 @@ static int _kgsl_alloc_pages(struct kgsl_memdesc *memdesc,
 	if (!local)
 		return -ENOMEM;
 
-	count = kgsl_memdesc_file_setup(memdesc);
-	if (count) {
-		kvfree(local);
-		return count;
+	if (!IS_ENABLED(CONFIG_QCOM_KGSL_HYBRID_ALLOCATION)) {
+		struct file *shmem_filp = kgsl_memdesc_file_setup(memdesc);
+
+		if (IS_ERR(shmem_filp)) {
+			kvfree(local);
+			return PTR_ERR(shmem_filp);
+		}
+		memdesc->shmem_filp = shmem_filp;
 	}
 
 	/* Start with 1MB alignment to get the biggest page we can */
@@ -1426,7 +1534,7 @@ static int _kgsl_alloc_pages(struct kgsl_memdesc *memdesc,
 
 	while (len) {
 		int ret = kgsl_alloc_page(memdesc, &page_size, &local[count],
-			npages, &align, count);
+						npages, &align, count);
 
 		if (ret == -EAGAIN)
 			continue;
@@ -1441,7 +1549,7 @@ static int _kgsl_alloc_pages(struct kgsl_memdesc *memdesc,
 			}
 
 			for (i = 0; i < count; ) {
-				int n = 1 << kgsl_get_page_order(local[i]);
+				int n = 1 << compound_order(local[i]);
 
 				kgsl_free_page(memdesc, local[i]);
 				i += n;
@@ -1470,7 +1578,7 @@ static int _kgsl_alloc_pages(struct kgsl_memdesc *memdesc,
 	*pages = local;
 
 done:
-	kgsl_memdesc_pagelist_cleanup(memdesc);
+	kgsl_memdesc_pagelist_cleanup(memdesc->shmem_filp, memdesc);
 	return count;
 }
 
@@ -1644,6 +1752,7 @@ void kgsl_free_secure_page(struct page *page)
 {
 	struct sg_table sgt;
 	struct scatterlist sgl;
+	int ret;
 
 	if (!page)
 		return;
@@ -1654,8 +1763,16 @@ void kgsl_free_secure_page(struct page *page)
 	sg_init_table(&sgl, 1);
 	sg_set_page(&sgl, page, PAGE_SIZE, 0);
 
-	kgsl_unlock_sgt(&sgt);
-	__free_page(page);
+	ret = kgsl_unlock_sgt(&sgt);
+	if (ret)
+		/*
+		 * Unlock of the secure page failed. This page will be
+		 * stuck in secure side forever and is unrecoverable.
+		 * Give up on this page and don't free it.
+		 */
+		pr_err("kgsl_unlock_sgt failed ret %d\n", ret);
+	else
+		__free_page(page);
 }
 
 struct page *kgsl_alloc_secure_page(void)
@@ -2094,36 +2211,3 @@ void kgsl_free_globals(struct kgsl_device *device)
 		kfree(md);
 	}
 }
-
-#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_OSVELTE)
-void dump_kgsl_process_mem_detail(struct kgsl_process_private *priv)
-{
-	int i = 0;
-	int id = 0;
-	struct kgsl_mem_entry *entry = NULL;
-	uint64_t *memtype_detail = (uint64_t *)kmalloc((KGSL_MEMTYPE_KERNEL + 1) * sizeof(uint64_t), GFP_KERNEL);
-	spin_lock(&priv->mem_lock);
-	for (entry = idr_get_next(&priv->mem_idr, &id); entry;
-	     id++, entry = idr_get_next(&priv->mem_idr, &id)) {
-		struct kgsl_memdesc *memdesc;
-		unsigned int type;
-		if (!kgsl_mem_entry_get(entry))
-			continue;
-		spin_unlock(&priv->mem_lock);
-		memdesc = &entry->memdesc;
-		type = kgsl_memdesc_get_memtype(memdesc);
-		if (type <= KGSL_MEMTYPE_KERNEL)
-			memtype_detail[type] += memdesc->size;
-		kgsl_mem_entry_put(entry);
-		spin_lock(&priv->mem_lock);
-	}
-	spin_unlock(&priv->mem_lock);
-	osvelte_info("%-16s %-5s \n", "memtype", "size");
-	for (i = 0; i <= KGSL_MEMTYPE_KERNEL; i++) {
-		if (memtype_detail[i] > 0) {
-			osvelte_info("%-16d %-5llu\n", i, memtype_detail[i] / SZ_1K);
-		}
-	}
-	kfree(memtype_detail);
-}
-#endif /* CONFIG_OPLUS_FEATURE_MM_OSVELTE */
