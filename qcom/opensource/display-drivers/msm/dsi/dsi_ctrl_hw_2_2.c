@@ -152,11 +152,9 @@ void dsi_ctrl_hw_kickoff_non_embedded_mode(struct dsi_ctrl_hw *ctrl,
 		reg &= ~BIT(26);
 
 	/* Select non EMBEDDED_MODE, pick the packet header from register */
-	reg |= ((cmd->vc_id & 0x3) << 22); /* virtual channel */
 	reg &= ~BIT(28);
 	reg |= BIT(24);/* long packet */
 	reg |= BIT(29);/* wc_sel = 1 */
-	reg |= (cmd->length & 0xFFFF); /* set wc with bit 15:0 cmd length */
 	reg |= (((cmd->datatype) & 0x03f) << 16);/* data type */
 	DSI_W32(ctrl, DSI_COMMAND_MODE_DMA_CTRL, reg);
 
@@ -316,16 +314,6 @@ void dsi_ctrl_hw_22_configure_splitlink(struct dsi_ctrl_hw *ctrl,
 
 	reg = DSI_R32(ctrl, DSI_SPLIT_LINK);
 
-	/* BTA_LINK_SEL */
-	reg &= ~(0x7 << 24);
-
-	if (flags & DSI_CTRL_CMD_SUBLINK0)
-		reg |= BIT(24);
-	else if (flags & DSI_CTRL_CMD_SUBLINK1)
-		reg |= BIT(25);
-	else
-		reg |= (BIT(24) | BIT(25));
-
 	/* DMA_LINK_SEL */
 	reg &= ~(0x7 << 12);
 
@@ -336,6 +324,14 @@ void dsi_ctrl_hw_22_configure_splitlink(struct dsi_ctrl_hw *ctrl,
 		reg |= BIT(13);
 	else
 		reg |= (BIT(12) | BIT(13));
+
+	/**
+	 * Avoid dma trigger on sublink1 for read commands. This can be
+	 * enabled in future if panel supports sending read command on sublink1.
+	 */
+	if (flags & DSI_CTRL_CMD_READ) {
+		reg = reg & ~BIT(13);
+	}
 
 	DSI_W32(ctrl, DSI_SPLIT_LINK, reg);
 

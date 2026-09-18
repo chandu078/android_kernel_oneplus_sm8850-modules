@@ -49,10 +49,6 @@
 #define MSM_MODE_FLAG_SEAMLESS_POMS_CMD			(1<<7)
 /* Request to switch bpp without DSC */
 #define MSM_MODE_FLAG_NONDSC_BPP_SWITCH			(1<<8)
-/* Request to switch EMSYNC FPS */
-#define MSM_MODE_FLAG_SEAMLESS_EMSYNC_FPS_SWITCH	(1<<9)
-/* Request to switch the timing mode on video panel */
-#define MSM_MODE_FLAG_SEAMLESS_DMS_VID			(1<<10)
 
 /* As there are different display controller blocks depending on the
  * snapdragon version, the kms support is split out and the appropriate
@@ -76,8 +72,6 @@ struct msm_kms_funcs {
 	void (*commit)(struct msm_kms *kms, struct drm_atomic_state *state);
 	void (*complete_commit)(struct msm_kms *kms,
 			struct drm_atomic_state *state);
-	/* cancel vrr timers */
-	void (*cancel_vrr_timers)(struct msm_kms *kms);
 	struct msm_display_mode *(*get_msm_mode)(
 				struct drm_connector_state *c_state);
 	/* functions to wait for atomic commit completed on each CRTC */
@@ -121,7 +115,6 @@ struct msm_kms_funcs {
 	/* pm suspend/resume hooks */
 	int (*pm_suspend)(struct device *dev);
 	int (*pm_resume)(struct device *dev);
-	int (*idle_timer_control)(struct msm_kms *kms, bool timer_state);
 	/* cleanup: */
 	void (*destroy)(struct msm_kms *kms);
 	/* get address space */
@@ -253,14 +246,6 @@ static inline bool msm_is_mode_seamless_vrr(const struct msm_display_mode *mode)
 	return mode ? (mode->private_flags & MSM_MODE_FLAG_SEAMLESS_VRR) : false;
 }
 
-static inline bool
-msm_is_mode_seamless_emsync_fps_switch(const struct msm_display_mode *mode)
-{
-	return mode ?
-		(mode->private_flags & MSM_MODE_FLAG_SEAMLESS_EMSYNC_FPS_SWITCH) :
-		false;
-}
-
 static inline bool msm_is_mode_seamless_poms_to_vid(const struct msm_display_mode *mode)
 {
 	return mode ? (mode->private_flags & MSM_MODE_FLAG_SEAMLESS_POMS_VID) : false;
@@ -280,13 +265,6 @@ static inline bool msm_is_mode_seamless_poms(const struct msm_display_mode *mode
 static inline bool msm_is_mode_seamless_dyn_clk(const struct msm_display_mode *mode)
 {
 	return mode ? (mode->private_flags & MSM_MODE_FLAG_SEAMLESS_DYN_CLK) : false;
-}
-
-static inline bool msm_is_mode_seamless_dms_vid(
-					const struct msm_display_mode *mode)
-{
-	return mode ? (mode->private_flags & MSM_MODE_FLAG_SEAMLESS_DMS_VID)
-		: false;
 }
 
 static inline bool msm_is_mode_bpp_switch(const struct msm_display_mode *mode)
@@ -320,9 +298,6 @@ static inline bool msm_is_private_mode_changed(
 	msm_mode = kms->funcs->get_msm_mode(conn_state);
 	if (!msm_mode)
 		return false;
-
-	if (msm_is_mode_seamless_emsync_fps_switch(msm_mode))
-		return true;
 
 	if (msm_is_mode_seamless_poms(msm_mode))
 		return true;

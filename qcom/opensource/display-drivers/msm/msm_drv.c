@@ -520,6 +520,7 @@ static int msm_drm_uninit(struct device *dev)
 
 	sde_dbg_destroy();
 	debugfs_remove_recursive(priv->debug_root);
+	drm_mode_config_cleanup(ddev);
 
 	if (priv->registered) {
 		drm_dev_unregister(ddev);
@@ -530,12 +531,7 @@ static int msm_drm_uninit(struct device *dev)
 	if (fbdev && priv->fbdev)
 		msm_fbdev_free(ddev);
 #endif /* CONFIG_DRM_FBDEV_EMULATION */
-
-	if (ddev->mode_config.num_crtc > 0)
-		drm_atomic_helper_shutdown(ddev);
-
-	drm_mode_config_cleanup(ddev);
-
+	drm_atomic_helper_shutdown(ddev);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	msm_irq_uninstall(ddev);
 #else
@@ -941,7 +937,7 @@ static int msm_drm_device_init(struct platform_device *pdev,
 
 	ret = hfi_msm_drv_init(ddev);
 	if (ret)
-		goto hfi_alloc_fail;
+		goto priv_alloc_fail;
 
 	if (get_mdp_ver(pdev) == KMS_SDE_HFI)
 		priv->disp_op = MSM_DISP_OP_HFI;
@@ -950,13 +946,6 @@ static int msm_drm_device_init(struct platform_device *pdev,
 
 	if (IS_DISP_OP_HWIO(priv->disp_op)) {
 		ret = sde_power_resource_init(pdev, &priv->phandle);
-		if (ret) {
-			pr_err("sde power resource init failed\n");
-			goto power_init_fail;
-		}
-	} else {
-		/* mmcx voting from HLOS is required for SSR sequence */
-		ret = sde_power_supply_init(pdev, &priv->phandle);
 		if (ret) {
 			pr_err("sde power resource init failed\n");
 			goto power_init_fail;
@@ -999,9 +988,8 @@ pm_runtime_error:
 dbg_init_fail:
 	sde_power_resource_deinit(pdev, &priv->phandle);
 power_init_fail:
-hfi_alloc_fail:
-	kfree(priv->hfi_priv);
 priv_alloc_fail:
+	kfree(priv->hfi_priv);
 	drm_dev_put(ddev);
 	return ret;
 }
@@ -1226,11 +1214,9 @@ static void context_close(struct msm_file_private *ctx)
 static void msm_drm_release(struct drm_device *dev)
 {
 	struct msm_drm_private *priv = dev->dev_private;
-	struct platform_device *pdev = to_platform_device(dev->dev);
 
 	dev->dev_private = NULL;
 	kfree(priv);
-	platform_set_drvdata(pdev, NULL);
 }
 
 static void msm_preclose(struct drm_device *dev, struct drm_file *file)
@@ -1277,13 +1263,8 @@ static void msm_lastclose(struct drm_device *dev)
 		struct drm_vblank_crtc *vblank = &dev->vblank[i];
 		struct timer_list *disable_timer = &vblank->disable_timer;
 
-#if (KERNEL_VERSION(6, 15, 0) > LINUX_VERSION_CODE)
 		if (del_timer_sync(disable_timer))
 			disable_timer->function(disable_timer);
-#else
-		if (timer_delete_sync(disable_timer))
-			disable_timer->function(disable_timer);
-#endif
 	}
 
 	/* wait for pending vblank requests to be executed by worker thread */
@@ -1295,9 +1276,6 @@ static void msm_lastclose(struct drm_device *dev)
 	if (!rc)
 		DRM_INFO("wait for crtc mask 0x%x failed, commit anyway...\n",
 				priv->pending_crtcs);
-
-	if (kms->funcs && kms->funcs->cancel_vrr_timers)
-		kms->funcs->cancel_vrr_timers(kms);
 
 	msm_atomic_flush_display_threads(priv);
 
@@ -1871,8 +1849,6 @@ int msm_ioctl_power_ctrl(struct drm_device *dev, void *data,
 	struct msm_file_private *ctx = file_priv->driver_priv;
 	struct msm_drm_private *priv;
 	struct drm_msm_power_ctrl *power_ctrl = data;
-	struct msm_kms *kms;
-	const struct msm_kms_funcs *funcs;
 	bool vote_req = false;
 	int old_cnt;
 	int rc = 0;
@@ -1883,13 +1859,6 @@ int msm_ioctl_power_ctrl(struct drm_device *dev, void *data,
 	}
 
 	priv = dev->dev_private;
-	kms = priv->kms;
-	if (!kms)
-		return -EINVAL;
-
-	funcs = kms->funcs;
-	if (!funcs || !funcs->idle_timer_control)
-		return -EINVAL;
 
 	mutex_lock(&ctx->power_lock);
 
@@ -1907,15 +1876,10 @@ int msm_ioctl_power_ctrl(struct drm_device *dev, void *data,
 	}
 
 	if (vote_req) {
-		if (power_ctrl->enable) {
+		if (power_ctrl->enable)
 			rc = pm_runtime_resume_and_get(dev->dev);
-			if (IS_DISP_OP_HFI(priv->disp_op))
-				rc = funcs->idle_timer_control(kms, true);
-		} else {
+		else
 			pm_runtime_put_sync(dev->dev);
-			if (IS_DISP_OP_HFI(priv->disp_op))
-				rc = funcs->idle_timer_control(kms, false);
-		}
 
 		if (rc < 0)
 			ctx->enable_refcnt = old_cnt;
@@ -2503,7 +2467,7 @@ static const struct component_master_ops msm_drm_ops = {
 
 static int msm_drm_component_dependency_check(struct device *dev)
 {
-	struct device_node *node, *parent_node;
+	struct device_node *node;
 	struct device_node *np = dev->of_node;
 	unsigned int i;
 
@@ -2526,24 +2490,6 @@ static int msm_drm_component_dependency_check(struct device *dev)
 			}
 		}
 	}
-
-	parent_node = of_get_parent(np);
-	if (!parent_node)
-		return 0;
-
-	node = of_get_child_by_name(parent_node, "qcom,hfi-core");
-	of_node_put(parent_node);
-	if (node && of_device_is_available(node)
-			&& of_node_check_flag(node, OF_POPULATED)) {
-		struct platform_device *pdev = of_find_device_by_node(node);
-
-		if (!platform_get_drvdata(pdev)) {
-			DISP_DEV_ERR(dev, "qcom,hfi-core not probed yet\n");
-			of_node_put(node);
-			return -EPROBE_DEFER;
-		}
-	}
-	of_node_put(node);
 
 	return 0;
 }

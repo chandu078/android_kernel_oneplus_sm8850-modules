@@ -677,11 +677,8 @@ static void sde_encoder_phys_cmd_te_rd_ptr_irq(void *arg, int irq_idx)
 	u32 fence_ready = 0;
 	enum msm_disp_op disp_op;
 
-	if (!phys_enc || !phys_enc->parent || !phys_enc->hw_pp || !phys_enc->hw_intf)
-		return;
-
-	ctl = phys_enc->hw_ctl;
-	if (!ctl)
+	if (!phys_enc || !phys_enc->parent || !phys_enc->hw_pp || !phys_enc->hw_intf
+		|| !phys_enc->hw_ctl)
 		return;
 
 #if defined(CONFIG_PXLW_IRIS) || defined(CONFIG_PXLW_SOFT_IRIS)
@@ -692,6 +689,7 @@ static void sde_encoder_phys_cmd_te_rd_ptr_irq(void *arg, int irq_idx)
 	disp_op = sde_encoder_get_disp_op(phys_enc->parent);
 	SDE_ATRACE_BEGIN("rd_ptr_irq");
 	cmd_enc = to_sde_encoder_phys_cmd(phys_enc);
+	ctl = phys_enc->hw_ctl;
 	cesta_client = sde_encoder_get_cesta_client(phys_enc->parent);
 
 	if (ctl->ops.get_scheduler_status[disp_op])
@@ -1301,11 +1299,18 @@ static int _sde_encoder_phys_cmd_wait_for_idle(
 		struct sde_encoder_phys *phys_enc)
 {
 	struct sde_encoder_wait_info wait_info = {0};
+	struct sde_hw_ctl *ctl;
 	enum sde_intr_idx intr_idx;
 	int ret;
 
 	if (!phys_enc) {
 		SDE_ERROR("invalid encoder\n");
+		return -EINVAL;
+	}
+
+	ctl = phys_enc->hw_ctl;
+	if (!ctl) {
+		SDE_ERROR("invalid hw_ctl\n");
 		return -EINVAL;
 	}
 
@@ -1331,6 +1336,16 @@ static int _sde_encoder_phys_cmd_wait_for_idle(
 				INTR_IDX_CTL_DONE : INTR_IDX_PINGPONG;
 
 	ret = sde_encoder_helper_wait_for_irq(phys_enc, intr_idx, &wait_info);
+
+	/*
+	* if hwfencing enabled, try again to wait for up to the extended timeout time in
+	* increments as long as fence has not been signaled.
+	*/
+	if (ret == -ETIMEDOUT && (phys_enc->sde_kms->catalog->hw_fence_rev ||
+				phys_enc->sde_kms->catalog->is_vrr_hw_fence_enable))
+		ret = sde_encoder_helper_hw_fence_extended_wait(phys_enc, ctl, &wait_info,
+				intr_idx);
+
 	if (ret == -ETIMEDOUT) {
 		if (_sde_encoder_phys_cmd_is_scheduler_idle(phys_enc))
 			return 0;
@@ -1871,7 +1886,7 @@ static void sde_encoder_phys_cmd_enable_helper(
 	}
 	disp_op = sde_encoder_get_disp_op(phys_enc->parent);
 
-	sde_encoder_helper_split_config(phys_enc, phys_enc->intf_idx, false);
+	sde_encoder_helper_split_config(phys_enc, phys_enc->intf_idx);
 
 	_sde_encoder_phys_cmd_pingpong_config(phys_enc);
 
@@ -2627,7 +2642,7 @@ static void sde_encoder_phys_cmd_update_split_role(
 			(role == old_role || role == ENC_ROLE_SKIP))
 		return;
 
-	sde_encoder_helper_split_config(phys_enc, phys_enc->intf_idx, false);
+	sde_encoder_helper_split_config(phys_enc, phys_enc->intf_idx);
 	_sde_encoder_phys_cmd_pingpong_config(phys_enc);
 	_sde_encoder_phys_cmd_update_flush_mask(phys_enc);
 }
@@ -3185,7 +3200,6 @@ struct sde_encoder_phys *sde_encoder_phys_cmd_init(
 		list_add(&cmd_enc->te_timestamp[i].list,
 				&cmd_enc->te_timestamp_list);
 
-#if (KERNEL_VERSION(6, 15, 0) > LINUX_VERSION_CODE)
 	hrtimer_init(&phys_enc->sde_vrr_cfg.self_refresh_timer,
 		CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	phys_enc->sde_vrr_cfg.self_refresh_timer.function =
@@ -3195,13 +3209,6 @@ struct sde_encoder_phys *sde_encoder_phys_cmd_init(
 		CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	phys_enc->sde_vrr_cfg.backlight_timer.function =
 		sde_encoder_phys_backlight_timer_cb;
-#else
-	hrtimer_setup(&phys_enc->sde_vrr_cfg.self_refresh_timer,
-		sde_encoder_phys_phys_self_refresh_helper, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-
-	hrtimer_setup(&phys_enc->sde_vrr_cfg.backlight_timer, sde_encoder_phys_backlight_timer_cb,
-		CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-#endif
 
 	SDE_DEBUG_CMDENC(cmd_enc, "created\n");
 

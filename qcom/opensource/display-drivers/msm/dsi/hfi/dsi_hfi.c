@@ -18,9 +18,6 @@
 #include "hfi_adapter.h"
 #include "hfi_props.h"
 #include "hfi_kms.h"
-#include "sde_dsc_helper.h"
-
-#define to_dsi_display(x) container_of(x, struct dsi_display, host)
 
 static int dsi_display_hfi_power_supplies(struct dsi_display *display,
 					  u32 hfi_power_control, bool hfi_power_enable)
@@ -53,82 +50,6 @@ end:
 	return rc;
 }
 
-static int _dsi_display_hfi_process_ssr_start(struct hfi_client_t *hfi_client)
-{
-	struct dsi_display *display;
-	struct dsi_display_hfi *display_hfi;
-	int rc = 0;
-
-	display = (struct dsi_display *)hfi_client->priv;
-	if (!display) {
-		DSI_ERR("invalid display\n");
-		return -EINVAL;
-	}
-
-	display_hfi = display->dsi_hfi_info;
-	if (!display_hfi) {
-		DSI_ERR("invalid display hfi handle\n");
-		return -EINVAL;
-	}
-
-	if (!display_hfi->shared_addr_map)
-		DSI_DEBUG("shared addr map is null\n");
-	else if (display_hfi->shared_addr_map->remote_addr ||
-			display_hfi->shared_addr_map->local_addr)
-		hfi_adapter_buffer_dealloc(hfi_client, display_hfi->shared_addr_map);
-
-	rc = hfi_adapter_release_all_cmd_bufs(hfi_client);
-	if (rc) {
-		DSI_ERR("failed to release command buffers, rc: %d\n", rc);
-		return rc;
-	}
-
-	return rc;
-}
-
-static int _dsi_display_hfi_process_ssr_end(struct hfi_client_t *hfi_client)
-{
-	struct dsi_display *display;
-	int rc = 0;
-
-	display = (struct dsi_display *)hfi_client->priv;
-	if (!display) {
-		DSI_ERR("invalid display\n");
-		return -EINVAL;
-	}
-
-	rc = dsi_hfi_panel_init(display, display->panel);
-	if (rc) {
-		DSI_ERR("failed to send panel init to DCP: %d", rc);
-		return rc;
-	}
-
-	return rc;
-}
-
-int dsi_hfi_process_event(struct hfi_client_t *hfi_client, enum hfi_adapter_event_type event,
-			bool blocking)
-{
-	if (!hfi_client) {
-		DSI_ERR("invalid client\n");
-		return -EINVAL;
-	}
-
-	DSI_DEBUG("%s: called\n", __func__);
-
-	switch (event) {
-	case HFI_ADAPTER_EVENT_SSR_START:
-		return _dsi_display_hfi_process_ssr_start(hfi_client);
-	case HFI_ADAPTER_EVENT_SSR_END:
-		return _dsi_display_hfi_process_ssr_end(hfi_client);
-	default:
-		DSI_ERR("%s: invalid event type: %d\n", __func__, event);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
 int dsi_hfi_process_cmd_buf(struct hfi_client_t *hfi_client, struct hfi_cmdbuf_t *cmd_buf)
 {
 	int rc = 0;
@@ -144,7 +65,7 @@ int dsi_hfi_process_cmd_buf(struct hfi_client_t *hfi_client, struct hfi_cmdbuf_t
 		return rc;
 	}
 
-	rc = hfi_adapter_release_cmd_buf(hfi_client, cmd_buf);
+	rc = hfi_adapter_release_cmd_buf(cmd_buf);
 	if (rc)
 		DSI_ERR("[WARNING] Failed to release command buffer\n");
 
@@ -187,8 +108,7 @@ int dsi_hfi_misr_setup(struct dsi_display *display)
 	misr_data.frame_count = display->misr_frame_count;
 	misr_data.module_type = HFI_DEBUG_MISR_DSI;
 
-	rc = hfi_adapter_add_set_property(display_hfi->hfi_client, cmd_buf,
-					HFI_COMMAND_DEBUG_MISR_SETUP, obj_id,
+	rc = hfi_adapter_add_set_property(cmd_buf, HFI_COMMAND_DEBUG_MISR_SETUP, obj_id,
 					HFI_PAYLOAD_TYPE_U32_ARRAY, &misr_data,
 					sizeof(misr_data), HFI_HOST_FLAGS_NONE);
 	if (rc) {
@@ -197,7 +117,7 @@ int dsi_hfi_misr_setup(struct dsi_display *display)
 	}
 
 	DSI_DEBUG("misr_setup: sending cmd buf\n");
-	rc = hfi_adapter_set_cmd_buf(display_hfi->hfi_client, cmd_buf);
+	rc = hfi_adapter_set_cmd_buf(cmd_buf);
 	SDE_EVT32(obj_id, HFI_COMMAND_DEBUG_MISR_SETUP, rc, SDE_EVTLOG_FUNC_CASE1);
 	if (rc)
 		DSI_ERR("Failed to send misr_setup command\n");
@@ -268,8 +188,7 @@ int dsi_hfi_misr_read(struct dsi_display *display)
 	misr_read.display_id = obj_id;
 	misr_read.module_type = HFI_DEBUG_MISR_DSI;
 
-	rc = hfi_adapter_add_get_property(display_hfi->hfi_client, cmd_buf,
-			HFI_COMMAND_DEBUG_MISR_READ, obj_id,
+	rc = hfi_adapter_add_get_property(cmd_buf, HFI_COMMAND_DEBUG_MISR_READ, obj_id,
 			HFI_PAYLOAD_TYPE_U32_ARRAY, &misr_read, sizeof(misr_read),
 			&display->hfi_cb_obj, (HFI_HOST_FLAGS_RESPONSE_REQUIRED |
 			HFI_HOST_FLAGS_NON_DISCARDABLE));
@@ -277,7 +196,7 @@ int dsi_hfi_misr_read(struct dsi_display *display)
 		DSI_ERR("Failed to add MISR read command\n");
 
 	SDE_EVT32(drm_conn->base.id, obj_id, HFI_COMMAND_DEBUG_MISR_READ, SDE_EVTLOG_FUNC_CASE1);
-	rc = hfi_adapter_set_cmd_buf_blocking(display_hfi->hfi_client, cmd_buf);
+	rc = hfi_adapter_set_cmd_buf_blocking(cmd_buf);
 	SDE_EVT32(drm_conn->base.id, obj_id, HFI_COMMAND_DEBUG_MISR_READ, rc,
 			SDE_EVTLOG_FUNC_CASE2);
 
@@ -351,7 +270,6 @@ void dsi_hfi_prop_handler(u32 hfi_uid, u32 prop, void *payload, u32 size,
 	case HFI_COMMAND_DISPLAY_POST_ENABLE:
 	case HFI_COMMAND_DISPLAY_SET_MODE:
 	case HFI_COMMAND_DISPLAY_POWER_REGISTER:
-	case HFI_COMMAND_DISPLAY_TRANSFER_DCS_CMD:
 		break;
 	case HFI_COMMAND_DEBUG_MISR_READ:
 		dsi_hfi_process_misr_read(display, payload, size);
@@ -378,14 +296,8 @@ int dsi_display_hfi_setup_hfi(struct dsi_display *display, struct hfi_adapter_t 
 	}
 
 	display_hfi = kvzalloc(sizeof(struct dsi_display_hfi), GFP_KERNEL);
-	if (!display_hfi) {
-		DSI_ERR("failed to allocate memory for display_hfi\n");
-		return -ENOMEM;
-	}
-
 	display->dsi_hfi_info = display_hfi;
-	display_hfi->tx_cmd_buf_dva = 0;
-	display_hfi->tx_cmd_buf_fill_level = 0;
+
 	display->hfi_cb_obj.hfi_prop_handler = dsi_hfi_prop_handler;
 	display_hfi->hfi_adapter = hfi_host;
 
@@ -394,8 +306,6 @@ int dsi_display_hfi_setup_hfi(struct dsi_display *display, struct hfi_adapter_t 
 		return -ENOMEM;
 
 	display_hfi->hfi_client->process_cmd_buf = dsi_hfi_process_cmd_buf;
-	display_hfi->hfi_client->process_event = dsi_hfi_process_event;
-	display_hfi->hfi_client->priv = (void *) display;
 
 	rc = hfi_adapter_client_register(hfi_host, display_hfi->hfi_client);
 	if (rc) {
@@ -449,21 +359,21 @@ int dsi_display_hfi_send_cmd_buf(struct dsi_display *display,
 	}
 
 	if (flags & HFI_HOST_FLAGS_RESPONSE_REQUIRED) {
-		rc = hfi_adapter_add_get_property(hfi_client, cmd_buf, hfi_cmd, obj_id,
-			hfi_payload_type, payload, payload_size, &display->hfi_cb_obj, flags);
+		rc = hfi_adapter_add_get_property(cmd_buf, hfi_cmd, obj_id, hfi_payload_type,
+			payload, payload_size, &display->hfi_cb_obj, flags);
 		if (rc)
 			DSI_ERR("could not set property for hfi_cmd 0x%x\n", hfi_cmd);
 
 		SDE_EVT32(obj_id, hfi_cmd, SDE_EVTLOG_FUNC_CASE1);
-		rc = hfi_adapter_set_cmd_buf_blocking(hfi_client, cmd_buf);
+		rc = hfi_adapter_set_cmd_buf_blocking(cmd_buf);
 		SDE_EVT32(obj_id, hfi_cmd, rc, SDE_EVTLOG_FUNC_CASE2);
 	} else {
-		rc = hfi_adapter_add_set_property(hfi_client, cmd_buf, hfi_cmd, obj_id,
-			hfi_payload_type, payload, payload_size, flags);
+		rc = hfi_adapter_add_set_property(cmd_buf, hfi_cmd, obj_id, hfi_payload_type,
+			payload, payload_size, flags);
 		if (rc)
 			DSI_ERR("could not set property for hfi_cmd 0x%x\n", hfi_cmd);
 
-		rc = hfi_adapter_set_cmd_buf(hfi_client, cmd_buf);
+		rc = hfi_adapter_set_cmd_buf(cmd_buf);
 		SDE_EVT32(obj_id, hfi_cmd, rc, SDE_EVTLOG_FUNC_CASE3);
 	}
 
@@ -483,7 +393,7 @@ int dsi_display_hfi_register_pwr_supplies(struct dsi_display *display)
 	u32 hfi_cmd = HFI_COMMAND_DISPLAY_POWER_REGISTER;
 	int rc = 0;
 
-	if (!display || !display->dsi_hfi_info) {
+	if (!display) {
 		DSI_ERR("invalid display\n");
 		return -EINVAL;
 	}
@@ -495,11 +405,11 @@ int dsi_display_hfi_register_pwr_supplies(struct dsi_display *display)
 	cmd_buf = hfi_adapter_get_cmd_buf(display_hfi->hfi_client, obj_id,
 					  HFI_CMDBUF_TYPE_DISPLAY_INFO_BLOCKING);
 
-	rc = hfi_adapter_add_get_property(display_hfi->hfi_client, cmd_buf, hfi_cmd, obj_id,
-			HFI_PAYLOAD_TYPE_NONE, NULL, 0, &display->hfi_cb_obj,
+	rc = hfi_adapter_add_get_property(cmd_buf, hfi_cmd, obj_id, HFI_PAYLOAD_TYPE_NONE,
+			NULL, 0, &display->hfi_cb_obj,
 			HFI_HOST_FLAGS_RESPONSE_REQUIRED | HFI_HOST_FLAGS_NON_DISCARDABLE);
 
-	rc = hfi_adapter_set_cmd_buf(display_hfi->hfi_client, cmd_buf);
+	rc = hfi_adapter_set_cmd_buf(cmd_buf);
 	SDE_EVT32(obj_id, hfi_cmd, rc, SDE_EVTLOG_FUNC_CASE1);
 
 	if (rc)
@@ -516,7 +426,7 @@ static void hfi_panel_get_mode_res_data(struct dsi_display_mode *mode,
 	timing_caps->res_data.h_front_porch = mode->timing.h_front_porch;
 	timing_caps->res_data.h_back_porch = mode->timing.h_back_porch;
 	timing_caps->res_data.h_sync_skew = mode->timing.h_skew;
-	timing_caps->res_data.h_pulse_width = mode->timing.h_sync_width;
+	timing_caps->res_data.h_sync_pulse = mode->timing.h_sync_width;
 	timing_caps->res_data.v_front_porch = mode->timing.v_front_porch;
 	timing_caps->res_data.v_back_porch = mode->timing.v_back_porch;
 	timing_caps->res_data.v_pulse_width = mode->timing.v_sync_width;
@@ -525,31 +435,23 @@ static void hfi_panel_get_mode_res_data(struct dsi_display_mode *mode,
 static void hfi_panel_get_mode_compression_params(struct dsi_display_mode *mode,
 						  struct dsi_panel_timing_caps *timing_caps)
 {
-	struct msm_display_dsc_info *dsc = &mode->priv_info->dsc;
-	u32 v_major = dsc->config.dsc_version_major;
-	u32 v_minor = dsc->config.dsc_version_minor;
-	int rc;
+	u32 v_major = mode->priv_info->dsc.config.dsc_version_major;
+	u32 v_minor = mode->priv_info->dsc.config.dsc_version_minor;
 
 	timing_caps->compression_params.mode = HFI_PANEL_COMPRESSION_DSC;
 	timing_caps->compression_params.version = ((v_major & 0x0F) << 4) | (v_minor & 0x0F);
-	timing_caps->compression_params.scr_version = dsc->scr_rev;
-	timing_caps->compression_params.slice_height = dsc->config.slice_height;
-	timing_caps->compression_params.slice_width = dsc->config.slice_width;
-	timing_caps->compression_params.slices_per_pkt = dsc->slice_per_pkt;
-	timing_caps->compression_params.bits_per_component = dsc->config.bits_per_component;
-	timing_caps->compression_params.pps_delay_ms = dsc->pps_delay_ms;
-	timing_caps->compression_params.bits_per_pixel = dsc->config.bits_per_pixel;
-	timing_caps->compression_params.chroma_format = dsc->chroma_format;
-	timing_caps->compression_params.color_space = dsc->source_color_space;
-	timing_caps->compression_params.block_prediction_enable = dsc->config.block_pred_enable;
-
-	if (dsc->rc_override_v1) {
-		rc = sde_dsc_get_rc_params(dsc, (u8 *)&timing_caps->rc_override.min_qp[0],
-					(u8 *)&timing_caps->rc_override.max_qp[0],
-					(u8 *)&timing_caps->rc_override.offsets[0]);
-		if (!rc)
-			timing_caps->rc_override_enabled = true;
-	}
+	timing_caps->compression_params.scr_version = mode->priv_info->dsc.scr_rev;
+	timing_caps->compression_params.slice_height = mode->priv_info->dsc.config.slice_height;
+	timing_caps->compression_params.slice_width = mode->priv_info->dsc.config.slice_width;
+	timing_caps->compression_params.slices_per_pkt = mode->priv_info->dsc.slice_per_pkt;
+	timing_caps->compression_params.bits_per_component =
+						mode->priv_info->dsc.config.bits_per_component;
+	timing_caps->compression_params.pps_delay_ms = mode->priv_info->dsc.pps_delay_ms;
+	timing_caps->compression_params.bits_per_pixel = mode->priv_info->dsc.config.bits_per_pixel;
+	timing_caps->compression_params.chroma_format = mode->priv_info->dsc.chroma_format;
+	timing_caps->compression_params.color_space = mode->priv_info->dsc.source_color_space;
+	timing_caps->compression_params.block_prediction_enable =
+						mode->priv_info->dsc.config.block_pred_enable;
 }
 
 static enum hfi_panel_phy_type dsi_get_panel_type_helper(struct dsi_panel *panel)
@@ -781,7 +683,6 @@ int hfi_panel_fill_dcs_cmds(struct dsi_display *display,
 	int j = 0;
 	int rc = 0;
 	u32 offset = 0;
-	struct dsi_display_hfi *display_hfi = display->dsi_hfi_info;
 
 	for (i = 0; i < DSI_CMD_SET_MAX; i++) {
 		if (j == NUM_PANEL_CMD_TYPES_SUPPORTED)
@@ -808,7 +709,6 @@ int hfi_panel_fill_dcs_cmds(struct dsi_display *display,
 			DSI_ERR("Failed to fill panel cmds into memory for cmd type %d", i);
 
 		sde_vaddr += offset;
-		display_hfi->tx_cmd_buf_fill_level += offset;
 		hfi_vaddr += (sizeof(struct dsi_hfi_panel_cmd_info) * priv_info->cmd_sets[i].count);
 		j++;
 	}
@@ -816,89 +716,6 @@ int hfi_panel_fill_dcs_cmds(struct dsi_display *display,
 	panel_timing_caps->payload.count = j;
 
 	return 0;
-}
-
-int dsi_hfi_host_transfer_sub(struct mipi_dsi_host *host, struct dsi_cmd_desc *cmd)
-{
-	struct dsi_display *display = to_dsi_display(host);
-	struct dsi_display_hfi *display_hfi;
-	struct sde_kms *sde_kms;
-	struct hfi_kms *hfi_kms;
-	struct hfi_client_t *hfi_client;
-	struct hfi_dsi_cmd_desc *dsi_cmd_desc;
-	struct hfi_shared_addr_map *tx_cmd_buf_map;
-	u32 hfi_cmd = HFI_COMMAND_DISPLAY_TRANSFER_DCS_CMD;
-	int rc = 0;
-	size_t mem_size = 0;
-	if (!display || !display->dsi_hfi_info || !cmd || !cmd->msg.tx_buf) {
-		DSI_ERR("Invalid params\n");
-		return -EINVAL;
-	}
-
-	sde_kms = sde_connector_get_kms(display->drm_conn);
-	if (!sde_kms)
-		return -EINVAL;
-
-	hfi_kms = to_hfi_kms(sde_kms);
-	if (!hfi_kms)
-		return -EINVAL;
-
-	hfi_client = &hfi_kms->hfi_client;
-
-	display_hfi = display->dsi_hfi_info;
-
-	/* Get the shared address map for command payload transfer between host and DCP */
-	tx_cmd_buf_map = &display_hfi->tx_cmd_buf_map;
-
-	mem_size = hfi_adapter_get_shared_mem_allocated_size(hfi_client, tx_cmd_buf_map);
-
-	if (!mem_size) {
-		tx_cmd_buf_map->size = SZ_4K;
-		rc = hfi_adapter_buffer_alloc(hfi_client, tx_cmd_buf_map);
-
-		if (rc || !hfi_adapter_get_shared_mem_allocated_size(hfi_client, tx_cmd_buf_map)) {
-			DSI_ERR("failed to allocate HFI buffer for command payload\n");
-			return -ENOMEM;
-		}
-
-		mem_size = hfi_adapter_get_shared_mem_allocated_size(hfi_client, tx_cmd_buf_map);
-	}
-
-	if (cmd->msg.tx_len > mem_size) {
-		DSI_ERR("command payload (%zu bytes) is larger than (%zu bytes)\n", cmd->msg.tx_len,
-			mem_size);
-		return -EINVAL;
-	}
-
-	dsi_cmd_desc = kzalloc(sizeof(struct hfi_dsi_cmd_desc), GFP_KERNEL);
-	if (!dsi_cmd_desc) {
-		DSI_ERR("failed to allocate memory for hfi_dsi_cmd_desc\n");
-		return -ENOMEM;
-	}
-
-	/* Populate dsi_cmd_desc */
-	dsi_cmd_desc->tx_len = cmd->msg.tx_len;
-	dsi_cmd_desc->type = cmd->msg.type;
-	dsi_cmd_desc->flags = cmd->msg.flags;
-	dsi_cmd_desc->ctrl_idx = cmd->ctrl;
-	dsi_cmd_desc->channel = cmd->msg.channel;
-	dsi_cmd_desc->last_command = cmd->last_command;
-	dsi_cmd_desc->post_wait_ms = cmd->post_wait_ms;
-	dsi_cmd_desc->ctrl_flags = cmd->ctrl_flags;
-	dsi_cmd_desc->tx_buff_addr_lsb = HFI_VAL_L32((u64)tx_cmd_buf_map->remote_addr);
-	dsi_cmd_desc->tx_buff_addr_msb = HFI_VAL_H32((u64)tx_cmd_buf_map->remote_addr);
-
-	/* Copy command payload to HFI buffer */
-	memcpy(tx_cmd_buf_map->local_addr, cmd->msg.tx_buf, cmd->msg.tx_len);
-
-	rc = dsi_display_hfi_send_cmd_buf(display, hfi_client, hfi_cmd, display->display_type,
-			HFI_PAYLOAD_TYPE_U32_ARRAY, dsi_cmd_desc, sizeof(struct hfi_dsi_cmd_desc),
-			(HFI_HOST_FLAGS_RESPONSE_REQUIRED | HFI_HOST_FLAGS_NON_DISCARDABLE));
-	if (rc)
-		DSI_ERR("Could not send HFI_COMMAND_DISPLAY_SEND_DCS_CMD, rc=%d\n", rc);
-
-	kfree(dsi_cmd_desc);
-	return rc;
 }
 
 static void dsi_hfi_populate_panel_generic_caps(struct dsi_display *display,
@@ -923,7 +740,6 @@ static void dsi_hfi_populate_panel_generic_caps(struct dsi_display *display,
 	panel_generic_caps->max_backlight_level = panel->bl_config.bl_max_level;
 	panel_generic_caps->max_brightness_level = panel->hdr_props.peak_brightness;
 	panel_generic_caps->vsync_src = dsi_get_panel_vsync_src(display);
-	panel_generic_caps->cphy_enabled = (panel->host_config.phy_type == DSI_PHY_TYPE_CPHY);
 
 	panel_generic_caps->panel_name = (*(u32 *)panel->name);
 	if (panel_generic_caps->panel_name)
@@ -982,11 +798,6 @@ static void dsi_hfi_populate_panel_timing_caps(struct dsi_display *display,
 {
 	int i;
 
-	if (!mode || !mode->priv_info) {
-		DSI_ERR("Invalid params %d\n", !mode);
-		return;
-	}
-
 	panel_timing_caps->panel_index = mode->mode_idx;
 	panel_timing_caps->clockrate[0] = HFI_VAL_L32(mode->timing.clk_rate_hz);
 	panel_timing_caps->clockrate[1] = HFI_VAL_H32(mode->timing.clk_rate_hz);
@@ -1006,11 +817,9 @@ static void dsi_hfi_populate_panel_timing_caps(struct dsi_display *display,
 	panel_timing_caps->top_index = 0;
 	hfi_panel_fill_dcs_cmds(display, mode->priv_info, panel_timing_caps, sde_vaddr, hfi_vaddr);
 	panel_timing_caps->phy_timings_payload.count = mode->priv_info->phy_timing_len;
-	if (mode->priv_info->phy_timing_val) {
-		for (i = 0; i < NUM_VARIABLE_DPHY_TIMINGS; i++)
-			panel_timing_caps->phy_timings_payload.dphy_timings[i] =
-				mode->priv_info->phy_timing_val[i];
-	}
+	for (i = 0; i < NUM_VARIABLE_DPHY_TIMINGS; i++)
+		panel_timing_caps->phy_timings_payload.dphy_timings[i] =
+			mode->priv_info->phy_timing_val[i];
 }
 
 static int dsi_hfi_append_panel_init_caps(struct hfi_cmdbuf_t *buffer,
@@ -1028,8 +837,6 @@ static int dsi_hfi_append_panel_init_caps(struct hfi_cmdbuf_t *buffer,
 	u32 sde_addr[3];
 	u32 hfi_addr[3];
 	u64 rem_prop_val = (u64) addr_map->remote_addr;
-	struct hfi_buff dcs_cmd_tx_buf_dva;
-	struct hfi_buff dcs_cmd_tx_buf_iova;
 
 	if (!display)
 		return -EINVAL;
@@ -1045,19 +852,6 @@ static int dsi_hfi_append_panel_init_caps(struct hfi_cmdbuf_t *buffer,
 	display_hfi = display->dsi_hfi_info;
 	if (!display_hfi)
 		return -EINVAL;
-
-	panel_init_caps.dcs_cmd_tx_buf_dva =
-			display_hfi->tx_cmd_buf_dva + display_hfi->tx_cmd_buf_fill_level;
-	panel_init_caps.dcs_cmd_tx_buf_iova =
-			display->cmd_buffer_iova + display_hfi->tx_cmd_buf_fill_level;
-
-	dcs_cmd_tx_buf_dva.addr_l = HFI_VAL_L32(panel_init_caps.dcs_cmd_tx_buf_dva);
-	dcs_cmd_tx_buf_dva.addr_h = HFI_VAL_H32(panel_init_caps.dcs_cmd_tx_buf_dva);
-	dcs_cmd_tx_buf_dva.size = display->cmd_buffer_size - display_hfi->tx_cmd_buf_fill_level;
-
-	dcs_cmd_tx_buf_iova.addr_l = HFI_VAL_L32(panel_init_caps.dcs_cmd_tx_buf_iova);
-	dcs_cmd_tx_buf_iova.addr_h = HFI_VAL_H32(panel_init_caps.dcs_cmd_tx_buf_iova);
-	dcs_cmd_tx_buf_iova.size = display->cmd_buffer_size - display_hfi->tx_cmd_buf_fill_level;
 
 	hfi_util_kv_helper_reset(display_hfi->kv_props);
 
@@ -1079,24 +873,11 @@ static int dsi_hfi_append_panel_init_caps(struct hfi_cmdbuf_t *buffer,
 			(void *)hfi_addr);
 	kv_size += sizeof(hfi_addr);
 
-	hfi_util_kv_helper_add(display_hfi->kv_props,
-			HFI_PACKKEY(HFI_PROPERTY_PANEL_DCS_CMD_TX_BUF_DVA, 0,
-			(sizeof(dcs_cmd_tx_buf_dva)) / sizeof(u32)),
-			(void *)&dcs_cmd_tx_buf_dva);
-	kv_size += sizeof(dcs_cmd_tx_buf_dva);
-
-	hfi_util_kv_helper_add(display_hfi->kv_props,
-			HFI_PACKKEY(HFI_PROPERTY_PANEL_DCS_CMD_TX_BUF_IOVA, 0,
-			(sizeof(dcs_cmd_tx_buf_iova) / sizeof(u32))),
-			(void *)&dcs_cmd_tx_buf_iova);
-	kv_size += sizeof(dcs_cmd_tx_buf_iova);
-
 	kv_count = hfi_util_kv_helper_get_count(display_hfi->kv_props);
 
 	payload_size = (kv_count * sizeof(u32)) + kv_size;
 
-	rc = hfi_adapter_add_prop_array(buffer->ctx,
-				buffer,
+	rc = hfi_adapter_add_prop_array(buffer,
 				HFI_COMMAND_PANEL_INIT_PANEL_CAPS,
 				object_id,
 				HFI_PAYLOAD_TYPE_U32,
@@ -1147,7 +928,6 @@ static int dsi_hfi_append_panel_generic_caps(struct hfi_cmdbuf_t *buffer,
 		{panel_generic_caps.max_backlight_level, HFI_PROPERTY_PANEL_BL_MAX_LEVEL},
 		{panel_generic_caps.vsync_src, HFI_PROPERTY_PANEL_VSYNC_SOURCE},
 		{panel_generic_caps.max_brightness_level, HFI_PROPERTY_PANEL_BRIGHTNESS_MAX_LEVEL},
-		{panel_generic_caps.cphy_enabled, HFI_PROPERTY_PANEL_CPHY_MODE},
 		/*Cutoff for properties that take on default value*/
 		{panel_generic_caps.panel_name, HFI_PROPERTY_PANEL_NAME},
 		{panel_generic_caps.panel_bpp, HFI_PROPERTY_PANEL_BPP},
@@ -1203,8 +983,7 @@ static int dsi_hfi_append_panel_generic_caps(struct hfi_cmdbuf_t *buffer,
 
 	payload_size = (kv_count * sizeof(u32)) + kv_size;
 
-	rc = hfi_adapter_add_prop_array(buffer->ctx,
-				buffer,
+	rc = hfi_adapter_add_prop_array(buffer,
 				HFI_COMMAND_PANEL_INIT_GENERIC_CAPS,
 				object_id,
 				HFI_PAYLOAD_TYPE_U32_ARRAY,
@@ -1278,14 +1057,6 @@ static int dsi_hfi_append_panel_timing_caps(struct hfi_cmdbuf_t *buffer,
 				(void *)&timing_caps_array[i].compression_params);
 		kv_size += sizeof(timing_caps_array[i].compression_params);
 
-		if (timing_caps_array[i].rc_override_enabled) {
-			hfi_util_kv_helper_add(display_hfi->kv_props,
-				HFI_PACKKEY(HFI_PROPERTY_PANEL_COMPRESSION_RC_OVERRIDE, 0,
-				(sizeof(timing_caps_array[i].rc_override) / sizeof(u32))),
-				(void *)&timing_caps_array[i].rc_override);
-			kv_size += sizeof(timing_caps_array[i].rc_override);
-		}
-
 		hfi_util_kv_helper_add(display_hfi->kv_props,
 				HFI_PACKKEY(HFI_PROPERTY_PANEL_DISPLAY_TOPOLOGY, 0,
 				(sizeof(timing_caps_array[i].topology) / sizeof(u32))),
@@ -1314,8 +1085,7 @@ static int dsi_hfi_append_panel_timing_caps(struct hfi_cmdbuf_t *buffer,
 
 		payload_size = (kv_count * sizeof(u32)) + kv_size;
 
-		rc = hfi_adapter_add_prop_array(buffer->ctx,
-				buffer,
+		rc = hfi_adapter_add_prop_array(buffer,
 				HFI_COMMAND_PANEL_INIT_TIMING_MODE_CAPS,
 				object_id,
 				HFI_PAYLOAD_TYPE_U32_ARRAY,
@@ -1340,7 +1110,6 @@ int dsi_hfi_panel_init(struct dsi_display *display, struct dsi_panel *panel)
 	u32 obj_id;
 	struct hfi_shared_addr_map *addr_map;
 	struct dsi_display_hfi *display_hfi;
-	struct msm_gem_object *tx_cmd_buf;
 
 	if (!display)
 		return -EINVAL;
@@ -1354,11 +1123,6 @@ int dsi_hfi_panel_init(struct dsi_display *display, struct dsi_panel *panel)
 	struct hfi_cmdbuf_t *buffer = hfi_adapter_get_cmd_buf(display_hfi->hfi_client,
 							obj_id,
 							HFI_CMDBUF_TYPE_DISPLAY_INFO_BLOCKING);
-
-	if (!buffer) {
-		DSI_ERR("failed to allocate hfi command buffer\n");
-		return -EINVAL;
-	}
 
 	panel_init_caps.num_timing_modes = panel->num_timing_nodes;
 	if (!panel_init_caps.num_timing_modes) {
@@ -1374,29 +1138,15 @@ int dsi_hfi_panel_init(struct dsi_display *display, struct dsi_panel *panel)
 		}
 	}
 
-	tx_cmd_buf = to_msm_bo(display->tx_cmd_buf);
-	if (!tx_cmd_buf || !tx_cmd_buf->sgt) {
-		DSI_ERR("Invalid tx command buffer\n");
-		goto error_buff;
-	}
-
-	rc = hfi_adapter_map_sg_table(display_hfi->hfi_client, tx_cmd_buf->sgt,
-			display->cmd_buffer_size, &display_hfi->tx_cmd_buf_dva);
-	if (rc) {
-		DSI_ERR("failed to map tx command buffer to FW, rc = %d\n", rc);
-		goto error_buff;
-	}
-
 	addr_map = kvzalloc(sizeof(struct hfi_shared_addr_map), GFP_KERNEL);
 	if (!addr_map) {
 		DSI_ERR("failed to allocate addr_map");
-		goto error_unmap_dva;
+		goto error_buff;
 	}
-	display_hfi->shared_addr_map = addr_map;
 
 	addr_map->size = SZ_4K;
 
-	hfi_adapter_buffer_alloc(display_hfi->hfi_client, addr_map);
+	hfi_adapter_buffer_alloc(addr_map);
 	if (!addr_map->remote_addr || !addr_map->local_addr)
 		goto error_addr_map;
 
@@ -1438,7 +1188,7 @@ int dsi_hfi_panel_init(struct dsi_display *display, struct dsi_panel *panel)
 		goto error_array;
 	}
 
-	rc = hfi_adapter_set_cmd_buf(display_hfi->hfi_client, buffer);
+	rc = hfi_adapter_set_cmd_buf(buffer);
 	SDE_EVT32(HFI_COMMAND_PANEL_INIT_PANEL_CAPS, HFI_COMMAND_PANEL_INIT_TIMING_MODE_CAPS,
 			HFI_COMMAND_PANEL_INIT_GENERIC_CAPS, rc, SDE_EVTLOG_FUNC_CASE4);
 	if (rc) {
@@ -1452,14 +1202,8 @@ error_array:
 	kfree(timing_caps_array);
 error_addr_map:
 	kfree(addr_map);
-error_unmap_dva:
-	rc = hfi_adapter_unmap_iova(display_hfi->hfi_client, display_hfi->tx_cmd_buf_dva,
-			display->cmd_buffer_size);
-	if (rc)
-		DSI_ERR("failed to unmap command buffer from FW\n");
-	display_hfi->tx_cmd_buf_dva = 0;
 error_buff:
-	rc = hfi_adapter_release_cmd_buf(display_hfi->hfi_client, buffer);
+	rc = hfi_adapter_release_cmd_buf(buffer);
 	if (rc)
 		DSI_ERR("failed to release command buffer\n");
 

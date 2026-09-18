@@ -54,16 +54,6 @@ struct hfi_cmdbuf_t *hfi_connector_get_cmd_buf(struct drm_connector *drm_conn,
 void sde_connector_add_roi_v1(u32 hfi_prop, struct sde_connector *conn,
 	struct sde_connector_state *old_state, struct hfi_cmdbuf_t *cmd_buf);
 
-void sde_connector_add_autorefresh(u32 hfi_prop, struct sde_connector *conn,
-	struct sde_connector_state *old_state, bool is_cont_splash,
-	struct hfi_util_u32_prop_helper *prop_collector);
-
-/**
- * hfi_conn_send_panel_init - send panel config and opertaing modes to fw
- * @drm_conn: pointer to the DRM connector structure
- * Return: error on failure to send or 0 on success
- */
-int hfi_conn_send_panel_init(struct drm_connector *drm_conn);
 #else
 int hfi_connector_init(int connector_type, struct sde_connector *c_conn);
 {
@@ -75,18 +65,6 @@ struct hfi_cmdbuf_t *hfi_connector_get_cmd_buf(struct drm_connector *drm_conn,
 {
 	return NULL;
 }
-
-int hfi_conn_send_panel_init(struct drm_connector *drm_conn)
-{
-	return 0;
-}
-
-static inline void sde_connector_add_autorefresh(u32 hfi_prop, struct sde_connector *conn,
-	struct sde_connector_state *old_state, bool is_cont_splash,
-	struct hfi_util_u32_prop_helper *prop_collector)
-{
-}
-
 #endif // IS_ENABLED(CONFIG_MDSS_HFI)
 
 #endif  // _HFI_CONNECTOR_H_

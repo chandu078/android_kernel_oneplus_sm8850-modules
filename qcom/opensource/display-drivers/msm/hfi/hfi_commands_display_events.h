@@ -103,31 +103,13 @@
 #define HFI_COMMAND_DISPLAY_EVENT_FRAME_SCAN_COMPLETE                           0x04000003
 
 /*
- * HFI_COMMAND_DISPLAY_EVENT_IDLE - This is a DCP event command sent to Host to notify
- * when display is idle.
- *
- * Below table describes the hfi_packet layout (Only data that would change per command is listed
- * below, other fields can be found in @ref disp_events_header_data_page)
- *
- * Data layout:
- * struct hfi_display_idle_event_data - idle event data
- * @timestamp_lo      :  lower value of 64bit idle timestamp
- * @timestamp_hi      :  higher value of 64bit idle timestamp
- * @idle_index        :  number of idle timeouts since last enable/disable of display
- * struct hfi_display_idle_event_data{
- *   u32 timestamp_lo;
- *   u32 timestamp_hi;
- *   u32 idle_index;
- *  }
- *
- * Hfi packet layout                      | Value
- *----------------------------------------|---------------------------------
- * hfi_packet.payload_info (type)         | HFI_PAYLOAD_U32_ARRAY
- * hfi_packet.cmd                         | HFI_COMMAND_DISPLAY_EVENT_IDLE
- * hfi_packet.flags                       | HFI_RX_FLAGS_NONE
- * hfi_packet.id                          | BITS 0:15 carry the display id for which the event is
-						applicable
- * hfi_packet.payload[0-3]                | struct hfi_display_idle_event_data
+ * HFI_COMMAND_DISPLAY_EVENT_IDLE - This is a DCP event commend sent to Host to notify when display
+ *                                  is idle.
+ * hfi_packet.payload_info.type           : HFI_PAYLOAD_NONE
+ *           .cmd                         : HFI_COMMAND_DISPLAY_EVENT_IDLE
+ *           .flags                       : HFI_RX_FLAGS_NONE
+ *           .id                          : BITS 0:15 carry the display id for which the event
+ *                                          is applicable
  */
 #define HFI_COMMAND_DISPLAY_EVENT_IDLE                                          0x04000004
 
@@ -135,44 +117,16 @@
  * HFI_COMMAND_DISPLAY_EVENT_POWER - This is a DCP event command sent to Host to notify per
  *                                   display power on/off.
  * Data layout:
- * struct hfi_display_power_event_data - power event data
- * @timestamp_lo      :  lower value of 64bit idle timestamp
- * @timestamp_hi      :  higher value of 64bit idle timestamp
- * @power_state       :  power_state corresponding to which power mode we are in.
- * struct hfi_display_power_event_data{
- *   u32 timestamp_lo;
- *   u32 timestamp_hi;
- *   enum hfi_display_power_mode power_state;
- *  }
- *
- * Below table describes the hfi_packet layout (Only data that would change per command is listed
- * below, other fields can be found in @ref disp_events_header_data_page)
- *
- * Hfi packet layout                      | Value
- *----------------------------------------|---------------------------------
- * hfi_packet.payload_info (type)         | HFI_PAYLOAD_U32_ARRAY
- * hfi_packet.cmd                         | HFI_COMMAND_DISPLAY_EVENT_POWER
- * hfi_packet.flags                       | HFI_RX_FLAGS_NONE
- * hfi_packet.id                          | BITS 0:15 carry the display id for which the event is
-						applicable
- * hfi_packet.payload[0-3]                | struct hfi_display_power_event_data
+ *    @power_state - power_state is 1/0 which corresponds to on/off.
+ *    u32 power_state;
+ * hfi_packet.payload_info.type           : HFI_PAYLOAD_U32
+ *           .cmd                         : HFI_COMMAND_DISPLAY_EVENT_POWER
+ *           .flags                       : HFI_RX_FLAGS_NONE
+ *           .id                          : BITS 0:15 carry the display id for which the event
+ *                                          is applicable
+ *           .payload[0]                  : power_state
  */
 #define HFI_COMMAND_DISPLAY_EVENT_POWER                                         0x04000005
-
-/*
- * HFI_COMMAND_DISPLAY_EVENT_HW_RECOVERY is sent from DCP to host to indicate a hw recovery event
- * for a given display.
- *
- * DCP to Host:
- * hfi_header.num_packets                 : 1
- *
- * hfi_packet.payload_info.type        : HFI_PAYLOAD_NONE
- *           .cmd                      : HFI_COMMAND_DISPLAY_EVENT_HW_RECOVERY
- *           .flags                    : HFI_TX_FLAGS_RESPONSE_REQUIRED
- *           .id                       : BITS 0:15 carry the display id for which the event
- *                                          is applicable
- */
-#define HFI_COMMAND_DISPLAY_EVENT_HW_RECOVERY                                   0x04000006
 
 #define HFI_COMMAND_DISPLAY_EVENT_END                                           0x04FFFFFF
 

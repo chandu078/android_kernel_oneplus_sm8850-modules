@@ -28,7 +28,6 @@
 #include "msm_drv.h"
 #include "sde_hw_mdss.h"
 #include "sde_kms.h"
-#include "sde_vm.h"
 #include "sde_connector.h"
 #include "sde_power_handle.h"
 #include "sde_cesta.h"
@@ -74,9 +73,6 @@ struct sde_crtc_state;
 #define SEC_TO_NS 1000000000
 #define DEVIATION_NS 500000
 #define EPT_TIMEOUT_NS 44000000
-
-/* Trigger sysfs commands before the final reserved lines at the end of Vtotal. */
-#define VTOTAL_RESERVE_LINES 500
 
 /*
  * flags to indicate the type of mode switch
@@ -133,13 +129,11 @@ struct sde_encoder_hw_resources {
  *                      the bounds of the physical display at the bit index
  * @recovery_events_enabled: indicates status of client for recoovery events
  * @frame_trigger_mode: indicates frame trigger mode
- * @update_dce_pp_mux: indicates if the pp mux needs to be updated for dce
  */
 struct sde_encoder_kickoff_params {
 	unsigned long affected_displays;
 	bool recovery_events_enabled;
 	enum frame_trigger_mode_type frame_trigger_mode;
-	bool update_dce_pp_mux;
 };
 
 struct sde_encoder_ops {
@@ -351,9 +345,8 @@ struct sde_encoder_hal_funcs {
 	 * @enc: Pointer to sde encoder structure
 	 * @mode: Pointer to drm mode structure
 	 * @mdj_ode: Pointer to adjusted drm mode structure
-	 * Returns: Zero on success
 	 */
-	int (*mode_set[MSM_DISP_OP_MAX])(struct sde_encoder_virt *enc,
+	void (*mode_set[MSM_DISP_OP_MAX])(struct sde_encoder_virt *enc,
 			struct drm_display_mode *mode, struct drm_display_mode *adj_mode);
 
 	/**
@@ -453,14 +446,6 @@ struct sde_encoder_hal_funcs {
 	 * Returns: timestamp of last known vblank event occurrence
 	 */
 	ktime_t (*get_vblank_timestamp[MSM_DISP_OP_MAX])(struct sde_encoder_virt *enc);
-
-	/**
-	 * register_power_event_notify - Register for display power event notification
-	 * @enc: Pointer to sde encoder structure
-	 * @enable: Flag to indicate whether notification is being enabled/disabled
-	 */
-	int (*register_power_event_notify[MSM_DISP_OP_MAX])(struct sde_encoder_virt *enc,
-			bool enable);
 };
 
 /**
@@ -472,7 +457,6 @@ struct sde_encoder_hal_funcs {
  * @base:		drm_encoder base class for registration with DRM
  * @enc_spin_lock:	Virtual-Encoder-Wide Spin Lock for IRQ purposes
  * @bus_scaling_client:	Client handle to the bus scaling interface
- * @cached_connector:	Pointer to cached drm_connector object.
  * @te_source:		vsync source pin information
  * @num_phys_encs:	Actual number of physical encoders contained.
  * @phys_encs:		Container of physical encoders managed.
@@ -504,8 +488,6 @@ struct sde_encoder_hal_funcs {
  *				done with frame processing
  * @crtc_frame_event_cb:	callback handler for frame event
  * @crtc_frame_event_cb_data:	callback handler private data
- * @crtc_power_event_cb:	callback into CRTC for power event notification
- * @crtc_power_event_cb_data:	callback handler private_data
  * @rsc_client:			rsc client pointer
  * @rsc_state_init:		boolean to indicate rsc config init
  * @disp_info:			local copy of msm_display_info struct
@@ -575,7 +557,6 @@ struct sde_encoder_virt {
 	spinlock_t enc_spinlock;
 	struct mutex vblank_ctl_lock;
 	uint32_t bus_scaling_client;
-	struct drm_connector *cached_connector;
 
 	uint32_t display_num_of_h_tiles;
 	uint32_t te_source;
@@ -605,8 +586,6 @@ struct sde_encoder_virt {
 	atomic_t pending_commit_cnt;
 	void (*crtc_frame_event_cb)(void *data, u32 event, ktime_t ts);
 	struct sde_kms_frame_event_cb_data crtc_frame_event_cb_data;
-	void (*crtc_power_event_cb)(void *data, u32 event);
-	struct sde_kms_frame_event_cb_data crtc_power_event_cb_data;
 
 	struct sde_rsc_client *rsc_client;
 	bool rsc_state_init;
@@ -730,16 +709,6 @@ void sde_encoder_register_vblank_callback(struct drm_encoder *encoder,
  */
 void sde_encoder_register_frame_event_callback(struct drm_encoder *encoder,
 		void (*cb)(void *, u32, ktime_t), struct drm_crtc *crtc);
-
-/**
- * sde_encoder_register_display_power_event_callback - provide callback to encoder that will be
- *	called after the display power event request is complete.
- * @encoder: encoder pointer
- * @cb: callback pointer, provide NULL to de-register
- * @crtc: pointer ot drm_crtc object interested in powercollapse events
- */
-void sde_encoder_register_display_power_event_callback(struct drm_encoder *encoder,
-		void (*cb)(void *, u32 event), struct drm_crtc *crtc);
 
 /**
  * sde_encoder_get_rsc_client - gets the rsc client state for primary
@@ -869,8 +838,6 @@ bool sde_encoder_is_dsc_merge(struct drm_encoder *drm_enc);
  */
 bool sde_encoder_check_curr_mode(struct drm_encoder *drm_enc, u32 mode);
 
-uint32_t sde_encoder_get_clones(struct drm_encoder *drm_enc);
-
 /**
  * sde_encoder_init - initialize virtual encoder object
  * @dev:        Pointer to drm device structure
@@ -932,12 +899,11 @@ int sde_encoder_display_failure_notification(struct drm_encoder *enc,
 bool sde_encoder_recovery_events_enabled(struct drm_encoder *encoder);
 
 /**
- * sde_encoder_setup_hw_recovery_event - handler to enable the sw recovery
+ * sde_encoder_enable_recovery_event - handler to enable the sw recovery
  * for this connector
  * @drm_enc:    Pointer to drm encoder structure
- * @enable:     enable/disable hw recovery event
  */
-void sde_encoder_setup_hw_recovery_event(struct drm_encoder *encoder, bool enable);
+void sde_encoder_enable_recovery_event(struct drm_encoder *encoder);
 /**
  * sde_encoder_in_clone_mode - checks if underlying phys encoder is in clone
  *	mode or independent display mode. ref@ WB in Concurrent writeback mode.
@@ -1045,13 +1011,6 @@ int sde_encoder_in_cont_splash(struct drm_encoder *enc);
  * @Return:     true if smooth dimming in progress
  */
 bool sde_encoder_smooth_dimming_in_progress(struct drm_encoder *enc);
-
-/**
- * sde_encoder_is_psr_supported - checks if display supports PSR feature
- * @drm_enc:    Pointer to drm encoder structure
- * @Return:     true if display supports PSR feature
- */
-bool sde_encoder_is_psr_supported(struct drm_encoder *enc);
 
 /**
  * sde_encoder_helper_hw_reset - hw reset helper function
@@ -1210,19 +1169,6 @@ static inline bool sde_encoder_is_loopback_display(struct drm_encoder *drm_enc)
 	return sde_enc &&
 		(sde_enc->disp_info.capabilities & MSM_DISPLAY_LOOPBACK_MODE);
 }
-
-static inline bool sde_encoder_is_wb_display(struct drm_encoder *drm_enc)
-{
-	struct sde_encoder_virt *sde_enc;
-
-	if (!drm_enc)
-		return false;
-
-	sde_enc = to_sde_encoder_virt(drm_enc);
-
-	return sde_enc && (sde_enc->disp_info.intf_type == DRM_MODE_CONNECTOR_VIRTUAL);
-}
-
 /*
  * sde_encoder_is_line_insertion_supported - get line insertion
  * feature bit value from panel
@@ -1377,20 +1323,6 @@ void sde_encoder_rc_restart_delayed(struct sde_encoder_virt *sde_enc,
 	enum sde_enc_rc_events sw_event);
 
 /**
- * sde_encoder_vm_primary_vhm_prepare_helper - prepare interface for secure vm transition
- * @sde_enc: pointer to sde encoder
- */
-bool sde_encoder_vm_primary_vhm_prepare_helper(struct sde_encoder_virt *sde_enc);
-
-/**
- * sde_encoder_vm_primary_vhm_prepare - prepare vhm panel for secure vm transition
- * @drm_enc: pointer to drm encoder
- * @vm_req: current vm_req state
- */
-void sde_encoder_vm_primary_vhm_prepare(struct drm_encoder *drm_enc,
-	enum sde_crtc_vm_req vm_req);
-
-/**
  * sde_encoder_get_cesta_client - return the SDE CESTA client
  * @drm_enc: pointer to drm encoder
  */
@@ -1519,24 +1451,4 @@ int sde_encoder_helper_inc_pending(struct drm_encoder *drm_enc);
  * @sde_enc: pointer to sde encoder
  */
 int sde_encoder_update_pending_kickoff_cnt(struct sde_encoder_virt *sde_enc);
- 
-/**
- * sde_encoder_check_frame_pending - increment pending count on the encoder
- * @msm_kms: pointer to kms
- * #drm_crtc: pointer to drm crtc
- */
-void sde_encoder_check_frame_pending(struct msm_kms *kms, struct drm_crtc *crtc);
-
-/**
- * sde_encoder_cancel_vrr_timers - cancel vrr timers
- * @encoder: pointer to drm_encoder
- */
-void sde_encoder_cancel_vrr_timers(struct drm_encoder *encoder);
-
-/**
- * sde_encoder_phys_delay_dcs - delay the sysfs node for triggering
- * @sde_enc: pointer to drm encoder
- */
-u32 sde_encoder_phys_delay_dcs(struct drm_encoder *drm_enc);
-
 #endif /* __SDE_ENCODER_H__ */

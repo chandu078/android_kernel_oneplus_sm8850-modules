@@ -1,4 +1,3 @@
-load(":repo_paths.bzl", "modules_label")
 load(":display_driver_build.bzl", "display_module_entry")
 
 display_driver_modules = display_module_entry([":display_drivers_headers"])
@@ -82,19 +81,18 @@ module_entry(
         "CONFIG_MDSS_HFI": [
             "msm/hfi/hfi_utils.c",
             "msm/hfi/hfi_msm_drv.c",
-            "msm/hfi/hfi_dbg.c",
             "msm/sde/hfi/hfi_catalog.c",
             "msm/sde/hfi/hfi_connector.c",
             "msm/sde/hfi/hfi_crtc.c",
             "msm/sde/hfi/hfi_encoder.c",
             "msm/sde/hfi/hfi_kms.c",
+            "msm/sde/hfi/hfi_msm_dbg.c",
             "msm/sde/hfi/hfi_plane.c",
             "msm/sde/hfi/hfi_color_proc.c",
             "msm/dsi/hfi/dsi_display_hfi.c",
             "msm/dsi/hfi/dsi_hfi.c",
-            "msm/sde/hfi/hfi_wb.c",
-         ],
-         "CONFIG_DRM_MSM_SDE" : [
+        ],
+        "CONFIG_DRM_MSM_SDE": [
             "msm/sde/sde_crtc.c",
             "msm/sde/sde_encoder.c",
             "msm/sde/sde_encoder_dce.c",
@@ -171,20 +169,17 @@ module_entry(
         "CONFIG_DRM_MSM_DSI": [
             "msm/dsi/dsi_phy.c",
             "msm/dsi/dsi_pwr.c",
-            "msm/dsi/dsi_phy_hw_v2_0.c",
             "msm/dsi/dsi_phy_hw_v3_0.c",
             "msm/dsi/dsi_phy_hw_v4_0.c",
             "msm/dsi/dsi_phy_hw_v5_0.c",
             "msm/dsi/dsi_phy_hw_v7_2.c",
             "msm/dsi/dsi_phy_timing_calc.c",
-            "msm/dsi/dsi_phy_timing_v2_0.c",
             "msm/dsi/dsi_phy_timing_v3_0.c",
             "msm/dsi/dsi_phy_timing_v4_0.c",
             "msm/dsi/dsi_pll.c",
             "msm/dsi/dsi_pll_5nm.c",
             "msm/dsi/dsi_pll_4nm.c",
             "msm/dsi/dsi_pll_3nm.c",
-            "msm/dsi/dsi_pll_14nm.c",
             "msm/dsi/dsi_ctrl_hw_cmn.c",
             "msm/dsi/dsi_ctrl_hw_2_2.c",
             "msm/dsi/dsi_ctrl.c",
@@ -256,24 +251,28 @@ module_entry(
             "msm/msm_smmu.c",
             "msm/msm_prop.c",
         ],
-        "CONFIG_MSM_SDE_ROTATOR": [
-            "rotator/sde_rotator_dev.c",
-            "rotator/sde_rotator_core.c",
-            "rotator/sde_rotator_base.c",
-            "rotator/sde_rotator_formats.c",
-            "rotator/sde_rotator_util.c",
-            "rotator/sde_rotator_io_util.c",
-            "rotator/sde_rotator_smmu.c",
-            "rotator/sde_rotator_r1_wb.c",
-            "rotator/sde_rotator_r1_pipe.c",
-            "rotator/sde_rotator_r1_ctl.c",
-            "rotator/sde_rotator_r1.c",
-            "rotator/sde_rotator_r3.c",
-            "rotator/sde_rotator_sync.c",
-            "rotator/sde_rotator_debug.c",
-            "rotator/sde_rotator_r1_debug.c",
-            "rotator/sde_rotator_r3_debug.c",
-        ],
+        "CONFIG_MSM_SDE_ROTATOR": {
+            True: [
+               "rotator/sde_rotator_dev.c",
+               "rotator/sde_rotator_core.c",
+               "rotator/sde_rotator_base.c ",
+               "rotator/sde_rotator_formats.c",
+               "rotator/sde_rotator_util.c",
+               "rotator/sde_rotator_io_util.c",
+               "rotator/sde_rotator_smmu.c",
+               "rotator/sde_rotator_r1_wb.c",
+               "rotator/sde_rotator_r1_pipe.c ",
+               "rotator/sde_rotator_r1_ctl.c",
+               "rotator/sde_rotator_r1.c",
+               "rotator/sde_rotator_r3.c",
+            ],
+            "CONFIG_SYNC_FILE": ["rotator/sde_rotator_sync.c"],
+            "CONFIG_DEBUG_FS": [
+                "rotator/sde_rotator_debug.c",
+                "rotator/sde_rotator_r1_debug.c",
+                "rotator/sde_rotator_r3_debug.c",
+            ],
+        },
 #ifdef OPLUS_FEATURE_DISPLAY
          "OPLUS_FEATURE_DISPLAY" : [
              "oplus/SM8850/oplus_display_utils.c",
@@ -313,39 +312,40 @@ module_entry(
 #endif /* OPLUS_FEATURE_DISPLAY */
       },
 
-
-
-      # Configs are handled by config_options = []
-      config_deps = {
-        "OPLUS_FEATURE_DISPLAY": [
+#ifdef OPLUS_FEATURE_DISPLAY
+      deps = [
             "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
             "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_bootmode",
             "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/device_info/bazel:device_info",
             "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/touchpanel_notify/bazel:oplus_bsp_tp_notify",
       ],
+#endif /* OPLUS_FEATURE_DISPLAY */
+
+      # Configs are handled by config_options = []
+      config_deps = {
         "CONFIG_QTI_HW_FENCE": [
-            modules_label("qcom/opensource/mm-drivers/hw_fence:%b_msm_hw_fence"),
-            modules_label("qcom/opensource/synx-kernel:%b_modules"),
-            modules_label("qcom/opensource/synx-kernel:synx_headers"),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/hw_fence:%b_msm_hw_fence",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:%b_modules",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:synx_headers",
         ],
         "CONFIG_QCOM_SPEC_SYNC": [
-            modules_label("qcom/opensource/mm-drivers/sync_fence:%b_sync_fence"),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/sync_fence:%b_sync_fence",
         ],
         "CONFIG_MSM_EXT_DISPLAY": [
-            modules_label("qcom/opensource/mm-drivers/msm_ext_display:%b_msm_ext_display"),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/msm_ext_display:%b_msm_ext_display",
         ],
         "CONFIG_HDCP_QSEECOM": [
-            modules_label("qcom/opensource/securemsm-kernel:%b_hdcp_qseecom_dlkm"),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:%b_hdcp_qseecom_dlkm",
         ],
         "CONFIG_MSM_MMRM": [
-            modules_label("qcom/opensource/mmrm-driver:%b_mmrm_driver"),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mmrm-driver:%b_mmrm_driver",
         ],
         "CONFIG_SMMU_PROXY": [
-            modules_label("qcom/opensource/securemsm-kernel:%b_smmu_proxy_dlkm"),
-            modules_label("qcom/opensource/securemsm-kernel:smmu_proxy_headers"),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:%b_smmu_proxy_dlkm",
+            "//vendor/qcom/sm8850-modules/qcom/opensource/securemsm-kernel:smmu_proxy_headers",
         ],
         "CONFIG_QTI_HFI_CORE": [
-            modules_label("qcom/opensource/mm-drivers/hfi_core:%b_msm_hfi_core"),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/mm-drivers/hfi_core:%b_msm_hfi_core",
         ],
     },
 )

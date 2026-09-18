@@ -31,7 +31,7 @@
  * 64 based on software design. It should be increased if any of the
  * hardware block has more subblocks.
  */
-#define MAX_SDE_HW_BLK  128
+#define MAX_SDE_HW_BLK  64
 
 /* each entry will have register address and bit offset in that register */
 #define MAX_BIT_OFFSET 2
@@ -48,8 +48,6 @@
 /* max mixer blend stages */
 #define DEFAULT_SDE_MIXER_BLENDSTAGES 7
 
-/* dummy block base address */
-#define DUMMY_SDE_BLOCK_BASE 0x0f0f
 /*
  * max bank bit for macro tile and ubwc format.
  * this value is left shifted and written to register
@@ -99,7 +97,6 @@
 #define LINE_MODE_WB_OFFSET		2
 
 #define QULTIV_DISP_GDSC2_DISABLED	0x7
-#define QULTIV_DISP_GDSC2_DISABLED_1	0x2
 #define SDE_PERF_MAX_CORE_CLK_RATE      650000000
 #define SDE_PERF_SYS_CACHE_ENABLE       0xffffffff
 
@@ -234,7 +231,6 @@ enum sde_prop {
 	DIM_LAYER,
 	SMART_DMA_REV,
 	IDLE_PC,
-	DDR_TYPE,
 	WAKEUP_WITH_TOUCH,
 	DEST_SCALER,
 	SMART_PANEL_ALIGN_MODE,
@@ -679,7 +675,6 @@ static struct sde_prop_type sde_prop[] = {
 	{DIM_LAYER, "qcom,sde-has-dim-layer", false, PROP_TYPE_BOOL},
 	{SMART_DMA_REV, "qcom,sde-smart-dma-rev", false, PROP_TYPE_STRING},
 	{IDLE_PC, "qcom,sde-has-idle-pc", false, PROP_TYPE_BOOL},
-	{DDR_TYPE, "qcom,sde-ddr-type", false, PROP_TYPE_U32_ARRAY},
 	{WAKEUP_WITH_TOUCH, "qcom,sde-wakeup-with-touch", false,
 			PROP_TYPE_BOOL},
 	{DEST_SCALER, "qcom,sde-has-dest-scaler", false, PROP_TYPE_BOOL},
@@ -707,10 +702,8 @@ static struct sde_prop_type sde_prop[] = {
 };
 
 static struct sde_prop_type sde_perf_prop[] = {
-	{PERF_MAX_BW_LOW, "qcom,sde-max-bw-low-kbps", false,
-			PROP_TYPE_U32_ARRAY},
-	{PERF_MAX_BW_HIGH, "qcom,sde-max-bw-high-kbps", false,
-			PROP_TYPE_U32_ARRAY},
+	{PERF_MAX_BW_LOW, "qcom,sde-max-bw-low-kbps", false, PROP_TYPE_U32},
+	{PERF_MAX_BW_HIGH, "qcom,sde-max-bw-high-kbps", false, PROP_TYPE_U32},
 	{PERF_MIN_CORE_IB, "qcom,sde-min-core-ib-kbps", false, PROP_TYPE_U32},
 	{PERF_MIN_LLCC_IB, "qcom,sde-min-llcc-ib-kbps", false, PROP_TYPE_U32},
 	{PERF_MIN_DRAM_IB, "qcom,sde-min-dram-ib-kbps", false, PROP_TYPE_U32},
@@ -1801,8 +1794,8 @@ static int _sde_sspp_setup_vigs(struct device_node *np,
 		if (sde_cfg->true_inline_rot_rev > 0) {
 			set_bit(SDE_SSPP_TRUE_INLINE_ROT, &sspp->features);
 			sblk->in_rot_format_list = sde_cfg->inline_rot_formats;
-			sblk->in_rot_maxheight = sde_cfg->in_rot_maxheight ?
-				sde_cfg->in_rot_maxheight : MAX_PRE_ROT_HEIGHT_INLINE_ROT_DEFAULT;
+			sblk->in_rot_maxheight =
+					MAX_PRE_ROT_HEIGHT_INLINE_ROT_DEFAULT;
 		}
 
 		if (IS_SDE_INLINE_ROT_REV_200(sde_cfg->true_inline_rot_rev) ||
@@ -2095,8 +2088,7 @@ static void sde_sspp_set_features(struct sde_mdss_cfg *sde_cfg,
 
 	if (props->exists[SSPP_MAX_PER_PIPE_BW])
 		sblk->max_per_pipe_bw = PROP_VALUE_ACCESS(props->values,
-				SSPP_MAX_PER_PIPE_BW,
-				sde_cfg->ddr_list_index * sde_cfg->sspp_count + sspp_index);
+				SSPP_MAX_PER_PIPE_BW, sspp_index);
 	else
 		sblk->max_per_pipe_bw = DEFAULT_MAX_PER_PIPE_BW;
 
@@ -2487,6 +2479,7 @@ static int sde_mixer_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_c
 		const char *disp_pref = NULL;
 		const char *cwb_pref = NULL;
 		const char *dcwb_pref = NULL;
+		u32 dummy_mixer_base = 0x0f0f;
 
 		mixer_base = PROP_VALUE_ACCESS(props->values, MIXER_OFF, i);
 		if (!mixer_base)
@@ -2546,20 +2539,15 @@ static int sde_mixer_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_c
 		if (cwb_pref && !strcmp(cwb_pref, "cwb"))
 			set_bit(SDE_DISP_CWB_PREF, &mixer->features);
 
-		if (BIT(mixer->id - LM_0) & sde_cfg->virtual_mixers_mask)
-			set_bit(SDE_MIXER_IS_VIRTUAL, &mixer->features);
-
 		of_property_read_string_index(np,
 			mixer_prop[MIXER_DCWB].prop_name, i, &dcwb_pref);
-		if (dcwb_pref && !strcmp(dcwb_pref, "dcwb"))
+		if (dcwb_pref && !strcmp(dcwb_pref, "dcwb")) {
 			set_bit(SDE_DISP_DCWB_PREF, &mixer->features);
-
-		if ((mixer->features & BIT(SDE_MIXER_IS_VIRTUAL) ||
-				mixer->features & BIT(SDE_DISP_DCWB_PREF)) &&
-				(mixer->base == DUMMY_SDE_BLOCK_BASE)) {
-			mixer->base = 0x0;
-			mixer->len = 0;
-			mixer->dummy_mixer = true;
+			if (mixer->base == dummy_mixer_base) {
+				mixer->base = 0x0;
+				mixer->len = 0;
+				mixer->dummy_mixer = true;
+			}
 		}
 
 		mixer->pingpong = pp_count > 0 ? pp_idx + PINGPONG_0
@@ -4237,15 +4225,9 @@ static int _sde_vbif_populate_qos_parsing(struct sde_mdss_cfg *sde_cfg,
 	int i, j, prop_index = VBIF_QOS_RT_REMAP;
 	u32 entries;
 
-	if (WARN_ON(!sde_cfg->ddr_count))
-		return -EINVAL;
-
-
-	for (i = VBIF_RT_CLIENT;
-			((i < VBIF_MAX_CLIENT) && (prop_index < VBIF_PROP_MAX));
-				i++, prop_index++) {
-		vbif->qos_tbl[i].count =
-				(prop_count[prop_index] / sde_cfg->ddr_count);
+	for (i = VBIF_RT_CLIENT; ((i < VBIF_MAX_CLIENT) && (prop_index < VBIF_PROP_MAX));
+						i++, prop_index++) {
+		vbif->qos_tbl[i].count = prop_count[prop_index];
 		SDE_DEBUG("qos_tbl[%d].count=%u\n", i, vbif->qos_tbl[i].count);
 
 		entries = 2 * sde_cfg->vbif_qos_nlvl;
@@ -4264,9 +4246,7 @@ static int _sde_vbif_populate_qos_parsing(struct sde_mdss_cfg *sde_cfg,
 
 		for (j = 0; j < vbif->qos_tbl[i].count; j++) {
 			vbif->qos_tbl[i].priority_lvl[j] =
-				PROP_VALUE_ACCESS(prop_value, prop_index,
-				vbif->qos_tbl[i].count
-				* sde_cfg->ddr_list_index + j);
+					PROP_VALUE_ACCESS(prop_value, prop_index, j);
 			SDE_DEBUG("client:%d, prop:%d, lvl[%d]=%u\n", i, prop_index, j,
 					vbif->qos_tbl[i].priority_lvl[j]);
 		}
@@ -4545,13 +4525,6 @@ static int sde_pp_parse_dt(struct device_node *np, struct sde_mdss_cfg *sde_cfg)
 			pp->merge_3d_id = PROP_VALUE_ACCESS(prop_value,
 					PP_MERGE_3D_ID, i) + 1;
 		}
-
-		if (pp->base == DUMMY_SDE_BLOCK_BASE) {
-			pp->base = 0x0;
-			pp->len = 0;
-			sblk->dither.base = 0x0;
-			sblk->dither.len = 0;
-		}
 	}
 
 end:
@@ -4593,19 +4566,6 @@ static void _sde_top_parse_dt_helper(struct sde_mdss_cfg *cfg,
 	cfg->max_mixer_blendstages = props->exists[MIXER_BLEND] ?
 			PROP_VALUE_ACCESS(props->values, MIXER_BLEND, 0) :
 			DEFAULT_SDE_MIXER_BLENDSTAGES;
-
-	/* set default value of ddr_count as one */
-	cfg->ddr_count = 1;
-	if (props->exists[DDR_TYPE]) {
-		cfg->ddr_count = props->counts[DDR_TYPE];
-		for (i = 0; i < cfg->ddr_count; i++) {
-			ddr_type = PROP_VALUE_ACCESS(props->values, DDR_TYPE, i);
-			if (ddr_type == of_fdt_get_ddrtype()) {
-				cfg->ddr_list_index = i;
-				break;
-			}
-		}
-	}
 
 	cfg->mdp[0].highest_bank_bit = DEFAULT_SDE_HIGHEST_BANK_BIT;
 
@@ -4922,16 +4882,6 @@ static int _sde_perf_parse_dt_validate(struct device_node *np, int *prop_count)
 	if (rc)
 		return rc;
 
-	rc = _validate_dt_entry(np, &sde_perf_prop[PERF_MAX_BW_LOW], 1,
-			&prop_count[PERF_MAX_BW_LOW], NULL);
-	if (rc)
-		return rc;
-
-	rc = _validate_dt_entry(np, &sde_perf_prop[PERF_MAX_BW_HIGH], 1,
-			&prop_count[PERF_MAX_BW_HIGH], NULL);
-	if (rc)
-		return rc;
-
 	return rc;
 }
 
@@ -5014,45 +4964,14 @@ static void _sde_perf_parse_dt_cfg_populate(struct sde_mdss_cfg *cfg,
 		struct sde_prop_value *prop_value,
 		bool *prop_exists)
 {
-	int i;
-	u32 ddr_type;
-
-	if (prop_exists[PERF_MAX_BW_LOW] && prop_count[PERF_MAX_BW_LOW] % 2 == 0) {
-		for (i = 0; i < prop_count[PERF_MAX_BW_LOW]; i = i + 2) {
-			ddr_type = PROP_VALUE_ACCESS(prop_value,
-					PERF_MAX_BW_LOW, i);
-			if (!ddr_type || (of_fdt_get_ddrtype() == ddr_type))
-				cfg->perf.max_bw_low =
-					PROP_VALUE_ACCESS(prop_value,
-					PERF_MAX_BW_LOW, i + 1);
-		}
-	}
-
-	if (!cfg->perf.max_bw_low) {
-		cfg->perf.max_bw_low =
+	cfg->perf.max_bw_low =
 			prop_exists[PERF_MAX_BW_LOW] ?
 			PROP_VALUE_ACCESS(prop_value, PERF_MAX_BW_LOW, 0) :
 			DEFAULT_MAX_BW_LOW;
-	}
-
-	if (prop_exists[PERF_MAX_BW_HIGH] && prop_count[PERF_MAX_BW_HIGH] % 2 == 0) {
-		for (i = 0; i < prop_count[PERF_MAX_BW_HIGH]; i = i + 2) {
-			ddr_type = PROP_VALUE_ACCESS(prop_value,
-					PERF_MAX_BW_HIGH, i);
-			if (!ddr_type || (of_fdt_get_ddrtype() == ddr_type))
-				cfg->perf.max_bw_high =
-					PROP_VALUE_ACCESS(prop_value,
-					PERF_MAX_BW_HIGH, i+1);
-		}
-	}
-
-	if (!cfg->perf.max_bw_high) {
-		cfg->perf.max_bw_high =
+	cfg->perf.max_bw_high =
 			prop_exists[PERF_MAX_BW_HIGH] ?
 			PROP_VALUE_ACCESS(prop_value, PERF_MAX_BW_HIGH, 0) :
 			DEFAULT_MAX_BW_HIGH;
-	}
-
 	cfg->perf.min_core_ib =
 			prop_exists[PERF_MIN_CORE_IB] ?
 			PROP_VALUE_ACCESS(prop_value, PERF_MIN_CORE_IB, 0) :
@@ -5364,11 +5283,6 @@ static int sde_parse_merge_3d_dt(struct device_node *np,
 		snprintf(merge_3d->name, SDE_HW_BLK_NAME_LEN, "merge_3d_%u",
 				merge_3d->id -  MERGE_3D_0);
 		merge_3d->len = PROP_VALUE_ACCESS(prop_value, HW_LEN, 0);
-
-		if (merge_3d->base == DUMMY_SDE_BLOCK_BASE) {
-			merge_3d->base = 0x0;
-			merge_3d->len = 0;
-		}
 	}
 
 end:
@@ -5877,19 +5791,6 @@ static void _sde_get_hw_caps_for_bengal(struct sde_mdss_cfg *sde_cfg, uint32_t h
 	set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
 }
 
-static void _sde_get_hw_caps_for_khaje(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
-{
-	set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
-	sde_cfg->perf.min_prefill_lines = 24;
-	sde_cfg->vbif_qos_nlvl = 8;
-	sde_cfg->ts_prefill_rev = 2;
-	sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-	sde_cfg->sui_block_xin_mask = 0xC01;
-	clear_bit(SDE_FEATURE_HDR, sde_cfg->features);
-	set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
-	set_bit(SDE_FEATURE_EPT, sde_cfg->features);
-}
-
 static void _sde_get_hw_caps_for_lagoon(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 {
 	set_bit(SDE_FEATURE_CWB, sde_cfg->features);
@@ -6164,28 +6065,6 @@ static void _sde_get_hw_caps_for_kalama(struct sde_mdss_cfg *sde_cfg, uint32_t h
 	sde_cfg->demura_supported[SSPP_DMA3][0] = BIT(DEMURA_0) | BIT(DEMURA_2);
 	sde_cfg->demura_supported[SSPP_DMA3][1] = BIT(DEMURA_1) | BIT(DEMURA_3);
 	sde_cfg->has_line_insertion = true;
-}
-
-static void _sde_get_hw_caps_for_malabar(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
-{
-	set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
-	clear_bit(SDE_FEATURE_HDR, sde_cfg->features);
-	sde_cfg->perf.min_prefill_lines = 40;
-	sde_cfg->has_reduced_ob_max = true;
-	sde_cfg->vbif_qos_nlvl = 8;
-	sde_cfg->ts_prefill_rev = 2;
-	sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-	set_bit(SDE_FEATURE_INLINE_SKIP_THRESHOLD, sde_cfg->features);
-	sde_cfg->true_inline_rot_rev = SDE_INLINE_ROT_VERSION_2_0_1;
-	set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
-	sde_cfg->mdss_hw_block_size = 0x158;
-	set_bit(SDE_FEATURE_MULTIRECT_ERROR, sde_cfg->features);
-	set_bit(SDE_MDP_PERIPH_TOP_0_REMOVED, &sde_cfg->mdp[0].features);
-	set_bit(SDE_FEATURE_HW_VSYNC_TS, sde_cfg->features);
-	set_bit(SDE_FEATURE_AVR_STEP, sde_cfg->features);
-	set_bit(SDE_FEATURE_UBWC_STATS, sde_cfg->features);
-	set_bit(SDE_FEATURE_EPT, sde_cfg->features);
-	set_bit(SDE_FEATURE_TRUSTED_VM, sde_cfg->features);
 }
 
 static void _sde_get_hw_caps_for_pineapple(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
@@ -6587,73 +6466,6 @@ static void _sde_get_hw_caps_for_seraph(struct sde_mdss_cfg *sde_cfg, uint32_t h
 	sde_cfg->mdss_hw_block_size = 0x158;
 }
 
-static void _sde_get_hw_caps_for_chora(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
-{
-	set_bit(SDE_FEATURE_DEDICATED_CWB, sde_cfg->features);
-	set_bit(SDE_FEATURE_CWB_DITHER, sde_cfg->features);
-	set_bit(SDE_FEATURE_CWB_CROP, sde_cfg->features);
-	set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
-	set_bit(SDE_FEATURE_3D_MERGE_RESET, sde_cfg->features);
-	set_bit(SDE_FEATURE_HDR_PLUS, sde_cfg->features);
-	set_bit(SDE_FEATURE_INLINE_SKIP_THRESHOLD, sde_cfg->features);
-	set_bit(SDE_MDP_DHDR_MEMPOOL_4K, &sde_cfg->mdp[0].features);
-	set_bit(SDE_FEATURE_VIG_P010, sde_cfg->features);
-	set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
-	set_bit(SDE_FEATURE_DITHER_LUMA_MODE, sde_cfg->features);
-	set_bit(SDE_FEATURE_MULTIRECT_ERROR, sde_cfg->features);
-	set_bit(SDE_FEATURE_FP16, sde_cfg->features);
-	set_bit(SDE_MDP_PERIPH_TOP_0_REMOVED, &sde_cfg->mdp[0].features);
-	set_bit(SDE_FEATURE_UBWC_STATS, sde_cfg->features);
-	set_bit(SDE_FEATURE_HW_VSYNC_TS, sde_cfg->features);
-	set_bit(SDE_FEATURE_AVR_STEP, sde_cfg->features);
-	set_bit(SDE_FEATURE_VBIF_CLK_SPLIT, sde_cfg->features);
-	set_bit(SDE_FEATURE_TRUSTED_VM, sde_cfg->features);
-	set_bit(SDE_FEATURE_CTL_DONE, sde_cfg->features);
-	set_bit(SDE_FEATURE_WB_ROTATION, sde_cfg->features);
-	set_bit(SDE_FEATURE_EPT, sde_cfg->features);
-	sde_cfg->allowed_dsc_reservation_switch = SDE_DP_DSC_RESERVATION_SWITCH;
-	sde_cfg->autorefresh_disable_seq = AUTOREFRESH_DISABLE_SEQ2;
-	/* if pingpong block supports it this should not be set on top block */
-	sde_cfg->ppb_sz_program = SDE_PPB_SIZE_THRU_TOP;
-	sde_cfg->perf.min_prefill_lines = 40;
-	sde_cfg->vbif_qos_nlvl = 8;
-	sde_cfg->qos_target_time_ns = 18600;
-	sde_cfg->ts_prefill_rev = 2;
-	sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-	sde_cfg->true_inline_rot_rev = SDE_INLINE_ROT_VERSION_2_0_1;
-	sde_cfg->uidle_cfg.uidle_rev = SDE_UIDLE_VERSION_1_0_4;
-	sde_cfg->sid_rev = SDE_SID_VERSION_2_0_0;
-	sde_cfg->mdss_hw_block_size = 0x158;
-	sde_cfg->has_line_insertion = true;
-	sde_cfg->virtual_mixers_mask = 0x2;
-}
-
-static void _sde_get_hw_caps_for_ravelin(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
-{
-	clear_bit(SDE_FEATURE_HDR, sde_cfg->features);
-	set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
-	sde_cfg->perf.min_prefill_lines = 40;
-	sde_cfg->has_reduced_ob_max = true;
-	sde_cfg->vbif_qos_nlvl = 8;
-	sde_cfg->ts_prefill_rev = 2;
-	sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
-	set_bit(SDE_FEATURE_SUI_NS_ALLOWED, sde_cfg->features);
-	set_bit(SDE_FEATURE_SUI_MISR, sde_cfg->features);
-	set_bit(SDE_FEATURE_SUI_BLENDSTAGE, sde_cfg->features);
-	set_bit(SDE_FEATURE_INLINE_SKIP_THRESHOLD, sde_cfg->features);
-	sde_cfg->true_inline_rot_rev = SDE_INLINE_ROT_VERSION_2_0_1;
-	sde_cfg->in_rot_maxheight = 1200;
-	set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
-	set_bit(SDE_FEATURE_DITHER_LUMA_MODE, sde_cfg->features);
-	sde_cfg->mdss_hw_block_size = 0x158;
-	set_bit(SDE_FEATURE_MULTIRECT_ERROR, sde_cfg->features);
-	set_bit(SDE_MDP_PERIPH_TOP_0_REMOVED, &sde_cfg->mdp[0].features);
-	set_bit(SDE_FEATURE_HW_VSYNC_TS, sde_cfg->features);
-	set_bit(SDE_FEATURE_AVR_STEP, sde_cfg->features);
-	set_bit(SDE_FEATURE_TRUSTED_VM, sde_cfg->features);
-	set_bit(SDE_FEATURE_UBWC_STATS, sde_cfg->features);
-}
-
 static struct sde_mdss_hw_caps sde_mdss_target_caps[] = {
 	{SDE_HW_VER_170, _sde_get_hw_caps_for_msm8996},
 	{SDE_HW_VER_300, _sde_get_hw_caps_for_msm8998},
@@ -6672,19 +6484,15 @@ static struct sde_mdss_hw_caps sde_mdss_target_caps[] = {
 	{SDE_HW_VER_660, _sde_get_hw_caps_for_holi},
 	{SDE_HW_VER_670, _sde_get_hw_caps_for_shima},
 	{SDE_HW_VER_680, _sde_get_hw_caps_for_monaco},
-	{SDE_HW_VER_6100, _sde_get_hw_caps_for_khaje},
 	{SDE_HW_VER_700, _sde_get_hw_caps_for_lahaina},
 	{SDE_HW_VER_720, _sde_get_hw_caps_for_yupik},
 	{SDE_HW_VER_810, _sde_get_hw_caps_for_waipio},
 	{SDE_HW_VER_820, _sde_get_hw_caps_for_diwali},
 	{SDE_HW_VER_850, _sde_get_hw_caps_for_cape},
-	{SDE_HW_VER_860, _sde_get_hw_caps_for_ravelin},
-	{SDE_HW_VER_870, _sde_get_hw_caps_for_malabar},
 	{SDE_HW_VER_880, _sde_get_hw_caps_for_vienna},
 	{SDE_HW_VER_900, _sde_get_hw_caps_for_kalama},
 	{SDE_HW_VER_980, _sde_get_hw_caps_for_seraph},
 	{SDE_HW_VER_A00, _sde_get_hw_caps_for_pineapple},
-	{SDE_HW_VER_A30, _sde_get_hw_caps_for_chora},
 	{SDE_HW_VER_B00, _sde_get_hw_caps_for_niobe},
 	{SDE_HW_VER_C00, _sde_get_hw_caps_for_sun},
 	{SDE_HW_VER_C30, _sde_get_hw_caps_for_tuna},
@@ -7043,8 +6851,8 @@ static int sde_hw_check_ssip_fuse(struct drm_device *dev, struct sde_mdss_cfg *s
 		disable = (fuse & BIT(1)) >> 1;
 		polarity = fuse & BIT(0);
 	} else if (IS_CANOE_TARGET(sde_cfg->hw_rev)) {
-		disable = (fuse & BIT(5)) >> 5;
-		polarity = (fuse & BIT(3)) >> 3;
+		disable = (fuse & BIT(2)) >> 2;
+		polarity = (fuse & BIT(0));
 	} else {
 		sde_cfg->ssip_allowed = false;
 		return 0;
@@ -7100,9 +6908,7 @@ static int sde_hw_check_qultivate_fuse(struct drm_device *dev, struct sde_mdss_c
 			return -ENOMEM;
 		}
 		config_v1->enabled = (fuse & BIT(29) ||
-			(part_info != NULL &&
-			 (part_info[0] == QULTIV_DISP_GDSC2_DISABLED ||
-			  part_info[0] == QULTIV_DISP_GDSC2_DISABLED_1)));
+			(part_info != NULL && part_info[0] == QULTIV_DISP_GDSC2_DISABLED));
 		config_v1->vig_count = 2;
 		config_v1->dma_count = 4;
 		config_v1->gdsc2_blocked = true;

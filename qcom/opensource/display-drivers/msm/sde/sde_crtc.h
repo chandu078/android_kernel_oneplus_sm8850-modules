@@ -416,13 +416,6 @@ struct sde_crtc_hal_funcs {
 	 * @crtc: Pointer to sde crtc structure
 	 */
 	int (*debugfs_misr_read[MSM_DISP_OP_MAX])(struct sde_crtc *crtc);
-
-	/**
-	 * set_idle_pc_timer - Update idle pc control timer based on drm property
-	 * @crtc: Pointer to sde crtc structure
-	 * @value: Value of enum for idle timer control
-	 */
-	int (*set_idle_pc_timer[MSM_DISP_OP_MAX])(struct sde_crtc *crtc, u32 value);
 };
 
 /**
@@ -509,7 +502,6 @@ struct sde_crtc_hal_funcs {
  * @cached_encoder_mask : cached encoder_mask for vblank work
  * @line_time_in_ns : current mode line time in nano sec is needed for QOS update
  * @frame_data      : Framedata data structure
- * @frame_data_lock : spinlock to protect framedata allocation, free and access
  * @previous_opr_value : store previous opr values
  * @opr_event_notify_enabled : Flag to indicate if opr event notify is enabled or not
  * @hwfence_features_mask : u32 mask to enable/disable hw fence features. See enum
@@ -635,7 +627,6 @@ struct sde_crtc {
 	u32 line_time_in_ns;
 
 	struct sde_frame_data frame_data;
-	spinlock_t frame_data_lock;
 
 	struct sde_opr_value previous_opr_value;
 	bool opr_event_notify_enabled;
@@ -700,7 +691,8 @@ struct sde_line_insertion_param {
  * @lm_roi        : Current LM ROI, possibly sub-rectangle of mode.
  *                  Origin top left of CRTC.
  * @user_roi_list : List of user's requested ROIs as from set property
-  * @property_state: Local storage for msm_prop properties
+ * @cached_user_roi_list : Copy of user_roi_list from previous PU frame
+ * @property_state: Local storage for msm_prop properties
  * @property_values: Current crtc property values
  * @input_fence_timeout_ns : Cached input fence timeout, in ns
  * @num_dim_layers: Number of dim layers
@@ -720,6 +712,7 @@ struct sde_line_insertion_param {
  * @cp_range_payload: array storing state user_data passed via range props
  * @cont_splash_populated: State was populated as part of cont. splash
  * @param: sde line insertion parameters
+ * @hwfence_in_fences_set: input hw fences are configured for the commit
  * @is_loopback_mode: boolean variable to indicate if crtc is running in loopback mode
  * @in_loopback_transition: boolean variable to indicate if crtc is transitioning in or out
 				of loopback mode
@@ -740,7 +733,7 @@ struct sde_crtc_state {
 	struct sde_rect crtc_roi;
 	struct sde_rect lm_bounds[MAX_MIXERS_PER_CRTC];
 	struct sde_rect lm_roi[MAX_MIXERS_PER_CRTC];
-	struct msm_roi_list user_roi_list;
+	struct msm_roi_list user_roi_list, cached_user_roi_list;
 
 	struct msm_property_state property_state;
 	struct msm_property_value property_values[CRTC_PROP_COUNT];
@@ -766,6 +759,7 @@ struct sde_crtc_state {
 		cp_range_payload[SDE_CP_CRTC_MAX_FEATURES];
 	bool cont_splash_populated;
 	struct sde_line_insertion_param line_insertion;
+	bool hwfence_in_fences_set;
 	bool is_loopback_mode;
 	bool in_loopback_transition;
 	struct sde_io_res cac_mixer_roi[MAX_MIXERS_PER_CRTC];

@@ -364,7 +364,6 @@ enum dsi_error_int_type {
  * @offset:        IOMMU VA for command buffer address.
  * @length:        Length of the command buffer.
  * @datatype:      Datatype of cmd.
- * @vc_id:         Virtual channel identifier.
  * @en_broadcast:  Enable broadcast mode if set to true.
  * @is_master:     Is master in broadcast mode.
  * @use_lpm:       Use low power mode for command transmission.
@@ -373,7 +372,6 @@ struct dsi_ctrl_cmd_dma_info {
 	u32 offset;
 	u32 length;
 	u8  datatype;
-	u32 vc_id;
 	bool en_broadcast;
 	bool is_master;
 	bool use_lpm;
@@ -633,15 +631,13 @@ struct dsi_ctrl_hw_ops {
 	 * @rx_byte:        Number of bytes to be read.
 	 * @pkt_size:        Size of response expected.
 	 * @hw_read_cnt:    Actual number of bytes read by HW.
-	 * @flags:          Controller flags of the command.
 	 */
 	u32 (*get_cmd_read_data[MSM_DISP_OP_MAX])(struct dsi_ctrl_hw *ctrl,
 				 u8 *rd_buf,
 				 u32 read_offset,
 				 u32 rx_byte,
 				 u32 pkt_size,
-				 u32 *hw_read_cnt,
-				 u32 flags);
+				 u32 *hw_read_cnt);
 
 	/**
 	 * wait_for_lane_idle() - wait for DSI lanes to go to idle state

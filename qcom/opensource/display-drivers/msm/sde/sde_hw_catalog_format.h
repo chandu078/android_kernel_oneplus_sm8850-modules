@@ -69,7 +69,6 @@
 static const struct sde_format_extended plane_formats[] = {
 	RGB_FMTS,
 	RGB_10BIT_FMTS,
-	{DRM_FORMAT_NV12, DRM_FORMAT_MOD_QCOM_DMA},
 	{0, 0},
 };
 
@@ -78,7 +77,6 @@ static const struct sde_format_extended plane_formats_vig[] = {
 
 	{DRM_FORMAT_NV12, 0},
 	{DRM_FORMAT_NV12, DRM_FORMAT_MOD_QCOM_COMPRESSED},
-	{DRM_FORMAT_NV12, DRM_FORMAT_MOD_QCOM_DMA},
 	{DRM_FORMAT_NV21, 0},
 	{DRM_FORMAT_VYUY, 0},
 	{DRM_FORMAT_UYVY, 0},

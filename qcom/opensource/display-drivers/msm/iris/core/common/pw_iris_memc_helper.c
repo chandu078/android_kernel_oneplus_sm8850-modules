@@ -4060,7 +4060,7 @@ void iris_set_pp_scl_aux(void)
 		IRIS_LOGE("%s(), fail to get panel timing!", __func__);
 		return;
 	}
-
+	
 	if (pcfg->iris_memc_ops.iris_memc_get_main_panel_timing_info(&main_timing))
 		return;
 

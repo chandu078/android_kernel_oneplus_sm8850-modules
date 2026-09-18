@@ -53,7 +53,6 @@
 /**
  * enum dsi_phy_version - DSI PHY version enumeration
  * @DSI_PHY_VERSION_UNKNOWN:    Unknown version.
- * @DSI_PHY_VERSION_2_0:	14nm
  * @DSI_PHY_VERSION_3_0:        10nm
  * @DSI_PHY_VERSION_4_0:        7nm
  * @DSI_PHY_VERSION_4_1:	7nm
@@ -66,7 +65,6 @@
  */
 enum dsi_phy_version {
 	DSI_PHY_VERSION_UNKNOWN,
-	DSI_PHY_VERSION_2_0, /* 14nm */
 	DSI_PHY_VERSION_3_0, /* 10nm */
 	DSI_PHY_VERSION_4_0, /* 7nm  */
 	DSI_PHY_VERSION_4_1, /* 7nm */
@@ -84,7 +82,6 @@ enum dsi_phy_version {
  * @DSI_PLL_VERSION_4NM:        4nm PLL
  * @DSI_PLL_VERSION_5NM:        5nm PLL
  * @DSI_PLL_VERSION_10NM:	10nm PLL
- * @DSI_PLL_VERSION_14NM:	14nm PLL
  * @DSI_PLL_VERSION_UNKNOWN:	Unknown PLL version
  */
 enum dsi_pll_version {
@@ -93,7 +90,6 @@ enum dsi_pll_version {
 	DSI_PLL_VERSION_4NM,
 	DSI_PLL_VERSION_5NM,
 	DSI_PLL_VERSION_10NM,
-	DSI_PLL_VERSION_14NM,
 	DSI_PLL_VERSION_UNKNOWN
 };
 

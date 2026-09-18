@@ -79,8 +79,6 @@ static int isl97900_led_event(struct device_node *node, enum isl_function event,
 #define TOPOLOGY_SET_LEN 3
 #define MAX_TOPOLOGY 5
 
-#define PRIVACY_V1_CMD_LEN 146
-
 #define DSI_PANEL_DEFAULT_LABEL  "Default dsi panel"
 
 #define DEFAULT_PANEL_JITTER_NUMERATOR		2
@@ -495,10 +493,10 @@ int dsi_panel_pinctrl_toggle_te_function(struct dsi_panel *panel)
 }
 
 #ifdef OPLUS_FEATURE_DISPLAY
-int dsi_panel_set_pinctrl_state(struct dsi_panel *panel, bool enable, bool is_cont_splash)
-#else
-static int dsi_panel_set_pinctrl_state(struct dsi_panel *panel, bool enable, bool is_cont_splash)
-#endif
+int dsi_panel_set_pinctrl_state(struct dsi_panel *panel, bool enable)
+#else /* OPLUS_FEATURE_DISPLAY */
+static int dsi_panel_set_pinctrl_state(struct dsi_panel *panel, bool enable)
+#endif /* OPLUS_FEATURE_DISPLAY */
 {
 	int rc = 0;
 	struct pinctrl_state *state;
@@ -518,14 +516,10 @@ static int dsi_panel_set_pinctrl_state(struct dsi_panel *panel, bool enable, boo
 		state = panel->pinctrl.suspend;
 	}
 
-	if (is_cont_splash && panel->disp_op == MSM_DISP_OP_HFI) {
-		DSI_DEBUG("Skipping pintctrl_select_state in HFI cont-splash case\n");
-	} else {
-		rc = pinctrl_select_state(panel->pinctrl.pinctrl, state);
-		if (rc)
-			DSI_ERR("[%s] failed to set pin state, rc=%d\n",
-					panel->name, rc);
-	}
+	rc = pinctrl_select_state(panel->pinctrl.pinctrl, state);
+	if (rc)
+		DSI_ERR("[%s] failed to set pin state, rc=%d\n",
+				panel->name, rc);
 
 #ifdef OPLUS_FEATURE_DISPLAY
 	if (oplus_display_ops.panel_set_pinctrl_state) {
@@ -538,7 +532,7 @@ static int dsi_panel_set_pinctrl_state(struct dsi_panel *panel, bool enable, boo
 	return rc;
 }
 
-int dsi_panel_power_on(struct dsi_panel *panel, bool is_cont_splash)
+int dsi_panel_power_on(struct dsi_panel *panel)
 {
 	int rc = 0;
 
@@ -557,21 +551,16 @@ int dsi_panel_power_on(struct dsi_panel *panel, bool is_cont_splash)
 		goto exit;
 	}
 
-	rc = dsi_panel_set_pinctrl_state(panel, true, is_cont_splash);
+	rc = dsi_panel_set_pinctrl_state(panel, true);
 	if (rc) {
 		DSI_ERR("[%s] failed to set pinctrl, rc=%d\n", panel->name, rc);
 		goto error_disable_vregs;
 	}
 
-	/* For HFI continuous splash case - avoid panel-reset GPIO */
-	if (is_cont_splash && panel->disp_op == MSM_DISP_OP_HFI) {
-		DSI_DEBUG("[%s] skipping panel reset in hfi path with cont-splash\n", panel->name);
-	} else {
-		rc = dsi_panel_reset(panel);
-		if (rc) {
-			DSI_ERR("[%s] failed to reset panel, rc=%d\n", panel->name, rc);
-			goto error_disable_gpio;
-		}
+	rc = dsi_panel_reset(panel);
+	if (rc) {
+		DSI_ERR("[%s] failed to reset panel, rc=%d\n", panel->name, rc);
+		goto error_disable_gpio;
 	}
 
 	goto exit;
@@ -583,7 +572,7 @@ error_disable_gpio:
 	if (gpio_is_valid(panel->bl_config.en_gpio))
 		gpio_set_value(panel->bl_config.en_gpio, 0);
 
-	(void)dsi_panel_set_pinctrl_state(panel, false, is_cont_splash);
+	(void)dsi_panel_set_pinctrl_state(panel, false);
 
 error_disable_vregs:
 	(void)dsi_pwr_enable_regulator(&panel->power_info, false);
@@ -628,7 +617,7 @@ int dsi_panel_power_off(struct dsi_panel *panel)
 		}
 	}
 #else /* OPLUS_FEATURE_DISPLAY */
-	rc = dsi_panel_set_pinctrl_state(panel, false, false);
+	rc = dsi_panel_set_pinctrl_state(panel, false);
 	if (rc) {
 		DSI_ERR("[%s] failed set pinctrl state, rc=%d\n", panel->name,
 		       rc);
@@ -1318,12 +1307,6 @@ static int dsi_panel_parse_timing(struct dsi_mode_info *mode,
 		rc = 0;
 	}
 
-	rc = utils->read_u32(utils->data, "qcom,mdss-ppb-overlap", &mode->overlap);
-	if (rc) {
-		DSI_DEBUG("overlap not defined in timing node\n");
-		rc = 0;
-	}
-
 	DSI_DEBUG("panel vert active:%d front_portch:%d back_porch:%d pulse_width:%d\n",
 		mode->v_active, mode->v_front_porch, mode->v_back_porch,
 		mode->v_sync_width);
@@ -1639,19 +1622,6 @@ static void dsi_panel_parse_split_link_config(struct dsi_host_common_cfg *host,
 	split_link->enabled = true;
 }
 
-static void dsi_panel_parse_dpu_dma_mode(struct dsi_host_common_cfg *host,
-					struct dsi_parser_utils *utils,
-					const char *name)
-{
-	bool dpu_dma_enabled;
-
-	dpu_dma_enabled = utils->read_bool(utils->data, "qcom,mdss-dpu-dma-mode");
-	if (dpu_dma_enabled)
-		DSI_DEBUG("[%s] dpu dma is supported\n", name);
-
-	host->dpu_dma_enabled = dpu_dma_enabled;
-}
-
 static int dsi_panel_parse_host_config(struct dsi_panel *panel)
 {
 	int rc = 0;
@@ -1700,54 +1670,6 @@ static int dsi_panel_parse_host_config(struct dsi_panel *panel)
 	dsi_panel_parse_split_link_config(&panel->host_config, utils,
 						panel->name);
 
-	dsi_panel_parse_dpu_dma_mode(&panel->host_config, utils, panel->name);
-
-error:
-	return rc;
-}
-
-static int dsi_panel_parse_esync_params(struct dsi_panel *panel,
-	struct esync_params *esync_params,
-	struct dsi_parser_utils *utils)
-{
-	int val, rc = 0;
-
-	if (!panel || !esync_params || !utils || !utils->data) {
-		DSI_ERR("invalid arguments\n");
-		return -EINVAL;
-	}
-
-	rc = utils->read_u32(utils->data, "qcom,mdss-esync-milli-skew", &val);
-	if (rc) {
-		DSI_DEBUG("mode esync skew fallback on default\n");
-		val = 0;
-	}
-	esync_params->milli_skew = val;
-
-	rc = utils->read_u32(utils->data, "qcom,mdss-esync-hsync-milli-pulse-width", &val);
-	if (rc) {
-		DSI_ERR("mode esync enabled but hsync pulse width not defined\n");
-		goto error;
-	}
-	esync_params->hsync_milli_pulse_width = val;
-
-	rc = utils->read_u32(utils->data, "qcom,mdss-esync-emsync-fps", &val);
-	if (rc) {
-		DSI_DEBUG("mode esync EM pulse not enabled\n");
-		esync_params->emsync_fps = 0;
-		return 0;
-	}
-	esync_params->emsync_fps = val;
-
-	rc = utils->read_u32(utils->data, "qcom,mdss-esync-emsync-milli-pulse-width", &val);
-	if (rc) {
-		DSI_ERR("mode esync EM pulse enabled but pulse width not defined\n");
-		goto error;
-	}
-	esync_params->emsync_milli_pulse_width = val;
-
-	return 0;
-
 error:
 	return rc;
 }
@@ -1766,25 +1688,39 @@ static int dsi_panel_parse_esync_caps(struct dsi_panel *panel,
 		return 0;
 	}
 
-	esync_caps->emsync_switch_enabled = utils->read_bool(utils->data,
-					"qcom,mdss-dsi-panel-esync-emsync-switch-enabled");
-	DSI_DEBUG("emsync switch feature %s\n",
-			(esync_caps->emsync_switch_enabled ? "enabled" : "disabled"));
-	if (esync_caps->emsync_switch_enabled)
-		return 0;
-
-	rc = dsi_panel_parse_esync_params(panel,
-		&esync_caps->default_esync_params, utils);
+	rc = utils->read_u32(utils->data, "qcom,mdss-esync-milli-skew", &val);
 	if (rc) {
-		DSI_ERR("[%s] parse esync params failed, rc=%d\n", panel->name, rc);
+		DSI_DEBUG("[%s] esync skew fallback on default\n", panel->name);
+		val = 0;
+	}
+	esync_caps->milli_skew = val;
+
+	rc = utils->read_u32(utils->data, "qcom,mdss-esync-hsync-milli-pulse-width", &val);
+	if (rc) {
+		DSI_ERR("[%s] esync enabled but hsync pulse width not defined\n", panel->name);
 		goto error;
 	}
+	esync_caps->hsync_milli_pulse_width = val;
+
+	rc = utils->read_u32(utils->data, "qcom,mdss-esync-emsync-fps", &val);
+	if (rc) {
+		DSI_DEBUG("[%s] esync EM pulse not enabled\n", panel->name);
+		esync_caps->emsync_fps = 0;
+		return 0;
+	}
+	esync_caps->emsync_fps = val;
+
+	rc = utils->read_u32(utils->data, "qcom,mdss-esync-emsync-milli-pulse-width", &val);
+	if (rc) {
+		DSI_ERR("[%s] esync EM pulse enabled but pulse width not defined\n", panel->name);
+		goto error;
+	}
+	esync_caps->emsync_milli_pulse_width = val;
 
 	return 0;
 
 error:
 	esync_caps->esync_support = false;
-	esync_caps->emsync_switch_enabled = false;
 	return rc;
 }
 
@@ -2118,12 +2054,7 @@ static int dsi_panel_parse_vrr_caps(struct dsi_panel *panel,
 	int rc = 0;
 	struct dsi_parser_utils *utils = &panel->utils;
 
-	/* required only for VMH TUI */
-	panel->vrr_caps.has_vhm_capability =
-		utils->read_bool(utils->data, "qcom,has-vhm-capability");
-
-	/*
-	 * "qcom,has-vrr-enable" is true for CMD mode panels
+	/* "qcom,has-vrr-enable" is true for CMD mode panels
 	 * that has AVR-step/EM pulse, ARP Panel, Video PSR Panel
 	 */
 	panel->vrr_caps.vrr_support = utils->read_bool(utils->data, "qcom,vrr-enable");
@@ -2660,9 +2591,6 @@ const char *cmd_set_prop_map[DSI_CMD_SET_MAX] = {
 	"qcom,mdss-dsi-sticky_on_fly-command",
 	"qcom,mdss-dsi-trigger_self_refresh-command",
 	"qcom,mdss-dsi-fps-switch-command",
-	"qcom,mdss-dsi-em-pulse-switch-command",
-	"Privacy layer not parsed from DTSI, generated dynamically",
-	"Brightness not parsed from DTSI, generated dynamically"
 };
 
 const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
@@ -2707,9 +2635,6 @@ const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
 	"qcom,mdss-dsi-sticky_on_fly-command-state",
 	"qcom,mdss-dsi-trigger_self_refresh-command-state",
 	"qcom,mdss-dsi-fps-switch-command-state",
-	"qcom,mdss-dsi-em-pulse-switch-command-state",
-	"Privacy layer not parsed from DTSI, generated dynamically",
-	"Brightness not parsed from DTSI, generated dynamically",
 };
 #endif /* OPLUS_FEATURE_DISPLAY */
 
@@ -3039,12 +2964,6 @@ static int dsi_panel_parse_misc_features(struct dsi_panel *panel)
 	panel->skip_panel_off = utils->read_bool(utils->data,
 			"qcom,skip-panel-power-off");
 
-	panel->privacy_feature_enabled = utils->read_bool(utils->data,
-			"qcom,mdss-dsi-panel-privacy-enabled");
-
-	DSI_DEBUG("%s: privacy feature %s\n", __func__,
-		(panel->privacy_feature_enabled ? "enabled" : "disabled"));
-
 	panel->spr_info.enable = false;
 	panel->spr_info.pack_type = MSM_DISPLAY_SPR_TYPE_MAX;
 
@@ -3231,9 +3150,6 @@ static int dsi_panel_post_pwr_ctrl(struct dsi_panel *panel, bool enable)
 		return -EINVAL;
 	}
 
-	if (panel->post_power_enable_status == enable)
-		return 0;
-
 	r_config = &panel->reset_config;
 	if (gpio_is_valid(r_config->oled_en_gpio)) {
 		if (enable) {
@@ -3243,22 +3159,19 @@ static int dsi_panel_post_pwr_ctrl(struct dsi_panel *panel, bool enable)
 			rc = poll_status_timeout((gpio_get_value(r_config->oled_en_gpio) == 0),
 				sleep_us, timeout_us);
 		}
-
-		if (rc) {
-			DSI_WARN("[%s] wait for oled en status failed,enable=%d rc=%d\n",
-					panel->name, enable, rc);
-			return rc;
-		}
 	}
 
-	rc = dsi_pwr_enable_regulator(&panel->post_power_info, enable);
 	if (rc) {
-		DSI_ERR("[%s] failed to set post power vregs status, enable=%d rc=%d\n",
-				panel->name, enable, rc);
+		DSI_WARN("[%s] wait for oled en status failed,enable=%d rc=%d\n",
+					panel->name, enable, rc);
 		return rc;
 	}
 
-	panel->post_power_enable_status = enable;
+	rc = dsi_pwr_enable_regulator(&panel->post_power_info, enable);
+	if (rc)
+		DSI_ERR("[%s] failed to set post power vregs status, enable=%d rc=%d\n",
+				panel->name, enable, rc);
+
 	return 0;
 }
 
@@ -4316,18 +4229,6 @@ static int dsi_panel_parse_dms_info(struct dsi_panel *panel)
 	const char *data;
 	struct dsi_parser_utils *utils = &panel->utils;
 
-	data = utils->get_property(utils->data,
-			"qcom,mdss-dms-vid-type", NULL);
-	if (data && !strcmp(data, "dms-vid-seamless"))
-		panel->dms_vid_caps.type = DSI_DMS_VID_SEAMLESS;
-	else if (data && !strcmp(data, "dms-vid-non-seamless"))
-		panel->dms_vid_caps.type = DSI_DMS_VID_NON_SEAMLESS;
-	else
-		panel->dms_vid_caps.type = DSI_DMS_VID_DISABLED;
-
-	panel->dms_vid_caps.maintain_const_clk = utils->read_bool(utils->data,
-		"qcom,dms-vid-maintain-const-clk");
-
 	panel->dms_mode = DSI_DMS_MODE_DISABLED;
 	dms_enabled = utils->read_bool(utils->data,
 		"qcom,dynamic-mode-switch-enabled");
@@ -4782,7 +4683,6 @@ struct dsi_panel *dsi_panel_get(struct device *parent,
 	panel->panel_of_node = of_node;
 	panel->parent = parent;
 	panel->type = type;
-	panel->post_power_enable_status = false;
 
 	dsi_panel_update_util(panel, parser_node);
 	utils = &panel->utils;
@@ -4869,15 +4769,15 @@ struct dsi_panel *dsi_panel_get(struct device *parent,
 	if (rc)
 		DSI_ERR("failed to parse hdr config, rc=%d\n", rc);
 
-	rc = dsi_panel_parse_dms_info(panel);
-	if (rc)
-		DSI_DEBUG("failed to get dms info, rc=%d\n", rc);
-
 	rc = dsi_panel_get_mode_count(panel);
 	if (rc) {
 		DSI_ERR("failed to get mode count, rc=%d\n", rc);
 		goto error;
 	}
+
+	rc = dsi_panel_parse_dms_info(panel);
+	if (rc)
+		DSI_DEBUG("failed to get dms info, rc=%d\n", rc);
 
 	rc = dsi_panel_parse_esd_config(panel);
 	if (rc)
@@ -5116,14 +5016,12 @@ int dsi_panel_get_mode_count(struct dsi_panel *panel)
 		goto error;
 	}
 
-	/* Multi-mode for video panel is supported when DMS_VID or
-	 * POMS is enabled.
+	/* No multiresolution support is available for video mode panels.
+	 * Multi-mode is supported for video mode during POMS is enabled.
 	 */
 	if (panel->panel_mode != DSI_OP_CMD_MODE &&
 		!panel->host_config.ext_bridge_mode &&
-		!panel->esync_caps.emsync_switch_enabled &&
-		!panel->panel_mode_switch_enabled &&
-		!panel->dms_vid_caps.type)
+		!panel->panel_mode_switch_enabled)
 		count = SINGLE_MODE_SUPPORT;
 
 	panel->num_timing_nodes = count;
@@ -5473,13 +5371,6 @@ int dsi_panel_get_mode(struct dsi_panel *panel,
 		if (rc)
 			DSI_ERR("failed to partial update caps, rc=%d\n", rc);
 
-		if (panel->esync_caps.emsync_switch_enabled) {
-			rc = dsi_panel_parse_esync_params(panel, &prv_info->esync_params, utils);
-			if (rc) {
-				DSI_ERR("failed to parse mode esync caps, rc=%d\n", rc);
-				goto parse_fail;
-			}
-		}
 #ifdef OPLUS_FEATURE_DISPLAY
 		if (oplus_display_ops.panel_get_mode) {
 			rc = oplus_display_ops.panel_get_mode(mode, utils);
@@ -5665,7 +5556,7 @@ int dsi_panel_pre_prepare(struct dsi_panel *panel)
 		goto error;
 #endif /* OPLUS_FEATURE_DISPLAY */
 
-	rc = dsi_panel_power_on(panel, false);
+	rc = dsi_panel_power_on(panel);
 	if (rc) {
 		DSI_ERR("[%s] panel power on failed, rc=%d\n", panel->name, rc);
 		goto error;
@@ -5904,7 +5795,7 @@ int dsi_panel_prepare(struct dsi_panel *panel)
 	}
 #else /* OPLUS_FEATURE_DISPLAY */
 	if (panel->lp11_init) {
-		rc = dsi_panel_power_on(panel, false);
+		rc = dsi_panel_power_on(panel);
 		if (rc) {
 			DSI_ERR("[%s] panel power on failed, rc=%d\n",
 			       panel->name, rc);
@@ -5922,193 +5813,6 @@ int dsi_panel_prepare(struct dsi_panel *panel)
 
 error:
 	mutex_unlock(&panel->panel_lock);
-	return rc;
-}
-
-static int dsi_panel_privacy_v1_prepare_dcs_cmds(struct dsi_panel_cmd_set *set,
-		struct sde_drm_privacy_layer_v1 *privacy_v1, int ctrl_idx, int unicast)
-{
-	static const int PRIVACY_CMD_LEN = PRIVACY_V1_CMD_LEN;
-	static const int PRIVACY_CMD_ENABLE_LEN = sizeof(privacy_cmd_cfg_v1.privacy_en_cmd);
-	static const int LKEY_ENABLE_CMD_LEN = sizeof(privacy_cmd_cfg_v1.lkey_enable_cmd);
-	static const int LKEY_DISABLE_CMD_LEN = sizeof(privacy_cmd_cfg_v1.lkey_disable_cmd);
-
-	int rc = 0, cnt=0;
-	char *privacy = NULL, *privacy_en = NULL;
-	char *lkey_en = NULL, *lkey_dis = NULL;
-
-	if (set == NULL) {
-		DSI_ERR("Panel command set for Privacy is NULL\n");
-		return -EINVAL;
-	}
-	set->cmds = NULL;
-
-	//Enabling privacy in layer mode
-	privacy_en = kmemdup(privacy_cmd_cfg_v1.privacy_en_cmd, PRIVACY_CMD_ENABLE_LEN, GFP_KERNEL);
-	if (!privacy_en) {
-		rc = -ENOMEM;
-		goto error_free_mem;
-	}
-
-	privacy = kzalloc(PRIVACY_CMD_LEN, GFP_KERNEL);
-	if (!privacy) {
-		rc = -ENOMEM;
-		goto error_free_mem;
-	}
-
-	privacy[0] = 0x66;//Privacy layer index
-	privacy[1] = privacy_v1->no_of_layers;
-
-	for (cnt=0; cnt < (privacy_v1->no_of_layers); cnt++) {
-		int offset = (cnt * 9) + 2;
-		privacy[offset+0] = (privacy_v1->privacy_list[cnt].left & 0xFF00) >> 8;
-		privacy[offset+1] = (privacy_v1->privacy_list[cnt].left & 0xFF);
-		privacy[offset+2] = (privacy_v1->privacy_list[cnt].top & 0xFF00) >> 8;
-		privacy[offset+3] = (privacy_v1->privacy_list[cnt].top & 0xFF);
-		privacy[offset+4] = (privacy_v1->privacy_list[cnt].right & 0xFF00) >> 8;
-		privacy[offset+5] = (privacy_v1->privacy_list[cnt].right & 0xFF);
-		privacy[offset+6] = (privacy_v1->privacy_list[cnt].bottom & 0xFF00) >> 8;
-		privacy[offset+7] = (privacy_v1->privacy_list[cnt].bottom & 0xFF);
-		privacy[offset+8] = (privacy_v1->privacy_list[cnt].corner_radius & 0xFF);
-	}
-
-	lkey_en = kmemdup(privacy_cmd_cfg_v1.lkey_enable_cmd, LKEY_ENABLE_CMD_LEN, GFP_KERNEL);
-	if (!lkey_en) {
-		rc = -ENOMEM;
-		goto error_free_mem;
-	}
-
-	lkey_dis = kmemdup(privacy_cmd_cfg_v1.lkey_disable_cmd, LKEY_DISABLE_CMD_LEN, GFP_KERNEL);
-	if (!lkey_dis) {
-		rc = -ENOMEM;
-		goto error_free_mem;
-	}
-
-	set->type = DSI_CMD_SET_PRIVACY_LAYER;
-	set->state = DSI_CMD_SET_STATE_HS;
-	set->count = 4;
-	set->cmds = kcalloc(set->count, sizeof(*set->cmds), GFP_KERNEL);
-	if (!set->cmds) {
-		rc = -ENOMEM;
-		goto error_free_mem;
-	}
-	set->cmds[0].msg.channel = 0;
-	set->cmds[0].msg.type = MIPI_DSI_DCS_LONG_WRITE;
-	set->cmds[0].msg.flags = 0;
-	set->cmds[0].msg.tx_len = LKEY_ENABLE_CMD_LEN;
-	set->cmds[0].msg.tx_buf = lkey_en;
-	set->cmds[0].msg.rx_len = 0;
-	set->cmds[0].msg.rx_buf = 0;
-	set->cmds[0].last_command = 0;
-	set->cmds[0].post_wait_ms = 0;
-	set->cmds[0].ctrl = 0;
-
-	set->cmds[1].msg.channel = 0;
-	set->cmds[1].msg.type = MIPI_DSI_DCS_LONG_WRITE;
-	set->cmds[1].msg.flags = 0;
-	set->cmds[1].msg.tx_len = PRIVACY_CMD_ENABLE_LEN;
-	set->cmds[1].msg.tx_buf = privacy_en;
-	set->cmds[1].msg.rx_len = 0;
-	set->cmds[1].msg.rx_buf = 0;
-	set->cmds[1].last_command = 0;
-	set->cmds[1].post_wait_ms = 0;
-	set->cmds[1].ctrl = 0;
-
-	set->cmds[2].msg.channel = 0;
-	set->cmds[2].msg.type = MIPI_DSI_DCS_LONG_WRITE;
-	set->cmds[2].msg.flags = 0;
-	set->cmds[2].msg.tx_len = PRIVACY_CMD_LEN;
-	set->cmds[2].msg.tx_buf = privacy;
-	set->cmds[2].msg.rx_len = 0;
-	set->cmds[2].msg.rx_buf = 0;
-	set->cmds[2].last_command = 0;
-	set->cmds[2].post_wait_ms = 0;
-	set->cmds[2].ctrl = 0;
-
-	set->cmds[3].msg.channel = 0;
-	set->cmds[3].msg.type = MIPI_DSI_DCS_LONG_WRITE;
-	set->cmds[3].msg.flags = 0;
-	set->cmds[3].msg.tx_len = LKEY_DISABLE_CMD_LEN;
-	set->cmds[3].msg.tx_buf = lkey_dis;
-	set->cmds[3].msg.rx_len = 0;
-	set->cmds[3].msg.rx_buf = 0;
-	set->cmds[3].last_command = 1;
-	set->cmds[3].post_wait_ms = 0;
-	set->cmds[3].ctrl = 0;
-	goto exit;
-
-error_free_mem:
-	if (set->cmds)
-		kfree(set->cmds);
-	if (privacy_en)
-		kfree(privacy_en);
-	if (privacy)
-		kfree(privacy);
-	if (lkey_en)
-		kfree(lkey_en);
-	if (lkey_dis)
-		kfree(lkey_dis);
-exit:
-	return rc;
-}
-
-static int dsi_panel_set_brightness_prepare_dcs_cmds(struct dsi_panel *panel,
-		struct dsi_panel_cmd_set *set, u32 bl_lvl)
-{
-	u8 *tx = NULL;
-	int rc = 0;
-	u8 bl_default_payload[2];
-
-	if (!set) {
-		DSI_ERR("Panel command set for Brightness is NULL\n");
-		return -EINVAL;
-	}
-
-	if (!panel || bl_lvl > 0xffff) {
-		DSI_ERR("invalid params\n");
-		return -EINVAL;
-	}
-
-	set->cmds = NULL;
-	set->type = DSI_CMD_SET_BRIGHTNESS;
-	set->state = DSI_CMD_SET_STATE_HS;
-	set->count = 1;
-	set->cmds = kcalloc(set->count, sizeof(*set->cmds), GFP_KERNEL);
-	if (!set->cmds) {
-		rc = -ENOMEM;
-		goto error_free_mem;
-	}
-
-	if (panel->bl_config.bl_inverted_dbv)
-		bl_lvl = (((bl_lvl & 0xff) << 8) | (bl_lvl >> 8));
-
-	bl_default_payload[0] = bl_lvl & 0xff;
-	bl_default_payload[1] = bl_lvl >> 8;
-	tx = kmalloc(1 + sizeof(bl_default_payload), GFP_KERNEL);
-	if (!tx) {
-		rc = -ENOMEM;
-		goto error_free_mem;
-	}
-
-	tx[0] = MIPI_DCS_SET_DISPLAY_BRIGHTNESS;
-	memcpy(&tx[1], bl_default_payload, sizeof(bl_default_payload));
-	set->cmds[0].msg.channel = 0;
-	set->cmds[0].msg.flags = 0;
-	set->cmds[0].msg.type = MIPI_DSI_DCS_LONG_WRITE;
-	set->cmds[0].msg.tx_buf = tx;
-	set->cmds[0].msg.tx_len = 1 + sizeof(bl_default_payload);
-	set->cmds[0].msg.rx_len = 0;
-	set->cmds[0].msg.rx_buf = 0;
-	set->cmds[0].last_command = 0;
-	set->cmds[0].post_wait_ms = 0;
-	set->cmds[0].ctrl = 0;
-
-	goto exit;
-
-error_free_mem:
-	kfree(set->cmds);
-	kfree(tx);
-exit:
 	return rc;
 }
 
@@ -6246,11 +5950,11 @@ int dsi_panel_send_qsync_off_dcs(struct dsi_panel *panel,
 static int dsi_panel_prepare_cmd(struct dsi_panel *panel,
 		struct msm_display_conn_params *params, enum dsi_cmd_set_type type,
 		bool last_command)
+
 {
 	int i;
 	struct dsi_panel_cmd_set *set;
 	struct dsi_display_mode_priv_info *priv_info;
-	int rc = 0;
 
 	if (!panel || !panel->cur_mode) {
 		DSI_ERR("Invalid params\n");
@@ -6260,15 +5964,8 @@ static int dsi_panel_prepare_cmd(struct dsi_panel *panel,
 	priv_info = panel->cur_mode->priv_info;
 	set = &priv_info->cmd_sets[type];
 
-	// Prepare the privacy buffer content dynamically.
-	if (type == DSI_CMD_SET_PRIVACY_LAYER)
-		rc = dsi_panel_privacy_v1_prepare_dcs_cmds(set, params->privacy_v1, 0, true);
-	if (type == DSI_CMD_SET_BRIGHTNESS)
-		rc = dsi_panel_set_brightness_prepare_dcs_cmds(panel, set, params->b_lvl);
-
 	if (!set->cmds) {
-		DSI_ERR("Invalid params cmds NULL, type %x, last_command %d\n",
-				type, last_command);
+		DSI_ERR("Invalid params\n");
 		return -EINVAL;
 	}
 
@@ -6303,10 +6000,7 @@ int dsi_panel_send_cmd(struct dsi_panel *panel,
 	if (params && params->peripheral_flush)
 		peripheral_flush = true;
 
-	rc = dsi_panel_prepare_cmd(panel, params, type, last_command);
-	if (rc)
-		DSI_ERR("[%s] failed to prepare cmd type %x rc=%d\n",
-				panel->name, type, rc);
+	dsi_panel_prepare_cmd(panel, params, type, last_command);
 
 	rc = dsi_panel_tx_cmd_set(panel, type, peripheral_flush);
 
@@ -6316,45 +6010,6 @@ int dsi_panel_send_cmd(struct dsi_panel *panel,
 		       panel->name, type, rc);
 
 	mutex_unlock(&panel->panel_lock);
-
-	return rc;
-}
-
-int dsi_panel_send_privacy_dcs(struct dsi_panel *panel, int ctrl_idx,
-		struct sde_drm_privacy_layer_v1 *privacy_v1)
-{
-	int rc = 0;
-
-	struct dsi_panel_cmd_set *set;
-	struct dsi_display_mode_priv_info *priv_info;
-
-	if (!panel->cur_mode || !panel->cur_mode->priv_info) {
-		DSI_ERR("Invalid params\n");
-		return -EINVAL;
-	}
-
-	priv_info = panel->cur_mode->priv_info;
-	set = &priv_info->cmd_sets[DSI_CMD_SET_PRIVACY_LAYER];
-
-	rc = dsi_panel_privacy_v1_prepare_dcs_cmds(set, privacy_v1, ctrl_idx, true);
-	if (rc) {
-		DSI_ERR("[%s] failed to prepare Privacy cmds, rc=%d\n",
-				panel->name, rc);
-		return rc;
-	}
-
-	mutex_lock(&panel->panel_lock);
-
-	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_PRIVACY_LAYER, false);
-
-	if (rc)
-		DSI_ERR("[%s] failed to send DSI_CMD_SET_PRIVACY_LAYER cmds, rc=%d\n",
-				panel->name, rc);
-
-	mutex_unlock(&panel->panel_lock);
-
-	dsi_panel_destroy_cmd_packets(set);
-	dsi_panel_dealloc_cmd_packets(set);
 
 	return rc;
 }

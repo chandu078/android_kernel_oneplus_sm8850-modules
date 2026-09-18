@@ -185,8 +185,6 @@ static void sde_hw_intf_avr_trigger(struct sde_hw_intf *ctx)
 	c = &ctx->hw;
 	SDE_REG_WRITE(c, INTF_AVR_TRIGGER, 0x1);
 	SDE_DEBUG("AVR Triggered\n");
-	/* ensure written */
-	wmb();
 }
 
 static int sde_hw_intf_avr_setup(struct sde_hw_intf *ctx,
@@ -240,8 +238,6 @@ static void sde_hw_intf_avr_enable(struct sde_hw_intf *ctx, bool enable)
 		avr_ctrl = BIT(0);
 
 	SDE_REG_WRITE(c, INTF_AVR_CONTROL, avr_ctrl);
-	/* ensure written */
-	wmb();
 }
 
 static void sde_hw_intf_avr_ctrl(struct sde_hw_intf *ctx,
@@ -249,12 +245,14 @@ static void sde_hw_intf_avr_ctrl(struct sde_hw_intf *ctx,
 {
 	struct sde_hw_blk_reg_map *c;
 	u32 avr_mode = 0;
+	u32 avr_ctrl = 0;
 
 	if (!ctx || !avr_params)
 		return;
 
 	c = &ctx->hw;
 	if (avr_params->avr_mode) {
+		avr_ctrl = BIT(0);
 		avr_mode = (avr_params->avr_mode == SDE_RM_QSYNC_ONE_SHOT_MODE) ?
 				(BIT(0) | BIT(8)) : 0x0;
 		if (avr_params->avr_step_lines)
@@ -267,6 +265,7 @@ static void sde_hw_intf_avr_ctrl(struct sde_hw_intf *ctx,
 	if (avr_params->hw_avr_trigger)
 		avr_mode = avr_mode | BIT(10);
 
+	SDE_REG_WRITE(c, INTF_AVR_CONTROL, avr_ctrl);
 	SDE_REG_WRITE(c, INTF_AVR_MODE, avr_mode);
 }
 
@@ -463,8 +462,6 @@ static void sde_hw_intf_enable_infinite_vfp(struct sde_hw_intf *ctx, bool enable
 
 	if (enable)
 		val |= BIT(9);
-	else
-		val &= ~BIT(9);
 
 	SDE_REG_WRITE(c, INTF_AVR_MODE, val);
 }
@@ -484,20 +481,6 @@ static void sde_hw_intf_reset_counter(struct sde_hw_intf *ctx)
 	struct sde_hw_blk_reg_map *c = &ctx->hw;
 
 	SDE_REG_WRITE(c, INTF_LINE_COUNT, BIT(31));
-}
-
-static u64 sde_hw_intf_get_panel_vsync_timestamp(struct sde_hw_intf *ctx)
-{
-	struct sde_hw_blk_reg_map *c = &ctx->hw;
-	u32 timestamp_lo, timestamp_hi;
-	u64 timestamp = 0;
-
-	timestamp_hi = SDE_REG_READ(c, INTF_VSYNC_TIMESTAMP1);
-	timestamp_lo = SDE_REG_READ(c, INTF_VSYNC_TIMESTAMP0);
-	timestamp = timestamp_hi;
-	timestamp = (timestamp << 32) | timestamp_lo;
-
-	return timestamp;
 }
 
 static u64 sde_hw_intf_get_vsync_timestamp(struct sde_hw_intf *ctx, bool is_vid)
@@ -675,7 +658,7 @@ static void sde_hw_intf_setup_timing_engine(struct sde_hw_intf *ctx,
 
 	/* Synchronize timing engine enable to TE */
 	if ((ctx->cap->features & BIT(SDE_INTF_TE_ALIGN_VSYNC))
-			&& p->poms_align_vsync && p->poms_pending)
+			&& p->poms_align_vsync)
 		intf_cfg2 |= BIT(16);
 
 	if (align_esync) {
@@ -987,13 +970,6 @@ static void sde_hw_intf_v1_get_status(
 
 	s->is_en = SDE_REG_READ(c, INTF_STATUS) & BIT(0);
 	s->is_prog_fetch_en = (SDE_REG_READ(c, INTF_CONFIG) & BIT(31));
-	s->intf_status_val = SDE_REG_READ(c, INTF_STATUS);
-
-	if (intf->cap->features & BIT(SDE_INTF_ESYNC)) {
-		s->esync_vsync_counter = SDE_REG_READ(c, INTF_ESYNC_VSYNC_COUNT);
-		s->esync_emsync_counter = SDE_REG_READ(c, INTF_ESYNC_EMSYNC_COUNT);
-	}
-
 	if (s->is_en) {
 		s->frame_count = sde_hw_intf_get_frame_count(intf);
 		s->line_count = SDE_REG_READ(c, INTF_LINE_COUNT) & 0xffff;
@@ -1002,7 +978,6 @@ static void sde_hw_intf_v1_get_status(
 		s->frame_count = 0;
 	}
 }
-
 static void sde_hw_intf_setup_misr(struct sde_hw_intf *intf,
 						bool enable, u32 frame_count)
 {
@@ -1606,11 +1581,8 @@ static void _setup_intf_ops(struct sde_hw_intf_ops *ops,
 	if (cap & BIT(SDE_INTF_RESET_COUNTER))
 		ops->reset_counter[MSM_DISP_OP_HWIO] = sde_hw_intf_reset_counter;
 
-	if (cap & (BIT(SDE_INTF_PANEL_VSYNC_TS) | BIT(SDE_INTF_MDP_VSYNC_TS))) {
+	if (cap & (BIT(SDE_INTF_PANEL_VSYNC_TS) | BIT(SDE_INTF_MDP_VSYNC_TS)))
 		ops->get_vsync_timestamp[MSM_DISP_OP_HWIO] = sde_hw_intf_get_vsync_timestamp;
-		ops->get_panel_vsync_timestamp[MSM_DISP_OP_HWIO] =
-					sde_hw_intf_get_panel_vsync_timestamp;
-	}
 
 	if (mdss_cap & BIT(SDE_MDP_DUAL_DPU_SYNC)) {
 		ops->setup_dpu_sync_prog_intf_offset[MSM_DISP_OP_HWIO] =

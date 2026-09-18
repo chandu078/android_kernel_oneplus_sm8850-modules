@@ -79,7 +79,7 @@ enum dsi_op_mode {
  * @DSI_MODE_FLAG_SEAMLESS:	Seamless transition requested by user
  * @DSI_MODE_FLAG_DFPS:		Seamless transition is DynamicFPS
  * @DSI_MODE_FLAG_VBLANK_PRE_MODESET:	Transition needs VBLANK before Modeset
- * @DSI_MODE_FLAG_DMS: Seamless transition is dynamic mode switch on cmd panel.
+ * @DSI_MODE_FLAG_DMS: Seamless transition is dynamic mode switch
  * @DSI_MODE_FLAG_VRR: Seamless transition is DynamicFPS.
  *                     New timing values are sent from DAL.
  * @DSI_MODE_FLAG_DYN_CLK: Seamless transition is dynamic clock change
@@ -89,9 +89,6 @@ enum dsi_op_mode {
  * @DSI_MODE_FLAG_POMS_TO_CMD:
  *         Seamless transition is dynamic panel operating mode switch to cmd
  * @DSI_MODE_FLAG_NONDSC_BPP_SWITCH:  Transition is bpp mode switch without DSC.
- * @DSI_MODE_FLAG_EMSYNC_FPS_SWITCH: Seamless transition is emsync fps switch
- * @DSI_MODE_FLAG_DMS_VID:
- *         Seamless transition is dynamic mode switch on vid panel.
  */
 enum dsi_mode_flags {
 	DSI_MODE_FLAG_SEAMLESS			= BIT(0),
@@ -103,9 +100,7 @@ enum dsi_mode_flags {
 	DSI_MODE_FLAG_DMS_FPS                   = BIT(6),
 	DSI_MODE_FLAG_POMS_TO_VID		= BIT(7),
 	DSI_MODE_FLAG_POMS_TO_CMD		= BIT(8),
-	DSI_MODE_FLAG_NONDSC_BPP_SWITCH		= BIT(9),
-	DSI_MODE_FLAG_EMSYNC_FPS_SWITCH		= BIT(10),
-	DSI_MODE_FLAG_DMS_VID			= BIT(11)
+	DSI_MODE_FLAG_NONDSC_BPP_SWITCH		= BIT(9)
 };
 
 /**
@@ -240,20 +235,6 @@ enum dsi_dfps_type {
 };
 
 /**
- * enum dsi_dms_vid_type - video panel mode switch type
- * @DSI_DMS_VID_DISABLED: video panel mode switch not supported
- * @DSI_DMS_VID_SEAMLESS: seamless video panel mode switch
- * @DSI_DMS_VID_NON_SEAMLESS: non-seamless video panel mode switch
- * @DSI_DMS_VID_TYPE_MAX
- */
-enum dsi_dms_vid_type {
-	DSI_DMS_VID_DISABLED = 0,
-	DSI_DMS_VID_SEAMLESS,
-	DSI_DMS_VID_NON_SEAMLESS,
-	DSI_DMS_VID_TYPE_MAX
-};
-
-/**
  * enum dsi_dyn_clk_feature_type - Dynamic clock feature support type
  * @DSI_DYN_CLK_TYPE_LEGACY:			Constant FPS is not supported
  * @DSI_DYN_CLK_TYPE_CONST_FPS_ADJUST_HFP:	Constant FPS supported with
@@ -321,9 +302,6 @@ enum dsi_dyn_clk_feature_type {
  * @DSI_CMD_SET_STICKY_ON_FLY:             Still indication enable for only one frame
  * @DSI_CMD_SET_TRIGGER_SELF_REFRESH:      Trigger self refresh from Gram
  * @DSI_CMD_SET_FPS_SWITCH:		   FPS Switch
- * @DSI_CMD_SET_EM_PULSE_SWITCH:           EM pulse switch cmd
- * @DSI_CMD_SET_PRIVACY_LAYER:		   Command to update panel on Privacy layer config
- * @DSI_CMD_SET_BRIGHTNESS:		   Command to update backlight
  * @DSI_CMD_SET_MAX
  */
 enum dsi_cmd_set_type {
@@ -368,9 +346,6 @@ enum dsi_cmd_set_type {
 	DSI_CMD_SET_STICKY_ON_FLY,
 	DSI_CMD_SET_TRIGGER_SELF_REFRESH,
 	DSI_CMD_SET_FPS_SWITCH,
-	DSI_CMD_SET_EM_PULSE_SWITCH,
-	DSI_CMD_SET_PRIVACY_LAYER,
-	DSI_CMD_SET_BRIGHTNESS,
 	DSI_CMD_SET_MAX
 };
 #endif /* OPLUS_FEATURE_DISPLAY */
@@ -500,7 +475,6 @@ struct dsi_panel_cmd_set {
  * @avr_step_fps:     AVR step fps rate
  * @esync_emsync_fps: esync EM pulse rate
  * @te_pulse_width_us:         Pulse width of TE in microseconds
- * @overlap:          Overlap pixel within pingpong buffer
  */
 struct dsi_mode_info {
 	u32 h_active;
@@ -531,7 +505,6 @@ struct dsi_mode_info {
 	u32 avr_step_fps;
 	u32 esync_emsync_fps;
 	u32 te_pulse_width_us;
-	u32 overlap;
 };
 
 /**
@@ -559,7 +532,6 @@ struct dsi_split_link_config {
  * @num_data_lanes:      Number of physical data lanes.
  * @bpp:                 Number of bits per pixel.
  * @bpp_switch_enabled:  Check if bpp switch is enabled without DSC.
- * @dpu_dma_enabled:     Check if dpu dma mode is enabled.
  * @en_crc_check:        Enable CRC checks.
  * @en_ecc_check:        Enable ECC checks.
  * @te_mode:             Source for TE signalling.
@@ -597,7 +569,6 @@ struct dsi_host_common_cfg {
 	u8 num_data_lanes;
 	u8 bpp;
 	bool bpp_switch_enabled;
-	bool dpu_dma_enabled;
 	bool en_crc_check;
 	bool en_ecc_check;
 	enum dsi_te_mode te_mode;
@@ -718,7 +689,6 @@ struct dsi_host_config {
  * @dsi_transfer_time_us: Specifies the dsi transfer time for cmd panels.
  * @qsync_min_fps:        Qsync min fps value for the mode
  * @avr_step_fps:         AVR step fps value for the mode
- * @esync_params:         esync parameters
  * @clk_rate_hz:          DSI bit clock per lane in hz.
  * @min_dsi_clk_hz:       Min dsi clk per lane to transfer frame in vsync time.
  * @bit_clk_list:         List of dynamic bit clock rates supported.
@@ -750,7 +720,6 @@ struct dsi_display_mode_priv_info {
 	u32 dsi_transfer_time_us;
 	u32 qsync_min_fps;
 	u32 avr_step_fps;
-	struct esync_params esync_params;
 	u64 clk_rate_hz;
 	u64 min_dsi_clk_hz;
 	struct msm_dyn_clk_list bit_clk_list;
@@ -765,7 +734,7 @@ struct dsi_display_mode_priv_info {
 	struct msm_ratio pclk_scale;
 	struct msm_roi_caps roi_caps;
 	bool widebus_support;
-	u32 allowed_mode_switch[MODE_SWITCH_BITMAP_SIZE];
+	u32 allowed_mode_switch;
 	bool disable_rsc_solver;
 #ifdef OPLUS_FEATURE_DISPLAY
 	/* Add for apollo */

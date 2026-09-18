@@ -146,8 +146,7 @@ static int _hfi_crtc_set_props_base(struct sde_crtc *crtc, u32 disp_id,
 	 * Once all the key value pairs of properties are collected invoke adapter api
 	 * to add all these property array as a single HFI Packet
 	 */
-	ret = hfi_adapter_add_set_property(cmd_buf->ctx,
-			cmd_buf,
+	ret = hfi_adapter_add_set_property(cmd_buf,
 			HFI_COMMAND_DISPLAY_SET_PROPERTY,
 			disp_id,
 			HFI_PAYLOAD_TYPE_U32_ARRAY,
@@ -203,8 +202,7 @@ int hfi_crtc_populate_custom_kv_setter_props(struct sde_crtc *crtc, u32 disp_id,
 	if (!kv_count)
 		goto end;
 
-	ret = hfi_adapter_add_prop_array(cmd_buf->ctx,
-			cmd_buf,
+	ret = hfi_adapter_add_prop_array(cmd_buf,
 			HFI_COMMAND_DISPLAY_SET_PROPERTY,
 			disp_id,
 			HFI_PAYLOAD_TYPE_U32_ARRAY,
@@ -267,8 +265,7 @@ void _hfi_crtc_disable(struct hfi_cmdbuf_t *cmd_buf, u32 disp_id, struct sde_crt
 
 	hfi_util_u32_prop_helper_reset(crtc_hfi->base_props);
 
-	ret = hfi_adapter_add_set_property(cmd_buf->ctx,
-			cmd_buf,
+	ret = hfi_adapter_add_set_property(cmd_buf,
 			HFI_COMMAND_DISPLAY_SET_PROPERTY,
 			disp_id,
 			HFI_PAYLOAD_TYPE_U32_ARRAY,
@@ -284,16 +281,6 @@ end:
 	mutex_unlock(&crtc_hfi->hfi_lock);
 }
 
-void hfi_crtc_set_pending_enc_mask(struct sde_crtc *sde_crtc, u32 enc_mask)
-{
-	struct hfi_crtc *hfi_crtc;
-
-	if (sde_crtc) {
-		hfi_crtc = to_hfi_crtc(sde_crtc);
-		hfi_crtc->pending_enc_mask = enc_mask;
-	}
-}
-
 u32 hfi_crtc_get_display_id(struct drm_crtc *crtc, struct drm_crtc_state *crtc_state)
 {
 	u32 disp_id = U32_MAX;
@@ -302,23 +289,26 @@ u32 hfi_crtc_get_display_id(struct drm_crtc *crtc, struct drm_crtc_state *crtc_s
 	struct drm_encoder *main_enc = NULL;
 	struct drm_connector_list_iter iter;
 	struct sde_crtc *sde_crtc;
-	struct hfi_crtc *hfi_crtc;
-	u32 enc_mask;
 
 	if (!crtc || !crtc_state)
 		return U32_MAX;
 
-	sde_crtc =  to_sde_crtc(crtc);
-	hfi_crtc = to_hfi_crtc(sde_crtc);
-
-	enc_mask = crtc_state->encoder_mask ?
-		crtc_state->encoder_mask : sde_crtc->cached_encoder_mask;
-	enc_mask = enc_mask ? enc_mask : hfi_crtc->pending_enc_mask;
-	drm_for_each_encoder_mask(enc, crtc->dev, enc_mask) {
+	drm_for_each_encoder_mask(enc, crtc->dev, crtc_state->encoder_mask) {
 		if (sde_encoder_in_clone_mode(enc))
 			continue;
 
 		main_enc = enc;
+	}
+
+	if (!main_enc) {
+		sde_crtc = to_sde_crtc(crtc);
+		drm_for_each_encoder_mask(enc, crtc->dev, sde_crtc->cached_encoder_mask) {
+			if (sde_encoder_in_clone_mode(enc))
+				continue;
+
+			main_enc = enc;
+			SDE_DEBUG("found encoder from cached\n");
+		}
 	}
 
 	if (main_enc) {
@@ -332,65 +322,10 @@ u32 hfi_crtc_get_display_id(struct drm_crtc *crtc, struct drm_crtc_state *crtc_s
 	return disp_id;
 }
 
-int hfi_crtc_destroy_shared_map_buffers(struct sde_crtc *crtc)
-{
-	int ret = 0;
-	struct hfi_crtc *crtc_hfi;
-	struct hfi_kms *hfi_kms;
-
-	if (!crtc) {
-		SDE_ERROR("invalid crtc\n");
-		return -EINVAL;
-	}
-
-	crtc_hfi = to_hfi_crtc(crtc);
-
-	hfi_kms = sde_crtc_get_kms(crtc);
-	if (!hfi_kms)
-		return -EINVAL;
-
-	ret = hfi_adapter_buffer_dealloc(&hfi_kms->hfi_client, &crtc_hfi->hfi_buff_map_dither);
-	if (ret) {
-		SDE_ERROR("failed to deallocate hfi shared memory for dither\n");
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-int hfi_crtc_alloc_shared_map_buffers(struct sde_crtc *crtc)
-{
-	int ret = 0;
-	struct hfi_crtc *crtc_hfi;
-	struct hfi_kms *hfi_kms;
-
-	if (!crtc) {
-		SDE_ERROR("invalid crtc\n");
-		return -EINVAL;
-	}
-
-	crtc_hfi = to_hfi_crtc(crtc);
-
-	hfi_kms = sde_crtc_get_kms(crtc);
-	if (!hfi_kms)
-		return -EINVAL;
-
-	crtc_hfi->hfi_buff_map_dither.size =
-		sizeof(struct hfi_display_dither) * (DSPP_MAX - DSPP_0);
-	ret = hfi_adapter_buffer_alloc(&hfi_kms->hfi_client, &crtc_hfi->hfi_buff_map_dither);
-	if (ret) {
-		SDE_ERROR("failed to allocate hfi shared memory for dither\n");
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
 void hfi_crtc_destroy(struct sde_crtc *crtc)
 {
 	int ret = 0;
 	struct hfi_crtc *crtc_hfi;
-	struct hfi_kms *hfi_kms;
 
 	if (!crtc) {
 		SDE_ERROR("invalid crtc\n");
@@ -399,11 +334,7 @@ void hfi_crtc_destroy(struct sde_crtc *crtc)
 
 	crtc_hfi = to_hfi_crtc(crtc);
 
-	hfi_kms = sde_crtc_get_kms(crtc);
-	if (!hfi_kms)
-		return;
-
-	ret = hfi_adapter_buffer_dealloc(&hfi_kms->hfi_client, &crtc_hfi->hfi_buff_map_dither);
+	ret = hfi_adapter_buffer_dealloc(&crtc_hfi->hfi_buff_map_dither);
 	if (ret)
 		SDE_ERROR("failed to deallocated hfi shared memory for dither\n");
 
@@ -498,6 +429,7 @@ int hfi_crtc_atomic_begin(struct sde_crtc *sde_crtc, struct sde_crtc_state *csta
 		return -EINVAL;
 
 	disp_id = hfi_crtc_get_display_id(crtc, crtc->state);
+	disp_id = 0;
 	if (disp_id == U32_MAX) {
 		SDE_ERROR("invalid display id\n");
 		return -EINVAL;
@@ -517,61 +449,6 @@ int hfi_crtc_atomic_begin(struct sde_crtc *sde_crtc, struct sde_crtc_state *csta
 	}
 
 	return ret;
-}
-
-int hfi_crtc_set_idle_pc_timer(struct sde_crtc *sde_crtc, u32 val)
-{
-	struct hfi_cmdbuf_t *cmd_buf;
-	struct hfi_kms *hfi_kms;
-	struct drm_crtc *crtc;
-	enum hfi_display_idle_timer_control payload;
-	u32 disp_id;
-	int rc = 0;
-
-	if (!sde_crtc)
-		return -EINVAL;
-
-	hfi_kms = sde_crtc_get_kms(sde_crtc);
-	if (!hfi_kms)
-		return -EINVAL;
-
-	crtc = &sde_crtc->base;
-	if (!crtc->state)
-		return -EINVAL;
-
-	disp_id = hfi_crtc_get_display_id(crtc, crtc->state);
-	if (disp_id == U32_MAX) {
-		SDE_ERROR("invalid display id\n");
-		return -EINVAL;
-	}
-
-	//Validate that value provided is in the range of enum.
-	if (val > HFI_UNBLOCK_TIMER)
-		return -EINVAL;
-
-	payload = val;
-
-	cmd_buf = hfi_adapter_get_cmd_buf(&hfi_kms->hfi_client,
-			disp_id, HFI_CMDBUF_TYPE_DISPLAY_INFO_BLOCKING);
-	if (!cmd_buf) {
-		SDE_ERROR("Failed to get valid command buffer\n");
-		return -EINVAL;
-	}
-
-	rc = hfi_adapter_add_set_property(&hfi_kms->hfi_client, cmd_buf,
-		HFI_COMMAND_DISPLAY_IDLE_TIMER_CONTROL, disp_id, HFI_PAYLOAD_TYPE_U32,
-		&payload, sizeof(payload), HFI_HOST_FLAGS_RESPONSE_REQUIRED);
-	if (rc) {
-		SDE_ERROR("Failed to add property rc:%d\n", rc);
-		hfi_adapter_release_cmd_buf(&hfi_kms->hfi_client, cmd_buf);
-		return rc;
-	}
-
-	rc = hfi_adapter_set_cmd_buf_blocking(&hfi_kms->hfi_client, cmd_buf);
-	if (rc)
-		SDE_ERROR("Failed to send idle pc timer control rc:%d\n", rc);
-
-	return rc;
 }
 
 #if IS_ENABLED(CONFIG_DEBUG_FS)
@@ -613,16 +490,16 @@ int hfi_crtc_debugfs_misr_setup(struct sde_crtc *sde_crtc)
 	misr_data.frame_count = sde_crtc->misr_frame_count;
 	misr_data.module_type = HFI_DEBUG_MISR_MIXER;
 
-	rc = hfi_adapter_add_set_property(&hfi_kms->hfi_client, cmd_buf,
-			HFI_COMMAND_DEBUG_MISR_SETUP, disp_id, HFI_PAYLOAD_TYPE_U32_ARRAY,
-			&misr_data, sizeof(misr_data), HFI_HOST_FLAGS_NONE);
+	rc = hfi_adapter_add_set_property(cmd_buf, HFI_COMMAND_DEBUG_MISR_SETUP,
+			disp_id, HFI_PAYLOAD_TYPE_U32_ARRAY, &misr_data,
+			sizeof(misr_data), HFI_HOST_FLAGS_NONE);
 	if (rc) {
 		SDE_ERROR("Failed to add property\n");
 		return rc;
 	}
 
 	SDE_DEBUG("misr_setup: sending cmd buf\n");
-	rc = hfi_adapter_set_cmd_buf(&hfi_kms->hfi_client, cmd_buf);
+	rc = hfi_adapter_set_cmd_buf(cmd_buf);
 	SDE_EVT32(crtc->base.id, disp_id, HFI_COMMAND_DEBUG_MISR_SETUP, rc, SDE_EVTLOG_FUNC_CASE1);
 	if (rc) {
 		SDE_ERROR("Failed to send misr_setup command\n");
@@ -711,8 +588,7 @@ int hfi_crtc_debugfs_misr_read(struct sde_crtc *sde_crtc)
 	/* Listener init */
 	hfi_crtc->misr_read_listener.hfi_prop_handler = &hfi_crtc_misr_read_hfi_prop_handler;
 
-	rc = hfi_adapter_add_get_property(&hfi_kms->hfi_client, cmd_buf,
-			HFI_COMMAND_DEBUG_MISR_READ, disp_id,
+	rc = hfi_adapter_add_get_property(cmd_buf, HFI_COMMAND_DEBUG_MISR_READ, disp_id,
 			HFI_PAYLOAD_TYPE_U32_ARRAY, &misr_read, sizeof(misr_read),
 			&hfi_crtc->misr_read_listener, (HFI_HOST_FLAGS_RESPONSE_REQUIRED |
 			HFI_HOST_FLAGS_NON_DISCARDABLE));
@@ -720,7 +596,7 @@ int hfi_crtc_debugfs_misr_read(struct sde_crtc *sde_crtc)
 		SDE_ERROR("Failed to add MISR read command!\n");
 
 	SDE_EVT32(crtc->base.id, disp_id, HFI_COMMAND_DEBUG_MISR_READ, SDE_EVTLOG_FUNC_CASE1);
-	rc = hfi_adapter_set_cmd_buf_blocking(&hfi_kms->hfi_client, cmd_buf);
+	rc = hfi_adapter_set_cmd_buf_blocking(cmd_buf);
 	SDE_EVT32(crtc->base.id, disp_id, HFI_COMMAND_DEBUG_MISR_READ, rc, SDE_EVTLOG_FUNC_CASE2);
 
 	return rc;
@@ -749,25 +625,17 @@ int _sde_crtc_hal_funcs_install(struct sde_crtc *crtc)
 	crtc->hal_ops.atomic_begin[MSM_DISP_OP_HFI] = hfi_crtc_atomic_begin;
 	crtc->hal_ops.debugfs_misr_setup[MSM_DISP_OP_HFI] = hfi_crtc_debugfs_misr_setup;
 	crtc->hal_ops.debugfs_misr_read[MSM_DISP_OP_HFI] = hfi_crtc_debugfs_misr_read;
-	crtc->hal_ops.set_idle_pc_timer[MSM_DISP_OP_HFI] = hfi_crtc_set_idle_pc_timer;
 
 	return 0;
 }
 
-static int _hfi_cp_crtc_allocate_dither(struct sde_crtc *crtc, struct hfi_crtc *hfi_crtc)
+static int _hfi_cp_crtc_allocate_dither(struct hfi_crtc *hfi_crtc)
 {
 	int ret = 0;
-	struct hfi_kms *hfi_kms;
-
-	hfi_kms = sde_crtc_get_kms(crtc);
-	if (!hfi_kms) {
-		SDE_ERROR("%s: failed to get hfi kms\n", __func__);
-		return -EINVAL;
-	}
 
 	hfi_crtc->hfi_buff_map_dither.size =
 		sizeof(struct hfi_display_dither) * (DSPP_MAX - DSPP_0);
-	ret = hfi_adapter_buffer_alloc(&hfi_kms->hfi_client, &hfi_crtc->hfi_buff_map_dither);
+	ret = hfi_adapter_buffer_alloc(&hfi_crtc->hfi_buff_map_dither);
 	if (ret) {
 		hfi_crtc->hfi_buff_map_dither.size = 0;
 		SDE_DEBUG("failed to allocate shared memory for SPR Dither, ret: %d\n", ret);
@@ -817,7 +685,7 @@ int hfi_crtc_init(struct sde_crtc *sde_crtc)
 		goto free_kv;
 	}
 
-	ret = _hfi_cp_crtc_allocate_dither(sde_crtc, crtc);
+	ret = _hfi_cp_crtc_allocate_dither(crtc);
 	if (ret)
 		SDE_DEBUG("failed to allocated shared memory for dither payloads ret: %d\n", ret);
 

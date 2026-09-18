@@ -91,8 +91,8 @@ struct hfi_display_roi {
 
 /*
  * struct hfi_display_vsync_data - vsync data
- * @timestamp_lo    :  lower value of 64bit vsync timestamp in ns
- * @timestamp_hi    :  higher value of 64bit vsync timestamp in ns
+ * @timestamp_lo    :  lower value of 64bit vsync timestamp
+ * @timestamp_hi    :  higher value of 64bit vsync timestamp
  * @vsync_index     :  vsync index for the timestamp
  */
 struct hfi_display_vsync_data {
@@ -103,8 +103,8 @@ struct hfi_display_vsync_data {
 
 /*
  * struct hfi_display_frame_event_data - frame event data
- * @timestamp_lo         :  lower value of 64bit Buffer flip timestamp in ns
- * @timestamp_hi         :  higher value of 64bit Buffer flip timestamp in ns
+ * @timestamp_lo         :  lower value of 64bit Buffer flip timestamp
+ * @timestamp_hi         :  higher value of 64bit Buffer flip timestamp
  * @bufferflip_index     :  bufferflip index for the timestamp
  */
 struct hfi_display_frame_event_data {
@@ -114,109 +114,12 @@ struct hfi_display_frame_event_data {
 };
 
 /*
- * enum hfi_layer_cache_state - Layer cache states.
- *
- * HFI_CACHE_STATE_DISABLE: Disable cache read/write.
- * HFI_CACHE_STATE_READ: Read from DDR and allocate into system cache, in subsequent frames
- *                       read from cache (GPU Idle fallback)
- * HFI_CACHE_STATE_WRITE: Write into system cache during the last composition frame, in
- *                        subsequent frames read from cache (CWB based idle fallback)
- */
-enum hfi_layer_cache_state {
-	HFI_CACHE_STATE_DISABLE = 0x0,
-	HFI_CACHE_STATE_READ = 0x1,
-	HFI_CACHE_STATE_WRITE = 0x2,
-};
-
-/*
- * @struct hfi_display_idle_event_data
- * @brief Idle event data
- *
- * @var timestamp_lo
- *   Lower 32 bits of the 64-bit idle event timestamp in ns.
- * @var timestamp_hi
- *   Higher 32 bits of the 64-bit idle event timestamp in ns.
- * @var idle_index
- *   Idle index for the timestamp.
- */
-struct hfi_display_idle_event_data {
-	u32 timestamp_lo;
-	u32 timestamp_hi;
-	u32 idle_index;
-};
-
-/*
- * @struct hfi_display_power_event_data
- * @brief Power event data
- *
- * @var timestamp_lo
- *   Lower 32 bits of the 64-bit power event timestamp in ns.
- * @var timestamp_hi
- *   Higher 32 bits of the 64-bit power event timestamp in ns.
- * @var power_state
- *   power_state corresponding to which power mode we are in.
- */
-struct hfi_display_power_event_data {
-	u32 timestamp_lo;
-	u32 timestamp_hi;
-	enum hfi_display_power_mode power_state;
-};
-
-
-/*
- * enum hfi_layer_cache_op_type - System cache read op type
- * HFI_CACHE_OP_TYPE_NONE          : No SW overwrite and driven by hardware
- * HFI_CACHE_NORMAL_CACHEABLE_READ : Normal Cacheable Read
- * HFI_CACHE_READ_INVALIDATE       : Read With Invalidate (RWI)
- * HFI_CACHE_READ_EVICT            : Read With Evict (RWE)
- * HFI_CACHE_PREFETCH_READ         : Prefetch Read (PRE)
- */
-enum hfi_layer_cache_op_type {
-	HFI_CACHE_OP_TYPE_NONE = 0x0,
-	HFI_CACHE_NORMAL_CACHEABLE_READ = 0x1,
-	HFI_CACHE_READ_INVALIDATE = 0x2,
-	HFI_CACHE_READ_EVICT = 0x3,
-	HFI_CACHE_PREFETCH_READ = 0x4,
-};
-
-/*
- * @enum hfi_display_idle_timer_control
- * @brief Enum to control idle timer.
- *
- * @var HFI_DEFAULT
- *   Restore idle timer to default state
- * @var HFI_WAKEUP
- *   Restore the display from power collapse state.
- * @var HFI_BLOCK_TIMER
- *   Block the idle timer from expiring
- * @var HFI_UNBLOCK_TIMER
- *   Unblock the idle timer from expiring
- */
-enum hfi_display_idle_timer_control {
-	HFI_DEFAULT          = 0x0,
-	HFI_WAKEUP           = 0x1,
-	HFI_BLOCK_TIMER      = 0x2,
-	HFI_UNBLOCK_TIMER    = 0x3,
-};
-
-/*
- * struct hfi_display_autorefresh_cfg - autorefresh config data.
- * @enable        :  autorefresh enable/disable.
- * @frame_count   :  autorefresh frame number for controlling frame rate.
- */
-struct hfi_display_autorefresh_cfg {
-	u32 enable;
-	u32 frame_count;
-};
-
-/*
  * hfi_display_event_id - HFI event ID
  * @HFI_EVENT_VSYNC                   : Event ID for vsync
  * @HFI_EVENT_FRAME_SCAN_START        : Event ID for frame scan start
  * @HFI_EVENT_FRAME_SCAN_COMPLETE     : Event ID for frame scan complete
  * @HFI_EVENT_FRAME_IDLE              : Event ID for frame idle
  * @HFI_EVENT_DISPLAY_POWER           : Event ID for display power
- * @HFI_EVENT_HW_RECOVERY             : Event ID for hw recovery
  */
 enum hfi_display_event_id {
 	HFI_EVENT_VSYNC                     = 0x1,
@@ -224,7 +127,6 @@ enum hfi_display_event_id {
 	HFI_EVENT_FRAME_SCAN_COMPLETE       = 0x3,
 	HFI_EVENT_FRAME_IDLE                = 0x4,
 	HFI_EVENT_DISPLAY_POWER             = 0x5,
-	HFI_EVENT_HW_RECOVERY               = 0x6,
 };
 
 /*
@@ -271,54 +173,6 @@ struct hfi_display_mode_info {
 };
 
 /*
- * struct hfi_dsi_cmd_desc - hfi dcp transfer dcs data
- * @size             :  Size of this struct used for backward compatibility.
- * @channel          :  DSI virtual channel id
- * @type             :  MIPI DSI data type of the DCS command.
- * @flags            :  MIPI flags controlling this message transmission.
- *                      Ex: MIPI_DSI_MSG_UNICAST_COMMAND
- * @tx_len           :  Transfer buffer length.
- * @tx_buff_addr_lsb :  Tx command buffer DCP address location (lo).
- * @tx_buff_addr_msb :  Tx command buffer DCP address location (hi).
- * @rx_len           :  Receiving buffer length.
- * @rx_buff_addr_lsb :  Rx command buffer DCP address location (lo).
- * @rx_buff_addr_msb :  Rx command buffer DCP address location (hi).
- * @ctrl_idx         :  DSI controller index
- * @ctrl_flags       :  CTRL flags.
- * @last_command     :  Is last DCS command.
- * @post_wait_ms     :  Wait time in milliseconds.
- * @reserved1        :  Reserved for future use.
- * @reserved2        :  Reserved for future use.
- */
-struct hfi_dsi_cmd_desc {
-	u32 size;
-
-	u8 channel;
-	u8 type;
-	u16 flags;
-
-	/* Transmit buffer information */
-	u32 tx_len;
-	u32 tx_buff_addr_lsb;
-	u32 tx_buff_addr_msb;
-
-	/* Receive buffer information */
-	u32 rx_len;
-	u32 rx_buff_addr_lsb;
-	u32 rx_buff_addr_msb;
-
-	/* Control information */
-	u32 ctrl_idx;
-	u32 ctrl_flags;
-	u32 last_command;
-	u32 post_wait_ms;
-
-	/* Reserved for future use */
-	u32 reserved1;
-	u32 reserved2;
-};
-
-/*
  * enum hfi_display_blend_stage - Defines blending stages
  * @HFI_BLEND_STAGE_BASE    :  base layer
  * @HFI_BLEND_STAGE_0       :  Blend Stage #0(One base layer + one foreground layer)
@@ -358,26 +212,6 @@ enum hfi_layer_fetch_mode {
 	HFI_TIME_MULTIPLEX_FETCH  = 0x1,
 };
 
-/*
- * @enum hfi_layer_security_policy
- * @brief Security policies for layers.
- *
- * @var HFI_LAYER_SECURITY_POLICY_NON_SECURE
- *   Default security mode with no security restrictions.
- * @var HFI_LAYER_SECURITY_POLICY_SECURE
- *   Secure mode with S1 and S2 translation.
- * @var HFI_LAYER_SECURITY_POLICY_SECURE_DIR_TRANSLATION
- *   Secure mode with S2 translation.
- * @var HFI_LAYER_SECURITY_POLICY_MAX
- *   Used to track the maximum security policy value possible.
- */
-enum hfi_layer_security_policy {
-	HFI_LAYER_SECURITY_POLICY_NON_SECURE                  = 0x0,
-	HFI_LAYER_SECURITY_POLICY_SECURE                      = 0x1,
-	HFI_LAYER_SECURITY_POLICY_SECURE_DIR_TRANSLATION      = 0x2,
-	HFI_LAYER_SECURITY_POLICY_MAX
-};
-
 /**
  * @def HFI_DISPLAY_ROTATION_0
  * @brief Set when layer is not rotated.
@@ -415,3 +249,4 @@ enum hfi_layer_security_policy {
 #define HFI_DISPLAY_REFLECT_Y   (1 << 5)
 
 #endif // __H_HFI_DEFS_DISPLAY_H__
+

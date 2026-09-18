@@ -33,6 +33,7 @@
 #define DSI_CMD_PPS_SIZE 135
 
 #define DSI_CMD_PPS_HDR_SIZE 7
+#define DSI_MODE_MAX 32
 
 /*
  * Defining custom dsi msg flag.
@@ -110,19 +111,16 @@ struct dsi_avr_capabilities {
 
 struct dsi_esync_capabilities {
 	bool esync_support;
-	bool emsync_switch_enabled;
-	struct esync_params default_esync_params;
+	u32 milli_skew;
+	u32 hsync_milli_pulse_width;
+	u32 emsync_milli_pulse_width;
+	u32 emsync_fps;
 };
 
 struct dsi_dyn_clk_caps {
 	bool dyn_clk_support;
 	enum dsi_dyn_clk_feature_type type;
 	bool maintain_const_fps;
-};
-
-struct dsi_dms_vid_caps {
-	enum dsi_dms_vid_type type;
-	bool maintain_const_clk;
 };
 
 struct dsi_pinctrl_info {
@@ -226,18 +224,6 @@ struct dsi_panel_spr_info {
 	enum msm_display_spr_pack_type_mode pack_type_mode;
 };
 
-struct privacy_cmd_cfg {
-    u8 privacy_en_cmd[4];     // Enable privacy layer
-    u8 lkey_enable_cmd[3];    // LKEY enable
-    u8 lkey_disable_cmd[3];   // LKEY disable
-};
-
-static const struct privacy_cmd_cfg privacy_cmd_cfg_v1 = {
-    .privacy_en_cmd     = {0xb0, 0x00, 0x3a, 0x66},
-    .lkey_enable_cmd    = {0xf0, 0x5a, 0x5a},
-    .lkey_disable_cmd   = {0xf0, 0xa5, 0xa5},
-};
-
 struct dsi_panel;
 
 struct dsi_panel_ops {
@@ -275,7 +261,6 @@ struct dsi_panel {
 
 	struct dsi_dfps_capabilities dfps_caps;
 	struct dsi_dyn_clk_caps dyn_clk_caps;
-	struct dsi_dms_vid_caps dms_vid_caps;
 	struct dsi_panel_phy_props phy_props;
 	bool dsc_switch_supported;
 
@@ -298,7 +283,6 @@ struct dsi_panel {
 	bool ulps_suspend_enabled;
 	bool allow_phy_power_off;
 	bool reset_gpio_always_on;
-	bool privacy_feature_enabled;
 	atomic_t esd_recovery_pending;
 
 #ifdef OPLUS_FEATURE_DISPLAY
@@ -325,8 +309,6 @@ struct dsi_panel {
 	u32 dsc_count;
 	u32 lm_count;
 
-	enum msm_disp_op disp_op;
-
 	bool ctl_op_sync;
 
 	int panel_test_gpio;
@@ -334,7 +316,7 @@ struct dsi_panel {
 	bool powered;
 	enum dsi_panel_physical_type panel_type;
 	bool need_post_on_supply;
-	bool post_power_enable_status;
+	enum msm_disp_op disp_op;
 
 	struct dsi_panel_ops panel_ops;
 
@@ -450,8 +432,6 @@ int dsi_panel_send_qsync_off_dcs(struct dsi_panel *panel,
 
 int dsi_panel_send_roi_dcs(struct dsi_panel *panel, int ctrl_idx,
 		struct dsi_rect *roi);
-int dsi_panel_send_privacy_dcs(struct dsi_panel *panel, int ctrl_idx,
-		struct sde_drm_privacy_layer_v1 *privacy_v1);
 
 int dsi_panel_dcs_cmd_tx(struct dsi_panel *panel, enum dsi_cmd_set_type cmd);
 
@@ -502,7 +482,7 @@ int dsi_panel_tx_cmd_set(struct dsi_panel *panel,
 		enum dsi_cmd_set_type type, bool do_peripheral_flush);
 int dsi_panel_parse_cmd_sets_sub(struct dsi_panel_cmd_set *cmd,
 		enum dsi_cmd_set_type type, struct dsi_parser_utils *utils);
-int dsi_panel_set_pinctrl_state(struct dsi_panel *panel, bool enable, bool is_cont_splash);
+int dsi_panel_set_pinctrl_state(struct dsi_panel *panel, bool enable);
 int dsi_panel_reset(struct dsi_panel *panel);
 #endif /* OPLUS_FEATURE_DISPLAY */
 
@@ -513,7 +493,7 @@ int dsi_panel_send_cmd(struct dsi_panel *panel,
 int dsi_panel_parse_freq_step_table(struct dsi_display_mode *mode,
 				struct dsi_parser_utils *utils);
 
-int dsi_panel_power_on(struct dsi_panel *panel, bool is_cont_splash);
+int dsi_panel_power_on(struct dsi_panel *panel);
 
 int dsi_panel_power_off(struct dsi_panel *panel);
 

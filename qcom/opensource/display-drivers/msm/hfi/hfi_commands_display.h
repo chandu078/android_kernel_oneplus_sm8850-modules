@@ -296,41 +296,21 @@
 #define HFI_COMMAND_DISPLAY_POWER_REGISTER                            0x0200000D
 
 /*
- * HFI_COMMAND_DISPLAY_TRANSFER_DCS_CMD  -  From Host to DCP, this command
- *                                          instructs DCP to send DCS commands to the panel.
+ * HFI_COMMAND_DISPLAY_LP_STATE_REQ   -     From Host to DCP, this command
+ *                                          tells DCP what power state to transition to
  *
  * Host to DCP:
  * hfi_header.num_packets                 : 1
  *
- * hfi_packet.payload_info.type           : HFI_PAYLOAD_U32_ARRAY
- *           .cmd                         : HFI_COMMAND_DISPLAY_TRANSFER_DCS_CMD
- *           .flags                       : HFI_TX_FLAGS_INTR_REQUIRED(optional) |
- *                                          HFI_TX_FLAGS_RESPONSE_REQUIRED |
- *                                          HFI_TX_FLAGS_NON_DISCARDABLE
+ * hfi_packet.payload_info.type           : HFI_PAYLOAD_U32
+ *           .cmd                         : HFI_COMMAND_DISPLAY_LP_STATE_REQ
+ *           .flags                       : HFI_TX_FLAGS_NON_DISCARDABLE
  *           .id                          : Bits 0:15 carry the display id
  *           .packet_id                   : unique id
- *           .payload                     : struct hfi_dsi_cmd_desc
- */
-#define HFI_COMMAND_DISPLAY_TRANSFER_DCS_CMD                          0x0200000E
+ *           .payload                     : enum hfi_display_power_mode;
 
-/*!
- * HFI_COMMAND_DISPLAY_IDLE_TIMER_CONTROL - From Host to DCP, this command tells DCP to modify the
- *                                          idle timer, see enum hfi_display_idle_timer_control
- *                                          for more info.
- *
- * Host to DCP:
- * hfi_header.num_packets                 : 1
- *
- * Hfi packet layout                      | Value
- *----------------------------------------|---------------------------------
- * hfi_packet.payload_info.type           | HFI_PAYLOAD_U32
- * hfi_packet.cmd                         | HFI_COMMAND_DISPLAY_IDLE_TIMER_CONTROL
- * hfi_packet.flags                       | HFI_TX_FLAGS_NON_DISCARDABLE
- * hfi_packet.id                          | Bits 0:15 carry the display id
- * hfi_packet.packet_id                   | unique id
- * hfi_packet.payload[0]                  | enum hfi_display_idle_timer_control
  */
-#define HFI_COMMAND_DISPLAY_IDLE_TIMER_CONTROL                        0x0200000F
+#define HFI_COMMAND_DISPLAY_LP_STATE_REQ                              0x0200000E
 
 #define HFI_COMMAND_DISPLAY_END                                       0x02FFFFFF
 

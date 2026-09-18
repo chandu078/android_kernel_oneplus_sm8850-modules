@@ -9,7 +9,6 @@
 #include <linux/clk.h>
 #include <linux/debugfs.h>
 #include <linux/kernel.h>
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/iommu.h>
 #include <linux/of.h>
@@ -18,7 +17,6 @@
 #include <linux/dma-buf.h>
 #include <linux/of_platform.h>
 #include <linux/msm_dma_iommu_mapping.h>
-#include <linux/qcom-iommu-util.h>
 
 #include "soc/qcom/secure_buffer.h"
 #include "sde_rotator_base.h"
@@ -26,7 +24,6 @@
 #include "sde_rotator_io_util.h"
 #include "sde_rotator_smmu.h"
 #include "sde_rotator_debug.h"
-#include <linux/of_device.h>
 
 #define SMMU_SDE_ROT_SEC	"qcom,smmu_sde_rot_sec"
 #define SMMU_SDE_ROT_UNSEC	"qcom,smmu_sde_rot_unsec"
@@ -218,10 +215,11 @@ int sde_smmu_attach(struct sde_rot_data_type *mdata)
 				sde_smmu_is_valid_domain_condition(mdata,
 						i,
 						true)) {
-				rc = qcom_iommu_sid_switch(sde_smmu->dev, SID_ACQUIRE);
+				rc = iommu_attach_device(
+					sde_smmu->rot_domain, sde_smmu->dev);
 				if (rc) {
 					SDEROT_ERR(
-						"iommu sid switch failed for domain[%d] with err:%d\n",
+						"iommu attach device failed for domain[%d] with err:%d\n",
 						i, rc);
 					sde_smmu_enable_power(sde_smmu,
 						false);
@@ -242,8 +240,8 @@ err:
 	for (i--; i >= 0; i--) {
 		sde_smmu = sde_smmu_get_cb(i);
 		if (sde_smmu && sde_smmu->dev) {
-			if (sde_smmu->domain_attached)
-				rc = qcom_iommu_sid_switch(sde_smmu->dev, SID_RELEASE);
+			iommu_detach_device(sde_smmu->rot_domain,
+							sde_smmu->dev);
 			sde_smmu_enable_power(sde_smmu, false);
 			sde_smmu->domain_attached = false;
 		}
@@ -260,7 +258,7 @@ err:
 int sde_smmu_detach(struct sde_rot_data_type *mdata)
 {
 	struct sde_smmu_client *sde_smmu;
-	int i, rc;
+	int i;
 
 	for (i = 0; i < SDE_IOMMU_MAX_DOMAIN; i++) {
 		if (!sde_smmu_is_valid_domain_type(mdata, i))
@@ -271,14 +269,12 @@ int sde_smmu_detach(struct sde_rot_data_type *mdata)
 			if (sde_smmu->domain_attached &&
 				sde_smmu_is_valid_domain_condition(mdata,
 					i, false)) {
-				rc = qcom_iommu_sid_switch(sde_smmu->dev, SID_RELEASE);
-				if (rc)
-					SDEROT_ERR("iommu sid switch failed (%d)\n", rc);
-				else {
-					SDEROT_DBG("iommu domain[%i] detached\n", i);
-					sde_smmu->domain_attached = false;
+				iommu_detach_device(sde_smmu->rot_domain,
+							sde_smmu->dev);
+				SDEROT_DBG("iommu domain[%i] detached\n", i);
+				sde_smmu->domain_attached = false;
 				}
-			} else {
+			else {
 				sde_smmu_enable_power(sde_smmu, false);
 			}
 		}
@@ -614,7 +610,7 @@ int sde_smmu_probe(struct platform_device *pdev)
 		dev->dma_parms = devm_kzalloc(dev,
 				sizeof(*dev->dma_parms), GFP_KERNEL);
 
-	dma_set_max_seg_size(dev, (unsigned int)DMA_BIT_MASK(32));
+	dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
 	dma_set_seg_boundary(dev, (unsigned long)DMA_BIT_MASK(64));
 
 	iommu_set_fault_handler(sde_smmu->rot_domain,
@@ -641,11 +637,7 @@ release_vreg:
 	return rc;
 }
 
-#if (KERNEL_VERSION(6, 10, 0) <= LINUX_VERSION_CODE)
-void sde_smmu_remove(struct platform_device *pdev)
-#else
 int sde_smmu_remove(struct platform_device *pdev)
-#endif
 {
 	int i;
 	struct sde_smmu_client *sde_smmu;
@@ -667,9 +659,7 @@ int sde_smmu_remove(struct platform_device *pdev)
 		sde_smmu->mp.vreg_config = NULL;
 		sde_smmu->mp.num_vreg = 0;
 	}
-#if (KERNEL_VERSION(6, 10, 0) > LINUX_VERSION_CODE)
-        return 0;
-#endif
+	return 0;
 }
 
 static struct platform_driver sde_smmu_driver = {

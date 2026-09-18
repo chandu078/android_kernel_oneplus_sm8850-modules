@@ -1275,6 +1275,7 @@ void sde_connector_set_vrr_params(struct drm_connector *connector)
 		drm_enc = connector->encoder;
 
 	if (c_conn->vrr_caps.video_mrr_support &&
+			msm_is_mode_seamless_vrr(&c_state->msm_mode) &&
 			!drm_mode_vrefresh(c_state->msm_mode.base))
 		frame_interval_ns =
 			NSEC_PER_SEC/drm_mode_vrefresh(c_state->msm_mode.base);
@@ -1319,8 +1320,7 @@ void sde_connector_set_vrr_params(struct drm_connector *connector)
 
 	c_conn->freq_pattern_updated = false;
 	c_conn->freq_pattern_type_changed = false;
-	if (usecase_idx_updated || frame_interval_updated || !c_conn->freq_pattern ||
-		msm_is_mode_seamless_emsync_fps_switch(&c_state->msm_mode)) {
+	if (usecase_idx_updated || frame_interval_updated || !c_conn->freq_pattern) {
 		new_freq_pattern = sde_encoder_get_freq_pattern(drm_enc, c_conn->frame_interval,
 				c_conn->usecase_idx);
 		if (!new_freq_pattern) {
@@ -1344,10 +1344,6 @@ void sde_connector_set_vrr_params(struct drm_connector *connector)
 			SDE_EVT32(new_freq_pattern->frame_interval,
 				old_freq_pattern->frame_interval, new_freq_pattern->usecase_idx,
 				old_freq_pattern->usecase_idx);
-		} else if (msm_is_mode_seamless_emsync_fps_switch(&c_state->msm_mode)) {
-			c_conn->freq_pattern = new_freq_pattern;
-			c_conn->freq_pattern_updated = true;
-			SDE_EVT32(SDE_EVTLOG_FUNC_CASE1);
 		}
 
 		if (new_freq_pattern && old_freq_pattern &&
@@ -1355,7 +1351,7 @@ void sde_connector_set_vrr_params(struct drm_connector *connector)
 				old_freq_pattern->freq_stepping_seq[0])) {
 			c_conn->qsync_updated = true;
 			SDE_EVT32(
-					SDE_EVTLOG_FUNC_CASE2,
+					SDE_EVTLOG_FUNC_CASE1,
 					new_freq_pattern->freq_stepping_seq[0],
 					old_freq_pattern->freq_stepping_seq[0]);
 		}
@@ -1504,11 +1500,6 @@ static int _sde_connector_update_dirty_properties(
 		case CONNECTOR_PROP_BRIGHTNESS:
 			b_lvl = sde_connector_get_property(connector->state,
 						CONNECTOR_PROP_BRIGHTNESS);
-			if (c_conn->vrr_caps.video_psr_support) {
-				c_conn->b_lvl = b_lvl;
-				c_conn->bl_dirty_change = true;
-				break;
-			}
 			backlight_device_set_brightness(c_conn->bl_device, b_lvl);
 			break;
 		default:
@@ -1571,10 +1562,8 @@ static bool sde_connector_power_on_off_frame(struct drm_connector *connector)
 int sde_connector_check_update_vhm_cmd(struct drm_connector *connector)
 {
 	struct sde_connector *c_conn;
-	struct sde_connector_state *c_state;
 	struct msm_freq_step_pattern *freq_pattern;
 	struct sde_encoder_virt *sde_enc;
-	enum sde_crtc_vm_req vm_req;
 	u64 cmd_bit_mask = 0;
 	int rc = 0;
 
@@ -1584,16 +1573,10 @@ int sde_connector_check_update_vhm_cmd(struct drm_connector *connector)
 	}
 
 	c_conn = to_sde_connector(connector);
-	c_state = to_sde_connector_state(connector->state);
 	sde_enc = to_sde_encoder_virt(c_conn->encoder);
 
 	if (sde_enc)
 		sde_enc->vrr_info.vhm_cmd_in_progress = SDE_NO_CMD_SCHEDULED;
-
-	vm_req = sde_crtc_get_property(to_sde_crtc_state(sde_enc->crtc->state),
-			CRTC_PROP_VM_REQ_STATE);
-	if (vm_req == VM_REQ_RELEASE)
-		return 0;
 
 	if (sde_encoder_in_cont_splash(connector->encoder))
 		return 0;
@@ -1606,6 +1589,7 @@ int sde_connector_check_update_vhm_cmd(struct drm_connector *connector)
 
 	SDE_EVT32(c_conn->vrr_cmd_state, c_conn->freq_pattern_updated,
 		SDE_EVTLOG_FUNC_CASE1);
+	mutex_lock(&c_conn->bl_vrr.bl_lock);
 	freq_pattern = c_conn->freq_pattern;
 
 	if (c_conn->vrr_cmd_state == VRR_CMD_POWER_ON ||
@@ -1627,28 +1611,10 @@ int sde_connector_check_update_vhm_cmd(struct drm_connector *connector)
 	else if (c_conn->freq_pattern_type_changed && !freq_pattern->needs_ap_refresh)
 		cmd_bit_mask |= BIT(DSI_CMD_SET_STICKY_STILL_EN);
 
-	if (msm_is_mode_seamless_emsync_fps_switch(&c_state->msm_mode) &&
-			c_conn->ops.check_cmd_defined(c_conn->display,
-			DSI_CMD_SET_EM_PULSE_SWITCH)) {
-		cmd_bit_mask |= BIT(DSI_CMD_SET_EM_PULSE_SWITCH);
-	}
-
-	if(c_state->privacy_layer_updated)
-		cmd_bit_mask |= BIT(DSI_CMD_SET_PRIVACY_LAYER);
-	else
-		cmd_bit_mask &= ~BIT(DSI_CMD_SET_PRIVACY_LAYER);
-
-	if (c_conn->bl_dirty_change) {
-		backlight_device_set_brightness(c_conn->bl_device, c_conn->b_lvl);
-		cmd_bit_mask |= BIT(DSI_CMD_SET_BRIGHTNESS);
-	}
-
 	if (cmd_bit_mask) {
-		mutex_lock(&c_conn->bl_vrr.bl_lock);
 		rc = sde_connector_update_cmd(connector, cmd_bit_mask, true);
 		if (sde_enc)
 			sde_enc->vrr_info.vhm_cmd_in_progress = SDE_CMD_SCHEDULED;
-		mutex_unlock(&c_conn->bl_vrr.bl_lock);
 	}
 
 	SDE_EVT32(SDE_EVTLOG_FUNC_CASE2, rc, cmd_bit_mask>>32, cmd_bit_mask,
@@ -1658,8 +1624,8 @@ int sde_connector_check_update_vhm_cmd(struct drm_connector *connector)
 
 	c_conn->freq_pattern_updated = false;
 	c_conn->freq_pattern_type_changed = false;
-	c_state->privacy_layer_updated = false;
 
+	mutex_unlock(&c_conn->bl_vrr.bl_lock);
 	return rc;
 }
 
@@ -1668,8 +1634,7 @@ int sde_connector_pre_kickoff(struct drm_connector *connector)
 	struct sde_connector *c_conn;
 	struct sde_connector_state *c_state;
 	struct msm_display_kickoff_params params;
-	struct dsi_display *display = NULL;
-	enum msm_disp_op disp_op;
+	struct dsi_display *display;
 	int rc;
 
 	if (!connector) {
@@ -1684,20 +1649,17 @@ int sde_connector_pre_kickoff(struct drm_connector *connector)
 		return -EINVAL;
 	}
 
+	display = _sde_connector_get_display(c_conn);
+	if (!display)
+		return 0;
 	/*
 	 * During pre kickoff DCS commands have to have an
 	 * asynchronous wait to avoid an unnecessary stall
 	 * in pre-kickoff. This flag must be reset at the
 	 * end of display pre-kickoff.
 	 */
-	if (c_conn->connector_type == DRM_MODE_CONNECTOR_DSI) {
-		display = _sde_connector_get_display(c_conn);
-		if (!display)
-			return 0;
-
-		/* Set queue_cmd_waits only for DSI connectors */
+	if (c_conn->connector_type == DRM_MODE_CONNECTOR_DSI)
 		display->queue_cmd_waits = true;
-	}
 
 	rc = _sde_connector_update_dirty_properties(connector);
 	if (rc) {
@@ -1719,23 +1681,6 @@ int sde_connector_pre_kickoff(struct drm_connector *connector)
 		rc = sde_connector_update_cmd(connector, BIT(DSI_CMD_SET_FPS_SWITCH), true);
 		if (rc)
 			SDE_EVT32(connector->base.id, SDE_EVTLOG_ERROR);
-	} else if (msm_is_mode_seamless_dms_vid(&c_state->msm_mode) &&
-			c_conn->ops.check_cmd_defined(c_conn->display,
-			DSI_CMD_SET_TIMING_SWITCH) &&
-			!c_conn->vrr_caps.video_psr_support) {
-		rc = sde_connector_update_cmd(connector, BIT(DSI_CMD_SET_TIMING_SWITCH),
-				true);
-		if (rc)
-			SDE_EVT32(connector->base.id, SDE_EVTLOG_ERROR);
-	}
-
-	disp_op = sde_connector_get_disp_op(connector);
-	if (c_conn->hal_ops.prepare_commit[disp_op]) {
-		rc = c_conn->hal_ops.prepare_commit[disp_op](connector, c_state);
-		if (rc) {
-			SDE_ERROR("prepare_commit HAL op failed, rc: %d\n", rc);
-			return rc;
-		}
 	}
 
 	if (!c_conn->ops.pre_kickoff)
@@ -1749,8 +1694,7 @@ int sde_connector_pre_kickoff(struct drm_connector *connector)
 	rc = c_conn->ops.pre_kickoff(connector, c_conn->display, &params);
 
 end:
-	c_conn->bl_dirty_change = false;
-	if (c_conn->connector_type == DRM_MODE_CONNECTOR_DSI && display)
+	if (c_conn->connector_type == DRM_MODE_CONNECTOR_DSI)
 		display->queue_cmd_waits = false;
 
 	return rc;
@@ -1763,6 +1707,7 @@ int sde_connector_prepare_commit(struct drm_connector *connector)
 	struct msm_display_conn_params params;
 	struct drm_encoder *drm_enc;
 	struct dsi_display *display;
+	enum msm_disp_op disp_op;
 	int rc = 0;
 
 	if (!connector) {
@@ -1790,30 +1735,17 @@ int sde_connector_prepare_commit(struct drm_connector *connector)
 
 	display = (struct dsi_display *)c_conn->display;
 
-	if (c_state->privacy_layer_updated)
-		params.privacy_v1 = &c_state->privacy_v1;
-
 	rc = c_conn->ops.prepare_commit(c_conn->display, &params);
 
 	SDE_EVT32(connector->base.id, params.qsync_mode,
 		  params.qsync_update, rc);
 
-	return rc;
-}
-
-int sde_connector_setup_obj_id(struct drm_connector *conn, int id)
-{
-	int rc = 0;
-	struct sde_connector *sde_conn;
-
-	if (!conn) {
-		SDE_ERROR("invalid argument, conn %d\n", conn != NULL);
-		return -EINVAL;
+	disp_op = sde_connector_get_disp_op(connector);
+	if (c_conn->hal_ops.prepare_commit[disp_op]) {
+		rc = c_conn->hal_ops.prepare_commit[disp_op](connector, c_state);
+		if (rc)
+			SDE_ERROR("prepare_commit HAL op failed, rc: %d\n", rc);
 	}
-
-	sde_conn = to_sde_connector(conn);
-	sde_conn->conn_id = id;
-
 	return rc;
 }
 
@@ -1947,14 +1879,11 @@ int sde_connector_update_cmd(struct drm_connector *connector,
 
 	memset(&params, 0, sizeof(params));
 
-	if (peripheral_flush &&
-			(-EOPNOTSUPP == sde_encoder_update_periph_flush(drm_enc)))
-		peripheral_flush = false;
+	if (peripheral_flush)
+		sde_encoder_update_periph_flush(drm_enc);
 
 	params.cmd_bit_mask = cmd_bit_mask;
 	params.peripheral_flush = peripheral_flush;
-	params.privacy_v1 = &c_state->privacy_v1;
-	params.b_lvl = c_conn->bl_dirty_value;
 
 	rc = c_conn->ops.process_dcs_cmd_bitmask(c_conn->display, &params);
 
@@ -2331,9 +2260,6 @@ sde_connector_atomic_duplicate_state(struct drm_connector *connector)
 		c_state->dyn_hdr_meta.dynamic_hdr_payload_size = 0;
 	}
 
-	/* Clear privacy layer info from prev state */
-	c_state->privacy_layer_updated = false;
-
 	return &c_state->base;
 }
 
@@ -2463,56 +2389,6 @@ static int _sde_connector_set_roi_v1(
 				c_state->rois.roi[i].y1,
 				c_state->rois.roi[i].x2,
 				c_state->rois.roi[i].y2);
-	}
-
-	return 0;
-}
-
-static int _sde_connector_set_privacy_layer_v1(
-		struct sde_connector *c_conn,
-		struct sde_connector_state *c_state,
-		void __user *usr_ptr)
-{
-	struct sde_drm_privacy_layer_v1 privacy_v1;
-	int i = 0;
-
-	if (!c_conn || !c_state) {
-		SDE_ERROR("invalid args\n");
-		return -EINVAL;
-	}
-
-	memset(&c_state->privacy_v1, 0, sizeof(c_state->privacy_v1));
-
-	if (!usr_ptr) {
-		SDE_DEBUG_CONN(c_conn, "privacy layers v1 cleared\n");
-		return 0;
-	}
-
-	if (copy_from_user(&privacy_v1, usr_ptr, sizeof(privacy_v1))) {
-		SDE_ERROR_CONN(c_conn, "failed to copy privacy layer v1 data\n");
-		return -EINVAL;
-	}
-
-	SDE_DEBUG_CONN(c_conn, "num privacy layers %d\n", privacy_v1.no_of_layers);
-
-	if (privacy_v1.no_of_layers > MAX_PRIVACY_LAYERS) {
-		SDE_ERROR_CONN(c_conn, "num privacy layers more than supported: %d",
-				privacy_v1.no_of_layers);
-		return -EINVAL;
-	}
-
-	c_state->privacy_v1.no_of_layers = privacy_v1.no_of_layers;
-	c_state->privacy_v1.reserved = privacy_v1.reserved;
-	c_state->privacy_layer_updated = true;
-
-	for (i = 0; i < privacy_v1.no_of_layers; i++) {
-		c_state->privacy_v1.privacy_list[i] = privacy_v1.privacy_list[i];
-		SDE_DEBUG_CONN(c_conn, "list%d: c_radius-%d privacy region (%d,%d) (%d,%d)\n", i,
-				c_state->privacy_v1.privacy_list[i].corner_radius,
-				c_state->privacy_v1.privacy_list[i].left,
-				c_state->privacy_v1.privacy_list[i].top,
-				c_state->privacy_v1.privacy_list[i].right,
-				c_state->privacy_v1.privacy_list[i].bottom);
 	}
 
 	return 0;
@@ -2855,12 +2731,6 @@ static int sde_connector_atomic_set_property(struct drm_connector *connector,
 		break;
 	case CONNECTOR_PROP_DYN_TRANSFER_TIME:
 		_sde_connector_set_prop_dyn_transfer_time(c_conn, val);
-		break;
-	case CONNECTOR_PROP_PRIVACY_LAYER_V1:
-		rc = _sde_connector_set_privacy_layer_v1(c_conn, c_state,
-				(void *)(uintptr_t)val);
-		if (rc)
-			SDE_ERROR_CONN(c_conn, "invalid privacy_layer_v1, rc: %d\n", rc);
 		break;
 
 #ifdef OPLUS_FEATURE_DISPLAY_ADFR
@@ -3337,25 +3207,18 @@ static ssize_t _sde_debugfs_conn_cmd_tx_write(struct file *file,
 {
 	struct drm_connector *connector = file->private_data;
 	struct sde_connector *c_conn = NULL;
-	struct drm_encoder *drm_enc;
 	struct sde_kms *sde_kms;
 	char *input, *token, *input_copy, *input_dup = NULL;
 	const char *delim = " ";
 	char buffer[MAX_CMD_PAYLOAD_SIZE] = {0};
 	int rc = 0, strtoint = 0;
 	u32 buf_size = 0;
-	u32 delay_time = 0;
 
 	if (*ppos || !connector) {
 		SDE_ERROR("invalid argument(s), conn %d\n", connector != NULL);
 		return -EINVAL;
 	}
 	c_conn = to_sde_connector(connector);
-
-	if (connector->state && connector->state->best_encoder)
-		drm_enc = connector->state->best_encoder;
-	else
-		drm_enc = connector->encoder;
 
 	sde_kms = sde_connector_get_kms(&c_conn->base);
 	if (!sde_kms) {
@@ -3388,11 +3251,6 @@ static ssize_t _sde_debugfs_conn_cmd_tx_write(struct file *file,
 	input[count] = '\0';
 
 	SDE_INFO("Command requested for transfer to panel: %s\n", input);
-
-	if (c_conn->vrr_caps.video_psr_support) {
-		delay_time = sde_encoder_phys_delay_dcs(drm_enc);
-		SDE_EVT32(SDE_EVTLOG_FUNC_CASE1, delay_time);
-	}
 
 	input_copy = kstrdup(input, GFP_KERNEL);
 	if (!input_copy) {
@@ -3819,7 +3677,6 @@ static int sde_connector_get_modes(struct drm_connector *connector)
 	return mode_count;
 }
 
-#if (KERNEL_VERSION(6, 15, 0) > LINUX_VERSION_CODE)
 static enum drm_mode_status
 sde_connector_mode_valid(struct drm_connector *connector,
 		struct drm_display_mode *mode)
@@ -3845,33 +3702,6 @@ sde_connector_mode_valid(struct drm_connector *connector,
 	/* assume all modes okay by default */
 	return MODE_OK;
 }
-#else
-static enum drm_mode_status
-sde_connector_mode_valid(struct drm_connector *connector,
-		const struct drm_display_mode *mode)
-{
-	struct sde_connector *c_conn;
-	struct msm_resource_caps_info avail_res;
-
-	if (!connector || !mode) {
-		SDE_ERROR("invalid argument(s), conn %pK, mode %pK\n",
-				connector, mode);
-		return MODE_ERROR;
-	}
-
-	c_conn = to_sde_connector(connector);
-
-	memset(&avail_res, 0, sizeof(avail_res));
-	sde_connector_get_avail_res_info(connector, &avail_res);
-
-	if (c_conn->ops.mode_valid)
-		return c_conn->ops.mode_valid(connector, (struct drm_display_mode *)mode,
-				c_conn->display, &avail_res);
-
-	/* assume all modes okay by default */
-	return MODE_OK;
-}
-#endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 static struct drm_encoder *
@@ -4168,8 +3998,6 @@ static int sde_connector_populate_mode_info(struct drm_connector *conn,
 				sde_kms_info_add_keystr(info, "topology", topo_name);
 		}
 
-		sde_kms_info_add_keyint(info, "lm_mask", c_conn->lm_mask);
-
 		sde_kms_info_add_keyint(info, "qsync_min_fps", mode_info.qsync_min_fps);
 		if (!c_conn->vrr_caps.video_mrr_support)
 			sde_kms_info_add_keyint(info, "avr_step_fps", mode_info.avr_step_fps);
@@ -4187,11 +4015,8 @@ static int sde_connector_populate_mode_info(struct drm_connector *conn,
 			}
 		}
 
-		if (c_conn->vrr_caps.video_psr_support || c_conn->vrr_caps.has_vhm_capability)
+		if (c_conn->vrr_caps.video_psr_support)
 			sde_kms_info_add_keyint(info, "has_vhm_support", 1);
-
-		if (c_conn->dpu_dma_enabled)
-			sde_kms_info_add_keyint(info, "dpu_dma_enabled", 1);
 
 		if (c_conn->vrr_caps.vrr_support)
 			sde_kms_info_add_keyint(info, "early_ept_timeout",
@@ -4216,8 +4041,8 @@ static int sde_connector_populate_mode_info(struct drm_connector *conn,
 					mode_info.mdp_transfer_time_us_max);
 		}
 
-		sde_kms_info_add_list(info, "allowed_mode_switch", mode_info.allowed_mode_switches,
-			ARRAY_SIZE(mode_info.allowed_mode_switches));
+		sde_kms_info_add_keyint(info, "allowed_mode_switch",
+			mode_info.allowed_mode_switches);
 
 		if (!mode_info.roi_caps.num_roi)
 			continue;
@@ -4250,7 +4075,7 @@ int sde_connector_set_blob_data(struct drm_connector *conn,
 	struct sde_kms_info *info;
 	struct sde_connector *c_conn = NULL;
 	struct sde_connector_state *sde_conn_state = NULL;
-	struct msm_mode_info *mode_info = NULL;
+	struct msm_mode_info mode_info;
 	struct drm_property_blob **blob = NULL;
 	int rc = 0;
 
@@ -4260,23 +4085,19 @@ int sde_connector_set_blob_data(struct drm_connector *conn,
 		return -EINVAL;
 	}
 
-	mode_info = kzalloc(sizeof(*mode_info), GFP_KERNEL);
-	if (!mode_info)
-		return -ENOMEM;
-
 	info = vzalloc(sizeof(*info));
-	if (!info) {
-		kfree(mode_info);
+	if (!info)
 		return -ENOMEM;
-	}
 
 	sde_kms_info_reset(info);
 
 	switch (prop_id) {
 	case CONNECTOR_PROP_SDE_INFO:
+		memset(&mode_info, 0, sizeof(mode_info));
+
 		if (state) {
 			sde_conn_state = to_sde_connector_state(state);
-			memcpy(mode_info, &sde_conn_state->mode_info,
+			memcpy(&mode_info, &sde_conn_state->mode_info,
 					sizeof(sde_conn_state->mode_info));
 		} else {
 			/**
@@ -4290,7 +4111,7 @@ int sde_connector_set_blob_data(struct drm_connector *conn,
 
 		if (c_conn->ops.set_info_blob) {
 			rc = c_conn->ops.set_info_blob(conn, info,
-					c_conn->display, mode_info);
+					c_conn->display, &mode_info);
 			if (rc) {
 				SDE_ERROR_CONN(c_conn,
 						"set_info_blob failed, %d\n",
@@ -4323,7 +4144,6 @@ int sde_connector_set_blob_data(struct drm_connector *conn,
 			prop_id);
 exit:
 	vfree(info);
-	kfree(mode_info);
 
 	return rc;
 }
@@ -4353,28 +4173,6 @@ static void _sde_connector_install_qsync_properties(struct sde_kms *sde_kms,
 		msm_property_install_enum(&c_conn->property_info, "avr_step_state",
 				0, 0, e_avr_step_state, ARRAY_SIZE(e_avr_step_state), 0,
 				CONNECTOR_PROP_AVR_STEP_STATE);
-}
-
-static void _sde_connector_install_emsync_fps_property(struct sde_connector *c_conn,
-	struct dsi_display *dsi_display)
-{
-	u32 max_emsync_fps = 0;
-	int i;
-
-	if (!c_conn || !dsi_display || !dsi_display->panel || !dsi_display->modes) {
-		SDE_ERROR("invalid arguments\n");
-		return;
-	} else if (!dsi_display->panel->esync_caps.emsync_switch_enabled)
-		return;
-
-	for (i = 0; i < dsi_display->panel->num_display_modes; ++i)
-		max_emsync_fps = max(max_emsync_fps,
-			dsi_display->modes[i].priv_info->esync_params.emsync_fps);
-
-	msm_property_install_range(&c_conn->property_info, "emsync_fps",
-		0x0, 0, max_emsync_fps,
-		dsi_display->modes[0].priv_info->esync_params.emsync_fps,
-		CONNECTOR_PROP_EMSYNC_FPS);
 }
 
 static int _sde_connector_install_properties(struct drm_device *dev,
@@ -4429,11 +4227,6 @@ static int _sde_connector_install_properties(struct drm_device *dev,
 				sizeof(dsi_display->panel->hdr_props),
 				CONNECTOR_PROP_HDR_INFO);
 		}
-
-		if(dsi_display && dsi_display->panel->privacy_feature_enabled)
-			msm_property_install_volatile_range(
-				&c_conn->property_info, "privacy_layers_v1", 0x0,
-				0, ~0, 0, CONNECTOR_PROP_PRIVACY_LAYER_V1);
 
 		if (dsi_display && dsi_display->panel &&
 				dsi_display->panel->dyn_clk_caps.dyn_clk_support)
@@ -4504,7 +4297,6 @@ static int _sde_connector_install_properties(struct drm_device *dev,
 			CONNECTOR_PROP_AUTOREFRESH);
 
 	c_conn->vrr_caps = display_info->vrr_caps;
-	c_conn->dpu_dma_enabled = display_info->dpu_dma_enabled;
 
 	if (c_conn->vrr_caps.vrr_support &&
 			!c_conn->vrr_caps.video_mrr_support) {
@@ -4542,8 +4334,6 @@ static int _sde_connector_install_properties(struct drm_device *dev,
 
 		msm_property_install_enum(&c_conn->property_info, "dsc_mode", 0,
 			0, e_dsc_mode, ARRAY_SIZE(e_dsc_mode), 0, CONNECTOR_PROP_DSC_MODE);
-
-		_sde_connector_install_emsync_fps_property(c_conn, dsi_display);
 
 		if (dsi_display && dsi_display->panel &&
 			display_info->capabilities & MSM_DISPLAY_CAP_CMD_MODE &&
@@ -4614,7 +4404,7 @@ static int _sde_connector_install_properties(struct drm_device *dev,
 		dsi_display = (struct dsi_display *)(display);
 		if (dsi_display && dsi_display->panel) {
 			msm_property_install_range(&c_conn->property_info, "brightness",
-			0x0, 0, 0xFFFF, 0,
+			0x0, 0, dsi_display->panel->bl_config.brightness_max_level, 0,
 			CONNECTOR_PROP_BRIGHTNESS);
 		}
 	}
@@ -4757,6 +4547,10 @@ struct drm_connector *sde_connector_init(struct drm_device *dev,
 
 	c_conn->conn_id = 0;
 
+	rc = hfi_connector_init(connector_type, c_conn);
+	if (rc)
+		goto error_free_conn;
+
 	memset(&display_info, 0, sizeof(display_info));
 
 	rc = drm_connector_init(dev,
@@ -4778,7 +4572,6 @@ struct drm_connector *sde_connector_init(struct drm_device *dev,
 	c_conn->lp_mode = 0;
 	c_conn->last_panel_power_mode = SDE_MODE_DPMS_ON;
 	c_conn->twm_en = false;
-	atomic_set(&c_conn->ssr_notify_enabled, 0);
 
 	sde_kms = to_sde_kms(priv->kms);
 	if (sde_kms->vbif[VBIF_NRT]) {
@@ -4809,12 +4602,6 @@ struct drm_connector *sde_connector_init(struct drm_device *dev,
 			SDE_CONNECTOR_NAME_SIZE,
 			"conn%u",
 			c_conn->base.base.id);
-
-	if (IS_DISP_OP_HFI(priv->disp_op)) {
-		rc = hfi_connector_init(connector_type, c_conn);
-		if (rc)
-			goto error_free_conn;
-	}
 
 	rc = sde_connector_get_info(&c_conn->base, &display_info);
 	if (rc)
@@ -4930,7 +4717,7 @@ error_free_conn:
 	return ERR_PTR(rc);
 }
 
-static int _sde_conn_setup_recovery_event(struct drm_connector *connector, bool enable)
+static int _sde_conn_enable_hw_recovery(struct drm_connector *connector)
 {
 	struct sde_connector *c_conn;
 
@@ -4941,7 +4728,7 @@ static int _sde_conn_setup_recovery_event(struct drm_connector *connector, bool 
 	c_conn = to_sde_connector(connector);
 
 	if (c_conn->encoder)
-		sde_encoder_setup_hw_recovery_event(c_conn->encoder, enable);
+		sde_encoder_enable_recovery_event(c_conn->encoder);
 
 	return 0;
 }
@@ -4978,7 +4765,7 @@ int sde_connector_register_custom_event(struct sde_kms *kms,
 		ret = 0;
 		break;
 	case DRM_EVENT_SDE_HW_RECOVERY:
-		ret = _sde_conn_setup_recovery_event(conn_drm, val);
+		ret = _sde_conn_enable_hw_recovery(conn_drm);
 #ifdef OPLUS_FEATURE_DISPLAY
 		if (!(get_eng_version() == FACTORY || get_eng_version() == AGING || get_eng_version() == HIGH_TEMP_AGING)) {
 #endif /* OPLUS_FEATURE_DISPLAY */
@@ -4992,15 +4779,6 @@ int sde_connector_register_custom_event(struct sde_kms *kms,
 		ret = 0;
 		break;
 #endif /* OPLUS_FEATURE_DISPLAY */
-	case DRM_EVENT_SSR:
-		if (!conn_drm) {
-			SDE_ERROR("invalid connector\n");
-			return -EINVAL;
-		}
-		c_conn = to_sde_connector(conn_drm);
-		atomic_set(&c_conn->ssr_notify_enabled, (val ? 1 : 0));
-		ret = 0;
-		break;
 	default:
 		break;
 	}
@@ -5011,8 +4789,7 @@ int sde_connector_event_notify(struct drm_connector *connector, uint32_t type,
 		uint32_t len, uint32_t val)
 {
 	struct drm_event event;
-	struct sde_connector *c_conn;
-	int ret = 0;
+	int ret;
 
 	if (!connector) {
 		SDE_ERROR("invalid connector\n");
@@ -5025,16 +4802,10 @@ int sde_connector_event_notify(struct drm_connector *connector, uint32_t type,
 	case DRM_EVENT_PANEL_DEAD:
 	case DRM_EVENT_SDE_HW_RECOVERY:
 	case DRM_EVENT_MISR_SIGN:
-		break;
 #ifdef OPLUS_FEATURE_DISPLAY
 	case DRM_EVENT_TP_TOUCHDOWN:
 #endif /* OPLUS_FEATURE_DISPLAY */
 		ret = 0;
-		break;
-	case DRM_EVENT_SSR:
-		c_conn = to_sde_connector(connector);
-		if (!atomic_read(&c_conn->ssr_notify_enabled))
-			return 0;
 		break;
 	default:
 		SDE_ERROR("connector %d, Unsupported event %d\n",

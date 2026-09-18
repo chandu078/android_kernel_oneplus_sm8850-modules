@@ -428,9 +428,6 @@ void sde_hw_reset_ubwc(struct sde_hw_mdp *mdp, struct sde_mdss_cfg *m)
 		} else if (IS_UBWC_43_SUPPORTED(ubwc_enc_version)) {
 			ver = 3;
 			mode = 1;
-		} else if (IS_UBWC_20_SUPPORTED(ubwc_enc_version)) {
-			ver = 0;
-			mode = 0;
 		} else {
 			ver = 2;
 			mode = 1;
@@ -1091,7 +1088,7 @@ struct sde_hw_sw_fuse *sde_hw_sw_fuse_init(void __iomem *addr,
 		c->demura_sw_fuse_offset = 0x88;
 	else if (IS_SUN_TARGET(c->hw.hw_rev))
 		c->demura_sw_fuse_offset = 0x7c;
-	else if (IS_CANOE_TARGET(c->hw.hw_rev) || IS_ALOR_TARGET(c->hw.hw_rev))
+	else if (IS_CANOE_TARGET(c->hw.hw_rev))
 		c->demura_sw_fuse_offset = 0x84;
 	else
 		c->demura_sw_fuse_offset = 0;

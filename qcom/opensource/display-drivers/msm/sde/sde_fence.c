@@ -802,6 +802,7 @@ int sde_fence_update_input_fence_id(struct sde_hw_ctl *hw_ctl)
 int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *hw_ctl, u32 debugfs_hw_fence,
 		struct sde_hw_mdp *hw_mdp, bool disable, bool override)
 {
+
 	if (!hw_mdp || !hw_ctl)
 		return -EINVAL;
 	/* we must support sw_override as well, so check both functions */
@@ -835,7 +836,6 @@ int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *hw_ctl, u32 debugf
 	if (hw_ctl->ops.hw_fence_ctrl[hw_ctl->hw.disp_op])
 		hw_ctl->ops.hw_fence_ctrl[hw_ctl->hw.disp_op](hw_ctl, true, true, 1, false,
 			false);
-
 	return 0;
 }
 #else

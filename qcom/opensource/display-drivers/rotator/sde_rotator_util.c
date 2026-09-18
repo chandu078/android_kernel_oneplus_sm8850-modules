@@ -21,9 +21,8 @@
 #include <linux/io.h>
 #include <linux/iopoll.h>
 #include <linux/regulator/consumer.h>
-#include <linux/version.h>
 #include <linux/module.h>
-#include <media/mmm_color_fmt.h>
+#include <media/msm_media_info.h>
 #include <linux/videodev2.h>
 #include <linux/ion.h>
 
@@ -37,14 +36,6 @@
 #define UV_TILEHEIGHT   8
 #define TILEWIDTH_SIZE  64
 #define TILEHEIGHT_SIZE 4
-
-#if IS_ENABLED(CONFIG_SMMU_PROXY)
-#include <smmu-proxy/include/uapi/linux/qti-smmu-proxy.h>
-#include <smmu-proxy/linux/qti-smmu-proxy.h>
-#endif
-
-#define CSF_2_5_ARCH_VER	2
-#define CSF_2_5_MAX_VER		5
 
 void sde_mdp_get_v_h_subsample_rate(u8 chroma_sample,
 		u8 *v_sample, u8 *h_sample)
@@ -359,13 +350,13 @@ int sde_mdp_get_plane_sizes(struct sde_mdp_format_params *fmt, u32 w, u32 h,
 
 			switch (fmt->format) {
 			case SDE_PIX_FMT_Y_CBCR_H2V2_VENUS:
-				cf = MMM_COLOR_FMT_NV12;
+				cf = COLOR_FMT_NV12;
 				break;
 			case SDE_PIX_FMT_Y_CRCB_H2V2_VENUS:
-				cf = MMM_COLOR_FMT_NV21;
+				cf = COLOR_FMT_NV21;
 				break;
 			case SDE_PIX_FMT_Y_CBCR_H2V2_P010_VENUS:
-				cf = MMM_COLOR_FMT_P010;
+				cf = COLOR_FMT_P010;
 				break;
 			default:
 				SDEROT_ERR("unknown color format %d\n",
@@ -374,11 +365,11 @@ int sde_mdp_get_plane_sizes(struct sde_mdp_format_params *fmt, u32 w, u32 h,
 			}
 
 			ps->num_planes = 2;
-			ps->ystride[0] = MMM_COLOR_FMT_Y_STRIDE(cf, w);
-			ps->ystride[1] = MMM_COLOR_FMT_UV_STRIDE(cf, w);
-			ps->plane_size[0] = MMM_COLOR_FMT_Y_SCANLINES(cf, h) *
+			ps->ystride[0] = VENUS_Y_STRIDE(cf, w);
+			ps->ystride[1] = VENUS_UV_STRIDE(cf, w);
+			ps->plane_size[0] = VENUS_Y_SCANLINES(cf, h) *
 				ps->ystride[0];
-			ps->plane_size[1] = MMM_COLOR_FMT_UV_SCANLINES(cf, h) *
+			ps->plane_size[1] = VENUS_UV_SCANLINES(cf, h) *
 				ps->ystride[1];
 		} else if (fmt->format == SDE_PIX_FMT_Y_CBCR_H2V2_P010) {
 			/*
@@ -807,13 +798,8 @@ static int sde_mdp_put_img(struct sde_mdp_img_data *data, bool rotator,
 		if (!data->skip_detach) {
 			data->srcp_attachment->dma_map_attrs |=
 				DMA_ATTR_DELAYED_UNMAP;
-#if (KERNEL_VERSION(6, 2, 0) <= LINUX_VERSION_CODE)
-			dma_buf_unmap_attachment_unlocked(data->srcp_attachment,
-					data->srcp_table, dir);
-#else
-			dma_buf_unmap_attachment(data->srcp_attachment, data->srcp_table,
-					dir);
-#endif
+			dma_buf_unmap_attachment(data->srcp_attachment,
+				data->srcp_table, dir);
 			dma_buf_detach(data->srcp_dma_buf,
 					data->srcp_attachment);
 			if (!(data->flags & SDE_ROT_EXT_DMA_BUF)) {
@@ -876,9 +862,7 @@ static int sde_mdp_get_img(struct sde_fb_data *img,
 		}
 	}
 
-	SDEROT_DBG("%d attach=%pK, dev_name:%s seccam:%d\n",
-			 __LINE__, data->srcp_attachment,
-		 dev_name(dev), sde_mdp_is_map_needed(data));
+	SDEROT_DBG("%d attach=%pK\n", __LINE__, data->srcp_attachment);
 	data->addr = 0;
 	data->len = 0;
 	data->mapped = false;
@@ -897,24 +881,11 @@ err_put:
 static int sde_mdp_map_buffer(struct sde_mdp_img_data *data, bool rotator,
 		int dir)
 {
-	int ret = -EINVAL, sec_cam = 0, rc = 0;
+	int ret = -EINVAL;
 	struct scatterlist *sg;
 	struct sg_table *sgt = NULL;
 	unsigned int i;
 	unsigned long flags = 0;
-	bool csf25_enabled = false;
-#if IS_ENABLED(CONFIG_SMMU_PROXY)
-	struct csf_version csf_ver = {};
-
-	rc = smmu_proxy_get_csf_version(&csf_ver);
-	if (rc) {
-		SDEROT_ERR("error in getting csf version, ret:%d\n", rc);
-		return -EINVAL;
-	}
-	if ((csf_ver.arch_ver == CSF_2_5_ARCH_VER) &&
-			(csf_ver.max_ver == CSF_2_5_MAX_VER))
-		csf25_enabled = true;
-#endif
 
 	if (data->addr && data->len)
 		return 0;
@@ -925,9 +896,6 @@ static int sde_mdp_map_buffer(struct sde_mdp_img_data *data, bool rotator,
 		return 0;
 	}
 
-	if (data->flags & SDE_SECURE_CAMERA_SESSION)
-		sec_cam = 1;
-
 	if (!IS_ERR_OR_NULL(data->srcp_dma_buf)) {
 		/*
 		 * dma_buf_map_attachment will call into
@@ -935,13 +903,8 @@ static int sde_mdp_map_buffer(struct sde_mdp_img_data *data, bool rotator,
 		 * attribute and lazy unmap attribute will be all
 		 * provided here.
 		 */
-		if (sec_cam && csf25_enabled) {
-			data->srcp_attachment->dma_map_attrs |=
-				DMA_ATTR_QTI_SMMU_PROXY_MAP;
-			SDEROT_INFO("proxy_map: dir:%d proxy map %p\n", dir, data->srcp_dma_buf);
-		} else
-			data->srcp_attachment->dma_map_attrs |=
-				DMA_ATTR_DELAYED_UNMAP;
+		data->srcp_attachment->dma_map_attrs |=
+			DMA_ATTR_DELAYED_UNMAP;
 
 		if (data->srcp_dma_buf && data->srcp_dma_buf->ops &&
 				data->srcp_dma_buf->ops->get_flags) {
@@ -955,12 +918,9 @@ static int sde_mdp_map_buffer(struct sde_mdp_img_data *data, bool rotator,
 				}
 			}
 		}
-#if (KERNEL_VERSION(6, 2, 0) <= LINUX_VERSION_CODE)
-		sgt = dma_buf_map_attachment_unlocked(data->srcp_attachment, dir);
-#else
-		sgt = dma_buf_map_attachment(data->srcp_attachment, dir);
-#endif
 
+		sgt = dma_buf_map_attachment(
+				data->srcp_attachment, dir);
 		if (IS_ERR_OR_NULL(sgt) ||
 				IS_ERR_OR_NULL(sgt->sgl)) {
 			SDEROT_ERR("Failed to map attachment\n");
@@ -970,7 +930,7 @@ static int sde_mdp_map_buffer(struct sde_mdp_img_data *data, bool rotator,
 		data->srcp_table = sgt;
 
 		data->len = 0;
-		for_each_sgtable_sg(sgt, sg, i) {
+		for_each_sg(sgt->sgl, sg, sgt->nents, i) {
 			data->len += sg->length;
 		}
 
@@ -985,13 +945,12 @@ static int sde_mdp_map_buffer(struct sde_mdp_img_data *data, bool rotator,
 		} else {
 			if (sgt->nents != 1) {
 				SDEROT_ERR(
-					"Fail ion buffer mapping for secure camera nents:%d\n",
-					sgt->nents);
+					"Fail ion buffer mapping for secure camera\n");
 				ret = -EINVAL;
 				goto err_unmap;
 			}
 
-			if (((uint64_t)sg_dma_address(sgt->sgl) >
+			if (((uint64_t)sg_dma_address(sgt->sgl) >=
 					PHY_ADDR_4G - sgt->sgl->length)) {
 				SDEROT_ERR(
 					"ion buffer mapped size invalid, size=%d\n",
@@ -1000,7 +959,7 @@ static int sde_mdp_map_buffer(struct sde_mdp_img_data *data, bool rotator,
 				goto err_unmap;
 			}
 
-			data->addr = sg_dma_address(data->srcp_table->sgl);
+			data->addr = sg_phys(data->srcp_table->sgl);
 			ret = 0;
 		}
 	}
@@ -1015,7 +974,7 @@ static int sde_mdp_map_buffer(struct sde_mdp_img_data *data, bool rotator,
 		data->addr += data->offset;
 		data->len -= data->offset;
 
-		SDEROT_DBG("ihdl=%p buf=0x%pa len=0x%lx\n",
+		SDEROT_DBG("ihdl=%pK buf=0x%pa len=0x%lx\n",
 			 data->srcp_dma_buf, &data->addr, data->len);
 	} else {
 		sde_mdp_put_img(data, rotator, dir);
@@ -1025,13 +984,7 @@ static int sde_mdp_map_buffer(struct sde_mdp_img_data *data, bool rotator,
 	return ret;
 
 err_unmap:
-#if (KERNEL_VERSION(6, 2, 0) <= LINUX_VERSION_CODE)
-	dma_buf_unmap_attachment_unlocked(data->srcp_attachment,
-			data->srcp_table, dir);
-#else
-	dma_buf_unmap_attachment(data->srcp_attachment, data->srcp_table,
-			dir);
-#endif
+	dma_buf_unmap_attachment(data->srcp_attachment, data->srcp_table, dir);
 err_detach:
 	dma_buf_detach(data->srcp_dma_buf, data->srcp_attachment);
 	if (!(data->flags & SDE_ROT_EXT_DMA_BUF)) {
@@ -1231,6 +1184,18 @@ static void sde_rot_dmabuf_unmap(struct dma_buf_attachment *attach,
 	kfree(sgt);
 }
 
+static void *sde_rot_dmabuf_no_map(struct dma_buf *buf, unsigned long n)
+{
+	SDEROT_WARN("NOT SUPPORTING dmabuf map\n");
+	return NULL;
+}
+
+static void sde_rot_dmabuf_no_unmap(struct dma_buf *buf, unsigned long n,
+		void *addr)
+{
+	SDEROT_WARN("NOT SUPPORTING dmabuf unmap\n");
+}
+
 static void sde_rot_dmabuf_release(struct dma_buf *buf)
 {
 	SDEROT_DBG("Release dmabuf:%pK\n", buf);
@@ -1247,6 +1212,8 @@ static const struct dma_buf_ops sde_rot_dmabuf_ops = {
 	.map_dma_buf	= sde_rot_dmabuf_map_tiny,
 	.unmap_dma_buf	= sde_rot_dmabuf_unmap,
 	.release	= sde_rot_dmabuf_release,
+	.map		= sde_rot_dmabuf_no_map,
+	.unmap		= sde_rot_dmabuf_no_unmap,
 	.mmap		= sde_rot_dmabuf_no_mmap,
 };
 

@@ -1269,7 +1269,7 @@ int oplus_panel_power_on(struct dsi_panel *panel)
 
 	oplus_pwm_set_power_on(panel);
 
-	rc = dsi_panel_set_pinctrl_state(panel, true, false);
+	rc = dsi_panel_set_pinctrl_state(panel, true);
 	if (rc) {
 		OPLUS_DSI_ERR("[%s] failed to set pinctrl, rc=%d\n", panel->name, rc);
 		goto error_disable_pinctrl;
@@ -1338,7 +1338,7 @@ error_disable_supply:
 	(void) oplus_panel_power_supply_disable(panel);
 
 error_disable_pinctrl:
-	(void)dsi_panel_set_pinctrl_state(panel, false, false);
+	(void)dsi_panel_set_pinctrl_state(panel, false);
 
 exit:
 	return rc;
@@ -1387,7 +1387,7 @@ int oplus_panel_power_off(struct dsi_panel *panel)
 	}
 #endif /* OPLUS_FEATURE_TP_BASIC */
 
-	rc = dsi_panel_set_pinctrl_state(panel, false, false);
+	rc = dsi_panel_set_pinctrl_state(panel, false);
 	if (rc) {
 		OPLUS_DSI_ERR("[%s] failed set pinctrl state, rc=%d\n", panel->name, rc);
 	}

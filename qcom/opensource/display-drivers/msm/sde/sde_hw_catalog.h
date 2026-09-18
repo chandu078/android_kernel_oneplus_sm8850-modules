@@ -50,19 +50,15 @@
 #define SDE_HW_VER_660	SDE_HW_VER(6, 6, 0) /* holi */
 #define SDE_HW_VER_670	SDE_HW_VER(6, 7, 0) /* shima */
 #define SDE_HW_VER_680	SDE_HW_VER(6, 8, 0) /* monaco */
-#define SDE_HW_VER_6100 SDE_HW_VER(6, 10, 0) /* khaje */
 #define SDE_HW_VER_700	SDE_HW_VER(7, 0, 0) /* lahaina */
 #define SDE_HW_VER_720	SDE_HW_VER(7, 2, 0) /* yupik */
 #define SDE_HW_VER_810	SDE_HW_VER(8, 1, 0) /* waipio */
 #define SDE_HW_VER_820	SDE_HW_VER(8, 2, 0) /* diwali */
 #define SDE_HW_VER_850	SDE_HW_VER(8, 5, 0) /* cape */
-#define SDE_HW_VER_860  SDE_HW_VER(8, 6, 0) /* ravelin */
-#define SDE_HW_VER_870	SDE_HW_VER(8, 7, 0) /* malabar */
 #define SDE_HW_VER_880  SDE_HW_VER(8, 8, 0) /* vienna */
 #define SDE_HW_VER_900	SDE_HW_VER(9, 0, 0) /* kalama */
 #define SDE_HW_VER_980	SDE_HW_VER(9, 8, 0) /* seraph */
 #define SDE_HW_VER_A00	SDE_HW_VER(10, 0, 0) /* pineapple */
-#define SDE_HW_VER_A30  SDE_HW_VER(10, 3, 0) /* chora */
 #define SDE_HW_VER_B00  SDE_HW_VER(11, 0, 0) /* niobe */
 #define SDE_HW_VER_C00	SDE_HW_VER(12, 0, 0) /* sun */
 #define SDE_HW_VER_C30	SDE_HW_VER(12, 3, 0) /* tuna */
@@ -95,14 +91,11 @@
 #define IS_HOLI_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_660)
 #define IS_SHIMA_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_670)
 #define IS_MONACO_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_680)
-#define IS_KHAJE_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_6100)
 #define IS_LAHAINA_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_700)
 #define IS_YUPIK_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_720)
 #define IS_WAIPIO_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_810)
 #define IS_DIWALI_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_820)
 #define IS_CAPE_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_850)
-#define IS_RAVELIN_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_860)
-#define IS_MALABAR_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_870)
 #define IS_KALAMA_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_900)
 #define IS_SERAPH_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_980)
 #define IS_PINEAPPLE_TARGET(rev) IS_SDE_MAJOR_MINOR_SAME((rev), SDE_HW_VER_A00)
@@ -484,8 +477,6 @@ enum {
  * @SDE_MIXER_10_BITS_COLOR   Layer mixer supports 10 bits color border and color fill
  * @SDE_MIXER_CAC_PRIMARY     Layer mixer preferred for primary during two pass CAC
  * @SDE_MIXER_CAC_LB          Layer mixer preferred for loopback during two pass CAC
- * @SDE_MIXER_IS_VIRTUAL      Layer mixer which is removed but used for proper
- *                            Dedicated CWB allocation
  * @SDE_MIXER_MAX             maximum value
  */
 enum {
@@ -504,7 +495,6 @@ enum {
 	SDE_MIXER_10_BITS_COLOR,
 	SDE_MIXER_CAC_PRIMARY,
 	SDE_MIXER_CAC_LB,
-	SDE_MIXER_IS_VIRTUAL,
 	SDE_MIXER_MAX
 };
 
@@ -2103,8 +2093,7 @@ struct sde_perf_cfg {
  * @true_inline_rot_rev inline rotator feature revision
  * @dnsc_blur_rev       downscale blur HW block version
  * @hw_fence_rev        hw fence feature revision
- * @cac_version         CAC version supported by the target
- * @cwb_cfg_mask        configuration mask for the CWB module in use
+ * @cac_version        CAC version supported by the target
  * @mdss_count          number of valid MDSS HW blocks
  * @mdss                array of pointers to MDSS HW blocks
  * @mdss_hw_block_size  max offset of MDSS_HW block (0 offset), used for debug
@@ -2146,8 +2135,6 @@ struct sde_perf_cfg {
  * @cwb_blk_stride      offset between each CWB blk
  * @dcwb_count          number of dcwb hardware instances
  * @qultivate_cfg       pointer to display_qultivate configurations
- * @ddr_count           number of ddr types supported
- * @ddr_list_index      Index of supported ddr type
  * @reg_dma_count       number of valid reg dma blocks available
  * @dma_cfg             pointer to config containing reg dma blocks
  * @ad_count            number of AD4 hardware instances
@@ -2173,7 +2160,6 @@ struct sde_perf_cfg {
  * @max_display_height  minimum display height
  * @min_display_width   maximum display width
  * @min_display_height  maximum display height
- * @in_rot_maxheight    max pre rotated height for inline rotation.
  * @max_sspp_linewidth  max source pipe line width
  * @vig_sspp_linewidth  max vig source pipe line width support
  * @scaling_linewidth   max vig source pipe linewidth for scaling usecases
@@ -2237,12 +2223,9 @@ struct sde_mdss_cfg {
 	u32 dnsc_blur_rev;
 	u32 hw_fence_rev;
 	u32 cac_version;
-	u32 cwb_cfg_mask;
 
 	/* HW Blocks */
 	u32 mdss_count;
-	u32 ddr_count;
-	u32 ddr_list_index;
 	struct sde_mdss_base_cfg mdss[MAX_BLOCKS];
 	u32 mdss_hw_block_size;
 	u32 mdp_count;
@@ -2254,8 +2237,6 @@ struct sde_mdss_cfg {
 	struct sde_sspp_cfg sspp[MAX_BLOCKS];
 	u32 mixer_count;
 	struct sde_lm_cfg mixer[MAX_BLOCKS];
-	u32 virtual_mixers_mask;
-
 	struct sde_dspp_top_cfg dspp_top;
 	u32 dspp_count;
 	struct sde_dspp_cfg dspp[MAX_BLOCKS];
@@ -2315,7 +2296,6 @@ struct sde_mdss_cfg {
 	u32 max_display_height;
 	u32 min_display_width;
 	u32 min_display_height;
-	u32 in_rot_maxheight;
 	u32 max_sspp_linewidth;
 	u32 vig_sspp_linewidth;
 	u32 scaling_linewidth;

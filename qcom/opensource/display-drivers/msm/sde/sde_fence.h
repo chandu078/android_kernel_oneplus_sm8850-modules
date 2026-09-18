@@ -410,7 +410,8 @@ void sde_fence_output_hw_fence_dir_write_init(struct sde_hw_ctl *hw_ctl);
 int sde_fence_update_hw_fences_txq(struct sde_fence_context *ctx, bool vid_mode, u32 line_count,
 	u32 debugfs_hw_fence);
 
-/**
+
+ /**
  * sde_fence_update_input_fence_id - updates input-fence id used for comparison with ipcc
  *                                         signal in dpu
  *
@@ -419,6 +420,7 @@ int sde_fence_update_hw_fences_txq(struct sde_fence_context *ctx, bool vid_mode,
  * Returns: Zero on success, otherwise returns an error code.
  */
 int sde_fence_update_input_fence_id(struct sde_hw_ctl *ctl);
+
 
 /**
  * sde_fence_update_input_hw_fence_signal - updates input-fence ipcc signal in dpu and enables
@@ -474,6 +476,7 @@ static inline int sde_fence_update_input_hw_fence_signal(struct sde_hw_ctl *ctl,
 {
 	return -EINVAL;
 }
+
 #endif /* CONFIG_SYNC_FILE && CONFIG_QTI_HW_FENCE */
 
 #endif /* _SDE_FENCE_H_ */

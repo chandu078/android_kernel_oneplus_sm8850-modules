@@ -185,7 +185,6 @@ struct sde_power_mmrm_reserve {
  * @mmrm_reserve: mmrm resource reservation
  * @wakelock_count: wakelock coint to avoid pm suspend
  * @bool cesta_pd: boolean to indicate if power domains are cesta controlled
- * @bool rsc_pd: boolean to indicate if power domains are rsc controlled
  * @num_power_domains: number of powerdomains
  * @power_domain_handles: array of power domains
  */
@@ -209,20 +208,9 @@ struct sde_power_handle {
 	atomic_t wakelock_count;
 
 	bool cesta_pd;
-	bool rsc_pd;
 	u32 num_power_domains;
 	struct sde_power_domain_handle power_domain_handles[SDE_POWER_PD_ID_MAX];
 };
-
-/**
- * sde_power_supply_init() - initializes the sde power handle for supply only
- * @pdev:   platform device to search the power resources
- * @pdata:  power handle to store the power resources
- *
- * Return: error code.
- */
-int sde_power_supply_init(struct platform_device *pdev,
-	struct sde_power_handle *phandle);
 
 /**
  * sde_power_resource_init() - initializes the sde power handle

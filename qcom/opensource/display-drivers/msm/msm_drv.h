@@ -87,14 +87,6 @@ struct msm_gem_vma;
 #define MAX_BRIDGES    16
 #define MAX_CONNECTORS 16
 
-#if IS_ENABLED(CONFIG_DSI_EXTENDED_MODES)
-#define DSI_MODE_MAX 256
-#else
-#define DSI_MODE_MAX 32
-#endif
-#define MODE_SWITCH_BITS_PER_WORD 32
-#define MODE_SWITCH_BITMAP_SIZE (DSI_MODE_MAX / MODE_SWITCH_BITS_PER_WORD)
-
 #define MSM_RGB 0x0
 #define MSM_YUV 0x1
 
@@ -179,7 +171,6 @@ enum msm_mdp_plane_property {
 	PLANE_PROP_CAC_TYPE,
 	PLANE_PROP_SRC_RECT_EXT,
 	PLANE_PROP_DST_RECT_EXT,
-	PLANE_PROP_COLOR_MASK_OVERRIDE,
 
 	/* total # of properties */
 	PLANE_PROP_COUNT
@@ -266,8 +257,6 @@ enum msm_mdp_conn_property {
 	CONNECTOR_PROP_EARLY_FENCE_LINE,
 	CONNECTOR_PROP_DYN_TRANSFER_TIME,
 	CONNECTOR_PROP_BRIGHTNESS,
-	CONNECTOR_PROP_EMSYNC_FPS,
-	CONNECTOR_PROP_PRIVACY_LAYER_V1,
 
 	/* enum/bitmask properties */
 	CONNECTOR_PROP_TOPOLOGY_NAME,
@@ -486,12 +475,10 @@ struct msm_display_mode {
  * struct msm_sub_mode - msm display sub mode
  * @dsc_enabled: boolean used to indicate if dsc should be enabled
  * @pixel_format_mode: used to indicate pixel format mode
- * @emsync_fps: used to indicate emsync fps
  */
 struct msm_sub_mode {
 	enum msm_display_dsc_mode dsc_mode;
 	enum msm_display_pixel_format pixel_format_mode;
-	u32 emsync_fps;
 };
 
 /**
@@ -510,7 +497,6 @@ struct msm_ratio {
  * @MSM_ENC_TX_COMPLETE - wait for the HW to transfer the frame to panel
  * @MSM_ENC_VBLANK - wait for the HW VBLANK event (for driver-internal waiters)
  * @MSM_ENC_ACTIVE_REGION - wait for the TG to be in active pixel region
- * @MSM_ENC_HW_RECOVERY - wait for the HW to recover from error
  * @MSM_ENC_EVENT_MAX - maximum value for events related to frame
  */
 enum msm_event_wait {
@@ -518,7 +504,6 @@ enum msm_event_wait {
 	MSM_ENC_TX_COMPLETE,
 	MSM_ENC_VBLANK,
 	MSM_ENC_ACTIVE_REGION,
-	MSM_ENC_HW_RECOVERY,
 	MSM_ENC_EVENT_MAX,
 };
 
@@ -946,14 +931,12 @@ struct msm_freq_step_list {
  * @video_psr_support: True if it is Video hybrid mode panel
  * @video_mrr_support: True if it is Video MRR feature for VHM panel
  * @arp_support:    True if it is ARP panel
- * @vhm_support:    True if panel has VHM capability
  */
 struct msm_vrr_capabilities {
 	bool vrr_support;
 	bool video_psr_support;
 	bool video_mrr_support;
 	bool arp_support;
-	bool has_vhm_capability;
 };
 
 /**
@@ -991,20 +974,6 @@ struct msm_display_wd_jitter_config {
 };
 
 /**
- * struct esync_params - defines esync related parameters
- * @milli_skew:   esync skew, in 1/1000ths of a line
- * @hsync_milli_pulse_width: esync's hsync pulse width, in 1/1000ths of a line
- * @emsync_fps:   esync's EM pulse rate in Hz
- * @emsync_milli_pulse_width: esync's EM pulse width, in 1/1000ths of a line
- */
-struct esync_params {
-	u32 milli_skew;
-	u32 hsync_milli_pulse_width;
-	u32 emsync_fps;
-	u32 emsync_milli_pulse_width;
-};
-
-/**
  * struct msm_mode_info - defines all msm custom mode info
  * @frame_rate:      frame_rate of the mode
  * @vtotal:          vtotal calculated for the mode
@@ -1032,11 +1001,9 @@ struct esync_params {
  * @freq_step_list: List of Frequency steping pattrerns.
  * @qsync_min_fps: qsync min fps rate
  * @avr_step_fps: AVR step fps rate
- * @esync_params: esync parameters
  * @wd_jitter:         Info for WD jitter.
  * @vpadding:        panel stacking height
  * @te_pulse_width_ns: pulse width of the TE in microseconds
- * @overlap:           Overlap pixel within pingpong buffer
  */
 struct msm_mode_info {
 	uint32_t frame_rate;
@@ -1057,17 +1024,15 @@ struct msm_mode_info {
 	u32 mdp_transfer_time_us;
 	u32 mdp_transfer_time_us_min;
 	u32 mdp_transfer_time_us_max;
-	u32 allowed_mode_switches[MODE_SWITCH_BITMAP_SIZE];
+	u32 allowed_mode_switches;
 	bool disable_rsc_solver;
 	struct msm_dyn_clk_list dyn_clk_list;
 	struct msm_freq_step_list *freq_step_list;
 	u32 qsync_min_fps;
 	u32 avr_step_fps;
-	struct esync_params esync_params;
 	struct msm_display_wd_jitter_config wd_jitter;
 	u32 vpadding;
 	u32 te_pulse_width_us;
-	u32 overlap;
 };
 
 /**
@@ -1119,6 +1084,10 @@ struct msm_resource_caps_info {
  * @hwfence_sw_override_always	whether to trigger fence software override every flush (only
  *				intended for TVM)
  * @esync_enabled:      esync is supported
+ * @esync_milli_skew:   esync skew, in 1/1000ths of a line
+ * @esync_hsync_milli_pulse_width: esync's hsync pulse width, in 1/1000ths of a line
+ * @esync_emsync_fps:   esync's EM pulse rate in Hz
+ * @esync_emsync_milli_pulse_width: esync's EM pulse width, in 1/1000ths of a line
  * @te_source		vsync source pin information
  * @disp_te_gpio:       TE GPIO identifier
  * @esd_rw_check:       whether ESD should be checked using the RW window (through TE)
@@ -1129,7 +1098,6 @@ struct msm_resource_caps_info {
  * @ctl_op_sync:        Indicates dual display panels are operating in sync mode
  * @is_master:          Flag indicating the Master display which drives the displays in sync mode
  * @disable_cesta_hw_sleep: Disable cesta hardware sleep & panic/wakeup_en for the display
- * @dpu_dma_enabled:		Flag indicating dpu dma mode is enabled
  */
 struct msm_display_info {
 	int intf_type;
@@ -1159,7 +1127,10 @@ struct msm_display_info {
 	bool hwfence_sw_override_always;
 
 	bool esync_enabled;
-	bool emsync_switch_enabled;
+	uint32_t esync_milli_skew;
+	uint32_t esync_hsync_milli_pulse_width;
+	uint32_t esync_emsync_fps;
+	uint32_t esync_emsync_milli_pulse_width;
 
 	bool event_notification_disabled;
 
@@ -1172,7 +1143,6 @@ struct msm_display_info {
 	bool ctl_op_sync;
 	bool is_master;
 	bool disable_cesta_hw_sleep;
-	bool dpu_dma_enabled;
 };
 
 #define MSM_MAX_ROI	4
@@ -1209,8 +1179,6 @@ struct msm_display_kickoff_params {
  * @freq_pattern: Frequency pattern to be set
  * @arp_t2_in_us: Time when TE shall be asserted relative to next frame
  *		  update deadline(T1) in case of ARP
- * @privacy_v1: Privacy layer info
- * @b_lvl: Brightness value to be set
  */
 struct msm_display_conn_params {
 	uint32_t qsync_mode;
@@ -1219,8 +1187,6 @@ struct msm_display_conn_params {
 	bool peripheral_flush;
 	struct msm_freq_step_pattern *freq_pattern;
 	uint16_t arp_t2_in_us;
-	struct sde_drm_privacy_layer_v1 *privacy_v1;
-	u32 b_lvl;
 };
 
 /**
@@ -1969,4 +1935,12 @@ bool msm_iommu_present_on_bus(const struct bus_type *bus);
  * Return: true if the IOMMU is present, false otherwise.
  */
 bool mdss_iommu_present(struct drm_device *dev);
+
+#if (KERNEL_VERSION(6, 13, 0) <= LINUX_VERSION_CODE)
+/* Functions from upstream kernel */
+int __drm_atomic_helper_disable_plane(struct drm_plane *plane,
+			struct drm_plane_state *plane_state);
+int __drm_atomic_helper_set_config(struct drm_mode_set *set,
+			struct drm_atomic_state *state);
+#endif /* (KERNEL_VERSION(6, 13, 0) <= LINUX_VERSION_CODE) */
 #endif /* __MSM_DRV_H__ */

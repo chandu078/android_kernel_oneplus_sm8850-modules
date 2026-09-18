@@ -103,29 +103,21 @@ static void _sde_hw_cwb_ctrl_init(struct sde_mdss_cfg *m,
 static void _sde_hw_dcwb_ctrl_init(struct sde_mdss_cfg *m,
 		void __iomem *addr, struct sde_hw_wb *hw_wb)
 {
-	int i, j, dcwb_count, blk_count;
+	int i, j;
 	u32 blk_off;
 	char name[64] = {0};
 
-	if (!hw_wb || !m->dcwb_count)
+	if (!hw_wb)
 		return;
 
-	dcwb_count = (m->dcwb_count < MAX_CWB_BLOCKSIZE) ? m->dcwb_count :
-		(m->dcwb_count / MAX_CWB_BLOCKSIZE);
-
-	if (dcwb_count == m->dcwb_count)
-		blk_count = m->dcwb_count;
-	else
-		blk_count = MAX_CWB_BLOCKSIZE;
-
-	for (j = 0; j < dcwb_count; j++) {
+	for (j = 0; j < (m->dcwb_count / MAX_CWB_BLOCKSIZE); j++) {
 		hw_wb->dcwb_hw[j].base_off = addr;
 		hw_wb->dcwb_hw[j].blk_off = m->cwb_blk_off[j];
 		hw_wb->dcwb_hw[j].length = 0x20;
 		hw_wb->dcwb_hw[j].hw_rev = m->hw_rev;
 		hw_wb->dcwb_hw[j].log_mask = SDE_DBG_MASK_WB;
 
-		for (i = 0; i < blk_count; i++) {
+		for (i = 0; i < MAX_CWB_BLOCKSIZE; i++) {
 			snprintf(name, sizeof(name), "dcwb%d", i);
 			blk_off = hw_wb->dcwb_hw[j].blk_off + (m->cwb_blk_stride * i);
 
@@ -376,12 +368,9 @@ static void sde_hw_wb_bind_dcwb_pp_blk(
 		return;
 
 	c = &ctx->hw;
-	if (enable) {
+	if (enable)
 		mux_cfg = (pp < PINGPONG_CWB_2) ? 0xd : 0xb;
-		ctx->catalog->cwb_cfg_mask |= 1 << pp;
-	} else {
-		ctx->catalog->cwb_cfg_mask &= ~(1 << pp);
-	}
+
 	SDE_REG_WRITE(c, WB_MUX, mux_cfg);
 }
 
@@ -870,10 +859,8 @@ struct sde_hw_blk_reg_map *sde_hw_wb_init(enum sde_wb idx,
 		if (SDE_CLK_CTRL_WB_VALID(cfg->clk_ctrl)) {
 			clk_client->hw = &c->hw;
 			clk_client->clk_ctrl = cfg->clk_ctrl;
-			clk_client->ops.get_clk_ctrl_status[MSM_DISP_OP_HWIO] =
-				sde_hw_wb_get_clk_ctrl_status;
-			clk_client->ops.setup_clk_force_ctrl[MSM_DISP_OP_HWIO] =
-				sde_hw_wb_setup_clk_force_ctrl;
+			clk_client->ops.get_clk_ctrl_status = sde_hw_wb_get_clk_ctrl_status;
+			clk_client->ops.setup_clk_force_ctrl = sde_hw_wb_setup_clk_force_ctrl;
 		} else {
 			SDE_ERROR("invalid wb clk ctrl type %d\n", cfg->clk_ctrl);
 		}

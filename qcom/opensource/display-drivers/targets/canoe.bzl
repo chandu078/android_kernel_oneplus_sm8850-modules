@@ -41,13 +41,8 @@ def define_canoe():
                     "CONFIG_THERMAL_OF",
                     "CONFIG_QCOM_SPEC_SYNC",
                     "CONFIG_MSM_EXT_DISPLAY",
-                    "CONFIG_DRM_SDE_RSC",
                     "CONFIG_DRM_SDE_CESTA",
                     "CONFIG_QTI_HW_FENCE",
-                    "CONFIG_SMMU_PROXY",
-                    "CONFIG_DSI_EXTENDED_MODES",
-                    "CONFIG_MSM_SDE_ROTATOR",
-                    "CONFIG_MSM_SDE_ROTATOR_EVTLOG_DEBUG",
 #ifdef CONFIG_PXLW_IRIS
                     "CONFIG_PXLW_IRIS",
                     "CONFIG_PXLW_IRIS7P",

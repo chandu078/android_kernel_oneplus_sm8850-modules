@@ -11,7 +11,6 @@
 #include <drm/drm_atomic.h>
 #include <drm/drm_panel.h>
 #include <linux/types.h>
-#include <linux/atomic.h>
 
 #include "msm_drv.h"
 #include "msm_prop.h"
@@ -780,7 +779,6 @@ struct sde_backlight_vrr_update {
  * @lm_mask: preferred LM mask for connector
  * @allow_bl_update: Flag to indicate if BL update is allowed currently or not
  * @dimming_bl_notify_enabled: Flag to indicate if dimming bl notify is enabled or not
- * @ssr_notify_enabled: atomic variable to identify if ssr event notification is enabled
  * @sde_backlight_vrr_update: Smooth dimming backlight structure for vrr
  * @qsync_mode: Cached Qsync mode, 0=disabled, 1=continuous mode
  * @qsync_updated: Qsync settings were updated
@@ -810,11 +808,6 @@ struct sde_backlight_vrr_update {
  * @is_lb_conn: Indicates if this connector is a loopback connector
  * @hfi_conn: Pointer to hfi connector struct
  * @hal_ops: hal ops for hfi communication
- * @dpu_dma_enabled: Indicates if dpu dma mode is enabled
- * @reproj_conn: Pointer to sde_reproj
- * @bl_dirty_change: Indicates if brightness prop is changed
- * @b_lvl: brightness property value
- * @bl_dirty_value: brightness final to be set
  */
 struct sde_connector {
 	struct drm_connector base;
@@ -873,7 +866,6 @@ struct sde_connector {
 	bool allow_bl_update;
 	bool dimming_bl_notify_enabled;
 	struct sde_backlight_vrr_update bl_vrr;
-	atomic_t ssr_notify_enabled;
 
 	u32 hdr_eotf;
 	bool hdr_metadata_type_one;
@@ -922,12 +914,6 @@ struct sde_connector {
 
 	struct hfi_connector *hfi_conn;
 	struct sde_connector_hal_funcs hal_ops;
-
-	bool dpu_dma_enabled;
-	struct sde_reproj *reproj_conn;
-	bool bl_dirty_change;
-	u32 b_lvl;
-	u32 bl_dirty_value;
 };
 
 /**
@@ -991,8 +977,6 @@ struct sde_connector {
  * @msm_mode: struct containing drm_mode and downstream private variables
  * @old_topology_name: topology of previous atomic state. remove this in later
  *	kernel versions which provide drm_atomic_state old_state pointers
- * @privacy_v1: Privacy layer info
- * @privacy_layer_updated: Privacy layer is updated
  * @cont_splash_populated: State was populated as part of cont. splash
  * @dnsc_blur_count: Number of downscale blur blocks used
  * @dnsc_blur_cfg: Configs for the downscale blur block
@@ -1012,8 +996,7 @@ struct sde_connector_state {
 	struct sde_connector_dyn_hdr_metadata dyn_hdr_meta;
 	struct msm_display_mode msm_mode;
 	enum sde_rm_topology_name old_topology_name;
-	struct sde_drm_privacy_layer_v1 privacy_v1;
-	bool privacy_layer_updated;
+
 	bool cont_splash_populated;
 
 	u32 dnsc_blur_count;
@@ -1632,11 +1615,6 @@ static inline bool sde_connector_is_3d_merge_enabled(struct drm_connector_state 
 		|| sde_connector_is_quadpipe_3d_merge_enabled(conn_state);
 }
 
-static inline bool sde_connector_supports_cac(struct drm_connector *conn)
-{
-	return (conn && (conn->connector_type == DRM_MODE_CONNECTOR_DSI ||
-		conn->connector_type == DRM_MODE_CONNECTOR_eDP));
-}
 /**
 * sde_connector_set_msm_mode - set msm_mode for connector state
 * @conn_state: Pointer to drm connector state structure
@@ -1678,13 +1656,6 @@ static inline u32 sde_conn_get_display_obj_id(struct drm_connector *conn)
  * conn: Pointer to drm_connector struct
  */
 void sde_conn_timeline_status(struct drm_connector *conn);
-
-/**
- * sde_connector_setup_obj_id - update connector object ids
- * @conn: Pointer to drm_connector struct
- * @id: Opaque Object id of connector
- */
-int sde_connector_setup_obj_id(struct drm_connector *conn, int id);
 
 /**
  * sde_connector_helper_bridge_disable - helper function for drm bridge disable
@@ -1777,29 +1748,5 @@ static inline void sde_connector_backlight_lock(struct sde_connector *c_conn, bo
 
 bool sde_connector_property_is_dirty(struct sde_connector_state *cstate,
 		uint32_t property_idx);
-
-/**
- * sde_connector_state_get_sub_mode - get sub mode from connector state
- * @conn_state: Pointer to sde connector state
- * @msm_sub_mode: Out parameter, the sub mode obtained fron connector state
- * @return: 0 success otherwise failure
- */
-static inline int
-sde_connector_state_get_sub_mode(struct drm_connector_state *conn_state,
-	struct msm_sub_mode *sub_mode)
-{
-	if (!conn_state || !sub_mode) {
-		SDE_ERROR("Invalid arguments\n");
-		return -EINVAL;
-	}
-
-	sub_mode->dsc_mode = sde_connector_get_property(conn_state,
-			CONNECTOR_PROP_DSC_MODE);
-	sub_mode->pixel_format_mode = sde_connector_get_property(conn_state,
-			CONNECTOR_PROP_BPP_MODE);
-	sub_mode->emsync_fps = sde_connector_get_property(conn_state,
-			CONNECTOR_PROP_EMSYNC_FPS);
-	return 0;
-}
 
 #endif /* _SDE_CONNECTOR_H_ */

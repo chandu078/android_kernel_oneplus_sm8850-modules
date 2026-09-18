@@ -143,7 +143,6 @@ char sde_hw_blk_str[SDE_HW_BLK_MAX][SDE_HW_BLK_NAME_LEN] = {
  * @top:       selected topology for the display
  * @hw_res:	   Hardware resources required as reported by the encoders
  * @conn_lm_mask:  preferred LM mask of cwb requested display
- * @cwb_cfg_mask:  configuration mask for the CWB module in use
  * @is_cac_transition: Boolean variable indicatiing if encoder is transitioning
 			in or out of cac loopback usecases
  */
@@ -152,7 +151,6 @@ struct sde_rm_requirements {
 	const struct sde_rm_topology_def *topology;
 	struct sde_encoder_hw_resources hw_res;
 	u32 conn_lm_mask;
-	u32 cwb_cfg_mask;
 	bool is_cac_transition;
 };
 
@@ -250,7 +248,7 @@ static bool _sde_rm_reserved_by_cac_enc(struct sde_rm *rm,
 
 	drm_for_each_encoder(enc, rm->dev)
 		if ((enc->base.id == blk->rsvp->enc_id) &&
-			(sde_encoder_is_built_in_display(enc) ||
+			(sde_encoder_is_dsi_display(enc) ||
 			sde_encoder_is_loopback_display(enc)))
 			return true;
 
@@ -1311,12 +1309,6 @@ static bool _sde_rm_check_lm_and_get_connected_blks(
 	*ds = NULL;
 	*pp = NULL;
 
-	if (lm_cfg->features & BIT(SDE_MIXER_IS_VIRTUAL)) {
-		SDE_DEBUG("lm %d hw block is removed and it is a virtual mixer",
-				lm_cfg->id);
-		return false;
-	}
-
 	lm_primary_pref = lm_cfg->features & BIT(SDE_DISP_PRIMARY_PREF);
 	lm_secondary_pref = lm_cfg->features & BIT(SDE_DISP_SECONDARY_PREF);
 	cwb_pref = lm_cfg->features & BIT(SDE_DISP_CWB_PREF);
@@ -1367,10 +1359,6 @@ static bool _sde_rm_check_lm_and_get_connected_blks(
 				((ffs(conn_lm_mask) % 2) ==  ((lm_cfg->id + 1) % 2))) {
 			SDE_DEBUG("fail: dcwb:%d trying to match lm:%d\n",
 					lm_cfg->id, ffs(conn_lm_mask));
-			return false;
-		} else if (RM_RQ_DCWB(reqs) && dcwb_pref && reqs->cwb_cfg_mask &&
-				(reqs->cwb_cfg_mask & (1 << lm_cfg->id))) {
-			SDE_DEBUG("fail: dcwb:%d trying to match with cwb cfg mask\n", lm_cfg->id);
 			return false;
 		} else if (RM_RQ_CAC_PRIMARY(reqs) && !cac_primary_pref) {
 			SDE_DEBUG("cac primary preference is not met,cac_prim_pref: %d lm_id: %d\n",
@@ -1576,7 +1564,6 @@ static int _sde_rm_reserve_ctls(
 	struct sde_rm_hw_blk *ctls[MAX_BLOCKS];
 	struct sde_rm_hw_iter iter, curr;
 	int i = 0;
-	bool curr_avail = false;
 
 	if (!top->num_ctl) {
 		SDE_DEBUG("invalid number of ctl: %d\n", top->num_ctl);
@@ -1586,8 +1573,6 @@ static int _sde_rm_reserve_ctls(
 	memset(&ctls, 0, sizeof(ctls));
 
 	sde_rm_init_hw_iter(&curr, rsvp->enc_id, SDE_HW_BLK_CTL);
-	curr_avail = _sde_rm_get_hw_locked(rm, &curr, true);
-
 	sde_rm_init_hw_iter(&iter, 0, SDE_HW_BLK_CTL);
 	while (_sde_rm_get_hw_locked(rm, &iter, true)) {
 		const struct sde_hw_ctl *ctl = to_sde_hw_ctl(iter.blk->hw);
@@ -1623,7 +1608,7 @@ static int _sde_rm_reserve_ctls(
 			continue;
 		}
 
-		if (curr_avail && (curr.blk->id != iter.blk->id)) {
+		if (_sde_rm_get_hw_locked(rm, &curr, true) && (curr.blk->id != iter.blk->id)) {
 			SDE_EVT32(curr.blk->id, iter.blk->id, SDE_EVTLOG_FUNC_CASE1);
 			SDE_DEBUG("ctl in use:%d avoiding new:%d\n", curr.blk->id, iter.blk->id);
 			continue;
@@ -2623,7 +2608,6 @@ static int _sde_rm_populate_requirements(
 	struct drm_connector *conn;
 	int i, num_lm;
 	enum sde_lm lm_idx;
-	u32 cwb_mask;
 
 	reqs->top_ctrl = sde_connector_get_property(conn_state,
 			CONNECTOR_PROP_TOPOLOGY_CONTROL);
@@ -2707,19 +2691,8 @@ static int _sde_rm_populate_requirements(
 				DRM_MODE_CONNECTOR_VIRTUAL) &&
 				(reqs->topology->num_lm == 1) &&
 				sde_crtc->mixers[0].hw_lm) {
-			if (!reqs->conn_lm_mask) {
-				lm_idx = sde_crtc->mixers[0].hw_lm->idx;
-				reqs->conn_lm_mask |= (lm_idx > 0) ? (1 << (lm_idx - LM_0)) : 0;
-			}
-
-			cwb_mask = (1 << PINGPONG_CWB_0) | (1 << PINGPONG_CWB_1);
-			if (cfg->cwb_cfg_mask & cwb_mask) {
-				reqs->cwb_cfg_mask = cwb_mask;
-			} else {
-				cwb_mask = (1 << PINGPONG_CWB_2) | (1 << PINGPONG_CWB_3);
-				if (cfg->cwb_cfg_mask & cwb_mask)
-					reqs->cwb_cfg_mask = cwb_mask;
-			}
+			lm_idx = sde_crtc->mixers[0].hw_lm->idx;
+			reqs->conn_lm_mask |= (lm_idx > 0) ? (1 << (lm_idx - LM_0)) : 0;
 		}
 	}
 

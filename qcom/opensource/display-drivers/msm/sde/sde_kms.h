@@ -88,9 +88,7 @@
 			pr_debug(fmt, ##__VA_ARGS__);                      \
 	} while (0)
 
-#define SDE_ERROR(fmt, ...) pr_err("%s[sde error]" fmt, __func__, ##__VA_ARGS__)
-
-#define SDE_WARN(fmt, ...) pr_warn("%s[sde warn]" fmt, __func__, ##__VA_ARGS__)
+#define SDE_ERROR(fmt, ...) pr_err("[sde error]" fmt, ##__VA_ARGS__)
 
 #define POPULATE_RECT(rect, a, b, c, d, Q16_flag) \
 	do {						\
@@ -128,7 +126,7 @@
 #define MAX_ALLOWED_CRTC_CNT_DURING_SECURE	1
 
 /* max active crtc when HFI client is active */
-#define MAX_ALLOWED_CRTC_CNT_DURING_HFI	5
+#define MAX_ALLOWED_CRTC_CNT_DURING_HFI	1
 
 /* max virtual encoders per secure crtc */
 #define MAX_ALLOWED_ENCODER_CNT_PER_SECURE_CRTC	1
@@ -493,9 +491,6 @@ struct sde_kms {
 	bool dsc_switch_support;
 	void **hdmi_displays;
 	int hdmi_display_count;
-	void **edp_displays;
-	int edp_display_count;
-	int builtin_disp_count;
 
 	bool has_danger_ctrl;
 
@@ -523,6 +518,7 @@ struct sde_kms {
 
 	struct hfi_kms *hfi_kms;
 	struct sde_kms_hal_funcs hal_ops;
+	bool hfi_session_start;
 	enum msm_disp_op debugfs_display_op;
 	enum msm_disp_op frame_trigger_state;
 };
@@ -695,11 +691,9 @@ void *sde_debugfs_get_root(struct sde_kms *sde_kms);
 #define SDE_KMS_INFO_MAX_SIZE	8192
 #else /* OPLUS_FEATURE_DISPLAY */
 #if IS_ENABLED(CONFIG_DRM_LOW_MSM_MEM_FOOTPRINT)
-#define SDE_KMS_INFO_MAX_SIZE (1 << 12)
-#elif IS_ENABLED(CONFIG_DSI_EXTENDED_MODES)
-#define SDE_KMS_INFO_MAX_SIZE (6 * (1 << 14))
+#define SDE_KMS_INFO_MAX_SIZE	(1 << 12)
 #else
-#define SDE_KMS_INFO_MAX_SIZE (1 << 14)
+#define SDE_KMS_INFO_MAX_SIZE	(1 << 14)
 #endif
 #endif /* OPLUS_FEATURE_DISPLAY */
 
@@ -1027,23 +1021,5 @@ static inline int sde_kms_set_disp_op(struct sde_kms *sde_kms, enum msm_disp_op 
 
 	return 0;
 }
-
-/*
- * sde_kms_reinit_device_lut_dma - function to set lut dma configuration to firmware.
- * @sde_kms: Pointer to sde kms object
- */
-int sde_kms_reinit_device_lut_dma(struct sde_kms *sde_kms);
-
-/*
- * sde_kms_suspend_helper - helper function to suspend all active displays
- * @sde_kms: Pointer to sde kms object
- */
-int sde_kms_suspend_helper(struct sde_kms *sde_kms);
-
-/*
- * sde_kms_resume_helper - helper function to resume all inactive displays
- * @sde_kms: Pointer to sde kms object
- */
-int sde_kms_resume_helper(struct sde_kms *sde_kms);
 
 #endif /* __sde_kms_H__ */

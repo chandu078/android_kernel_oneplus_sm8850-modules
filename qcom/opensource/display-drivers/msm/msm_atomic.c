@@ -95,9 +95,7 @@ static inline bool _msm_seamless_for_crtc(struct drm_atomic_state *state,
 
 	if (msm_is_mode_seamless(msm_mode) ||
 		msm_is_mode_seamless_vrr(msm_mode) ||
-		msm_is_mode_seamless_emsync_fps_switch(msm_mode) ||
 		msm_is_mode_seamless_poms(msm_mode) ||
-		msm_is_mode_seamless_dms_vid(msm_mode) ||
 		msm_is_mode_seamless_dyn_clk(msm_mode))
 		return true;
 
@@ -155,8 +153,6 @@ static inline bool _msm_seamless_for_conn(struct drm_connector *connector,
 	if (msm_is_mode_seamless(msm_mode) ||
 		msm_is_mode_seamless_vrr(msm_mode) ||
 		msm_is_mode_seamless_dyn_clk(msm_mode) ||
-		msm_is_mode_seamless_emsync_fps_switch(msm_mode) ||
-		msm_is_mode_seamless_dms_vid(msm_mode) ||
 		msm_is_mode_seamless_dms(msm_mode))
 		return true;
 
@@ -786,20 +782,15 @@ static void msm_atomic_commit_dispatch(struct drm_device *dev,
 {
 	struct msm_drm_private *priv = dev->dev_private;
 	struct drm_crtc *crtc = NULL;
-	struct drm_crtc_state *old_crtc_state = NULL, *new_crtc_state = NULL;
+	struct drm_crtc_state *crtc_state = NULL;
 	int ret = -ECANCELED, i = 0, j = 0;
 	bool nonblock;
 
 	/* cache since work will kfree commit in non-blocking case */
 	nonblock = commit->nonblock;
 
-	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state,
-			new_crtc_state, i) {
-		if (!old_crtc_state->active && !new_crtc_state->active)
-			continue;
-
+	for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
 		for (j = 0; j < priv->num_crtcs; j++) {
-
 			if (priv->disp_thread[j].crtc_id ==
 						crtc->base.id) {
 				if (priv->disp_thread[j].thread) {
@@ -931,6 +922,16 @@ int msm_atomic_commit(struct drm_device *dev,
 #endif
 		}
 		c->plane_mask |= (1 << drm_plane_index(plane));
+	}
+
+	/* Protection for prepare_fence callback */
+retry:
+	ret = drm_modeset_lock(&state->dev->mode_config.connection_mutex,
+		state->acquire_ctx);
+
+	if (ret == -EDEADLK) {
+		drm_modeset_backoff(state->acquire_ctx);
+		goto retry;
 	}
 
 	/*

@@ -25,26 +25,12 @@
 
 int dsi_display_hfi_panel_enable_supplies(struct dsi_display *display, bool enable)
 {
-	struct sde_kms *sde_kms;
-	struct msm_kms *msm_kms;
-	bool is_cont_splash = false;
 	int rc = 0;
 
 	if (!display->panel) {
 		DSI_ERR("invalid panel\n");
 		return -EINVAL;
 	}
-
-	sde_kms = sde_connector_get_kms(display->drm_conn);
-	if (!sde_kms)
-		return -EINVAL;
-
-	msm_kms = &sde_kms->base;
-	if (!msm_kms)
-		return -EINVAL;
-
-	if (msm_kms->funcs && msm_kms->funcs->check_for_splash)
-		is_cont_splash = msm_kms->funcs->check_for_splash(msm_kms);
 
 	mutex_lock(&display->panel->panel_lock);
 
@@ -53,7 +39,7 @@ int dsi_display_hfi_panel_enable_supplies(struct dsi_display *display, bool enab
 			goto error;
 
 		DSI_DEBUG("powering on panel\n");
-		rc = dsi_panel_power_on(display->panel, is_cont_splash);
+		rc = dsi_panel_power_on(display->panel);
 		if (rc) {
 			DSI_ERR("dsi panel failed to enable power supplies\n");
 			goto error;
@@ -87,11 +73,6 @@ static int dsi_display_hfi_set_mode(struct dsi_display *display, struct dsi_disp
 	struct hfi_display_mode_info *hfi_mode_info;
 	u32 hfi_cmd = HFI_COMMAND_DISPLAY_SET_MODE;
 	int rc = 0;
-
-	if (!mode) {
-		DSI_ERR("Invalid param %d\n", !mode);
-		return -EINVAL;
-	}
 
 	sde_kms = sde_connector_get_kms(display->drm_conn);
 	if (!sde_kms)
@@ -499,5 +480,26 @@ free_gem:
 	msm_gem_free_object(display->tx_cmd_buf);
 	mutex_unlock(&display->drm_dev->struct_mutex);
 error:
+	return rc;
+}
+
+int dsi_hfi_transition(struct dsi_display *display, enum hfi_display_power_mode lpm_state)
+{
+	int rc = 0;
+
+	if (!lpm_state)
+		return rc;
+
+	rc = dsi_display_hfi_send_cmd_buf(display,
+			display->dsi_hfi_info->hfi_client,
+			HFI_COMMAND_DISPLAY_LP_STATE_REQ,
+			display->display_type,
+			HFI_PAYLOAD_TYPE_U32,
+			(void *) lpm_state,
+			sizeof(enum hfi_display_power_mode),
+			(HFI_HOST_FLAGS_RESPONSE_REQUIRED | HFI_HOST_FLAGS_NON_DISCARDABLE));
+	if (rc)
+		DSI_ERR("could not send hfi command, rc=%d\n", rc);
+
 	return rc;
 }

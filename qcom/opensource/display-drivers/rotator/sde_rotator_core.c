@@ -8,7 +8,6 @@
 
 #include <linux/platform_device.h>
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/uaccess.h>
@@ -17,24 +16,7 @@
 #include <linux/debugfs.h>
 #include <linux/regulator/consumer.h>
 #include <linux/dma-direction.h>
-
-#if (KERNEL_VERSION(6, 3, 0) <= LINUX_VERSION_CODE)
-#include <linux/firmware/qcom/qcom_scm.h>
-#else
 #include <linux/qcom_scm.h>
-#endif
-
-#if IS_ENABLED(CONFIG_SMMU_PROXY)
-#include <smmu-proxy/include/uapi/linux/qti-smmu-proxy.h>
-#include <smmu-proxy/linux/qti-smmu-proxy.h>
-#endif
-
-#define CSF_2_5_ARCH_VER	2
-#define CSF_2_5_MAX_VER		5
-
-#include <linux/qcom-iommu-util.h>
-#include <linux/dma-map-ops.h>
-#include <linux/dma-mapping.h>
 #include <soc/qcom/secure_buffer.h>
 #include <asm/cacheflush.h>
 #include <uapi/linux/sched/types.h>
@@ -576,121 +558,38 @@ static int sde_rotator_import_buffer(struct sde_layer_buffer *buffer,
 	return ret;
 }
 
-static int sde_rot_smmu_proxy_switch(struct sde_rot_data_type *mdata, bool acquire)
-{
-	int ret = 0;
-#if IS_ENABLED(CONFIG_SMMU_PROXY)
-	int op;
-	struct csf_version csf_ver = {};
-
-	if (acquire)
-		op = SMMU_PROXY_SWITCH_OP_ACQUIRE_SID;
-	else
-		op = SMMU_PROXY_SWITCH_OP_RELEASE_SID;
-
-	ret = smmu_proxy_get_csf_version(&csf_ver);
-	if (ret) {
-		SDEROT_ERR("error in getting csf version, ret:%d\n", ret);
-		return -EINVAL;
-	}
-
-	if ((csf_ver.arch_ver == CSF_2_5_ARCH_VER) &&
-			(csf_ver.max_ver == CSF_2_5_MAX_VER)) {
-		ret = smmu_proxy_switch_sid(&mdata->pdev->dev, op);
-		if (ret)
-			SDEROT_ERR("smmu proxy switch sid failed, op:%d ret:%d\n", ret, op);
-	}
-
-	SDEROT_EVTLOG(csf_ver.arch_ver, csf_ver.max_ver, csf_ver.min_ver, op, ret);
-	SDEROT_DBG("csf:%d.%d.%d acquire:%d op:%d, ret:%d\n",
-			acquire, csf_ver.arch_ver, csf_ver.max_ver, csf_ver.min_ver, op, ret);
-#endif
-	return ret;
-}
-
-static int sde_rotator_scm_call(struct sde_rot_data_type *mdata, int vmid)
-{
-	struct device dummy = {};
-	dma_addr_t dma_handle;
-	uint32_t num_sids = 1;
-	uint32_t *sec_sid;
-	int ret = 0;
-	struct qtee_shm shm;
-	bool qtee_en = qtee_shmbridge_is_enabled();
-	phys_addr_t mem_addr;
-	u64 mem_size;
-
-	if (qtee_en) {
-		ret = qtee_shmbridge_allocate_shm(num_sids * sizeof(uint32_t),
-			&shm);
-		if (ret)
-			return -ENOMEM;
-
-		sec_sid = (uint32_t *) shm.vaddr;
-		mem_addr = shm.paddr;
-		/**
-		 * SMMUSecureModeSwitch requires the size to be number of SID's
-		 * but shm allocates size in pages. Modify the args as per
-		 * client requirement.
-		 */
-		mem_size = sizeof(uint32_t) * num_sids;
-	} else {
-		sec_sid = kcalloc(num_sids, sizeof(uint32_t), GFP_KERNEL);
-		if (!sec_sid)
-			return -ENOMEM;
-
-		mem_addr = virt_to_phys(sec_sid);
-		mem_size = sizeof(uint32_t) * num_sids;
-	}
-
-	sec_sid[0] = mdata->sde_smmu[SDE_IOMMU_DOMAIN_ROT_SECURE].sid;
-	SDEROT_DBG("sid_mask: %d\n", sec_sid[0]);
-
-	ret = dma_coerce_mask_and_coherent(&dummy, (u64)DMA_BIT_MASK(64));
-	if (ret) {
-		SDEROT_ERR("Failed to set dma mask for dummy dev %d\n", ret);
-		goto map_error;
-	}
-	set_dma_ops(&dummy, NULL);
-
-	dma_handle = dma_map_single(&dummy, sec_sid,
-				num_sids * sizeof(uint32_t), DMA_TO_DEVICE);
-	if (dma_mapping_error(&dummy, dma_handle)) {
-		SDEROT_ERR("dma_map_single for dummy dev failed vmid 0x%x\n",
-									vmid);
-		goto map_error;
-	}
-
-	ret = qcom_scm_mem_protect_sd_ctrl(SDE_ROTATOR_DEVICE,
-					mem_addr, mem_size, vmid);
-	if (ret)
-		SDEROT_ERR("Error:scm_call2, vmid %d, ret%d\n",
-				vmid, ret);
-
-	SDEROT_DBG("rot dev0x%x vmid 0x%x, num_sids %d, qtee_en %d sid0x%x ret:%d",
-				SDE_ROTATOR_DEVICE, vmid, num_sids, qtee_en, sec_sid[0], ret);
-	SDEROT_EVTLOG(mdata->sec_cam_en, MEM_PROTECT_SD_CTRL_SWITCH,
-					sec_sid[0], SDE_ROTATOR_DEVICE, vmid, qtee_en, ret);
-
-	dma_unmap_single(&dummy, dma_handle,
-				num_sids * sizeof(uint32_t), DMA_TO_DEVICE);
-
-map_error:
-	if (qtee_en)
-		qtee_shmbridge_free_shm(&shm);
-	else
-		kfree(sec_sid);
-
-	return ret;
-}
-
 static int sde_rotator_secure_session_ctrl(bool enable)
 {
 	struct sde_rot_data_type *mdata = sde_rot_get_mdata();
+	uint32_t *sid_info = NULL;
 	int ret = 0;
-	u32 vmid = 0;
+	phys_addr_t mem_addr;
+	u64 mem_size;
+	u32 vmid;
+	struct qtee_shm shm;
+	bool qtee_en = qtee_shmbridge_is_enabled();
 
 	if (test_bit(SDE_CAPS_SEC_ATTACH_DETACH_SMMU, mdata->sde_caps_map)) {
+
+		if (qtee_en) {
+			ret = qtee_shmbridge_allocate_shm(sizeof(uint32_t),
+				&shm);
+			if (ret)
+				return -ENOMEM;
+
+			sid_info = (uint32_t *) shm.vaddr;
+			mem_addr = shm.paddr;
+			mem_size = sizeof(uint32_t);
+		} else {
+			sid_info = kzalloc(sizeof(uint32_t), GFP_KERNEL);
+			if (!sid_info)
+				return -ENOMEM;
+
+			mem_addr = virt_to_phys(sid_info);
+			mem_size = sizeof(uint32_t);
+		}
+
+		sid_info[0] = mdata->sde_smmu[SDE_IOMMU_DOMAIN_ROT_SECURE].sid;
 
 		if (!mdata->sec_cam_en && enable) {
 			/*
@@ -698,50 +597,63 @@ static int sde_rotator_secure_session_ctrl(bool enable)
 			 * Send SCM call to hypervisor to switch the
 			 * secure_vmid to secure context
 			 */
+			vmid = VMID_CP_CAMERA_PREVIEW;
+
 			mdata->sec_cam_en = 1;
 			sde_smmu_secure_ctrl(0);
 
-			vmid = VMID_CP_CAMERA_PREVIEW;
-			ret = sde_rotator_scm_call(mdata, vmid);
+			ret = qcom_scm_mem_protect_sd_ctrl(SDE_ROTATOR_DEVICE,
+						mem_addr, mem_size, vmid);
 			if (ret) {
-				SDEROT_ERR("sde_rotator_scm_call ret=%d attaching rot sec\n", ret);
-				goto scm_fail;
+				SDEROT_ERR("qcom_scm_mem_protect ret=%d\n", ret);
+				/* failure, attach smmu */
+				mdata->sec_cam_en = 0;
+				sde_smmu_secure_ctrl(1);
+				ret = -EINVAL;
+				goto end;
 			}
 
-			ret = sde_rot_smmu_proxy_switch(mdata, true);
-			if (ret) {
-				SDEROT_ERR("qcom_scm_mem_protect ret=%d attaching rot sec\n", ret);
-				vmid = VMID_CP_PIXEL;
-				goto proxy_fail;
-			}
-			return 0;
+			SDEROT_DBG(
+			  "scm(1) sid0x%x dev0x%llx vmid0x%llx qtee_en%d ret%d\n",
+				sid_info[0], SDE_ROTATOR_DEVICE, vmid,
+				qtee_en, ret);
+			SDEROT_EVTLOG(1, sid_info, sid_info[0], SDE_ROTATOR_DEVICE,
+					vmid, qtee_en, ret);
 		} else if (mdata->sec_cam_en && !enable) {
 			/*
 			 * Disable secure camera operation
 			 * Send SCM call to hypervisor to switch the
 			 * secure_vmid to non-secure context
 			 */
-			sde_rot_smmu_proxy_switch(mdata, false);
 			vmid = VMID_CP_PIXEL;
 			mdata->sec_cam_en = 0;
-			ret = sde_rotator_scm_call(mdata, vmid);
+
+			ret = qcom_scm_mem_protect_sd_ctrl(SDE_ROTATOR_DEVICE,
+					mem_addr, mem_size, vmid);
+			if (ret)
+				SDEROT_ERR("qcom_scm_mem_protect ret=%d\n", ret);
+
+			SDEROT_DBG(
+			  "scm(0) sid0x%x dev0x%llx vmid0x%llx qtee_en%d ret%d\n",
+				sid_info[0], SDE_ROTATOR_DEVICE, vmid,
+				qtee_en, ret);
 
 			/* force smmu to reattach */
 			sde_smmu_secure_ctrl(1);
-			return 0;
+
+			SDEROT_EVTLOG(0, sid_info, sid_info[0], SDE_ROTATOR_DEVICE,
+					vmid, qtee_en, ret);
 		}
 	} else {
 		return 0;
 	}
 
-	return 0;
-proxy_fail:
-	if (vmid)
-		sde_rotator_scm_call(mdata, vmid);
-scm_fail:
-	/* failure, attach smmu */
-	mdata->sec_cam_en = 0;
-	sde_smmu_secure_ctrl(1);
+end:
+	if (qtee_en)
+		qtee_shmbridge_free_shm(&shm);
+	else
+		kfree(sid_info);
+
 	return ret;
 }
 
@@ -1140,20 +1052,6 @@ static void sde_rotator_put_hw_resource(struct sde_rot_queue *queue,
 			entry->item.session_id, entry->item.sequence_id);
 }
 
-static void rotator_thread_priority_worker(struct kthread_work *work)
-{
-	int ret = 0;
-	struct sched_param param = { 0 };
-	struct task_struct *task = current->group_leader;
-
-	param.sched_priority = 5;
-	ret = sched_setscheduler(task, SCHED_FIFO, &param);
-	if (ret)
-		SDEROT_ERR(
-			"pid:%d name:%s priority update failed %d\n",
-			current->tgid, task->comm, ret);
-}
-
 /*
  * caller will need to call sde_rotator_deinit_queue when
  * the function returns error
@@ -1162,6 +1060,8 @@ static int sde_rotator_init_queue(struct sde_rot_mgr *mgr)
 {
 	int i, size, ret = 0;
 	char name[32];
+	struct sched_param param = { .sched_priority = 5 };
+
 	size = sizeof(struct sde_rot_queue) * mgr->queue_count;
 	mgr->commitq = devm_kzalloc(mgr->device, size, GFP_KERNEL);
 	if (!mgr->commitq)
@@ -1174,16 +1074,21 @@ static int sde_rotator_init_queue(struct sde_rot_mgr *mgr)
 		kthread_init_worker(&mgr->commitq[i].rot_kw);
 		mgr->commitq[i].rot_thread = kthread_run(kthread_worker_fn,
 				&mgr->commitq[i].rot_kw, name);
-		kthread_init_work(&mgr->thread_priority_work,
-				rotator_thread_priority_worker);
-		kthread_queue_work(&mgr->commitq[i].rot_kw,
-				&mgr->thread_priority_work);
-		kthread_flush_work(&mgr->thread_priority_work);
 		if (IS_ERR(mgr->commitq[i].rot_thread)) {
 			ret = -EPERM;
 			mgr->commitq[i].rot_thread = NULL;
 			break;
 		}
+
+		ret = sched_setscheduler(mgr->commitq[i].rot_thread,
+			SCHED_FIFO, &param);
+		if (ret) {
+			SDEROT_ERR(
+				"failed to set kthread priority for commitq %d\n",
+				ret);
+			break;
+		}
+
 		/* timeline not used */
 		mgr->commitq[i].timeline = NULL;
 	}
@@ -1200,16 +1105,21 @@ static int sde_rotator_init_queue(struct sde_rot_mgr *mgr)
 		kthread_init_worker(&mgr->doneq[i].rot_kw);
 		mgr->doneq[i].rot_thread = kthread_run(kthread_worker_fn,
 				&mgr->doneq[i].rot_kw, name);
-		kthread_init_work(&mgr->thread_priority_work,
-				rotator_thread_priority_worker);
-		kthread_queue_work(&mgr->commitq[i].rot_kw,
-				&mgr->thread_priority_work);
-		kthread_flush_work(&mgr->thread_priority_work);
 		if (IS_ERR(mgr->doneq[i].rot_thread)) {
 			ret = -EPERM;
 			mgr->doneq[i].rot_thread = NULL;
 			break;
 		}
+
+		ret = sched_setscheduler(mgr->doneq[i].rot_thread,
+			SCHED_FIFO, &param);
+		if (ret) {
+			SDEROT_ERR(
+				"failed to set kthread priority for doneq %d\n",
+				ret);
+			break;
+		}
+
 		/* timeline not used */
 		mgr->doneq[i].timeline = NULL;
 	}
@@ -2211,46 +2121,6 @@ static int sde_rotator_add_request(struct sde_rot_mgr *mgr,
 	return 0;
 }
 
-static void sde_rotator_complete_hwactive_job(struct sde_rot_mgr *mgr,
-		struct sde_rot_entry_container *req)
-{
-	struct kthread_work *commit_work;
-	struct kthread_work *done_work;
-	struct sde_rot_entry *entry;
-	struct sde_rot_hw_resource *hw;
-	struct sde_rot_queue *queue;
-	int i;
-
-	if (!mgr || !req) {
-		SDEROT_ERR("invalid params\n");
-		return;
-	}
-
-	for (i = 0; i < req->count; i++) {
-		entry = &req->entries[i];
-		if (!entry)
-			continue;
-
-		queue =	entry->commitq;
-		if (!queue || !queue->hw)
-			continue;
-
-		commit_work = &entry->commit_work;
-		done_work = &entry->done_work;
-		hw = queue->hw;
-		SDEROT_EVTLOG(req->count, atomic_read(&req->pending_count),
-			atomic_read(&hw->num_active));
-		if (atomic_read(&hw->num_active)) {
-			sde_rot_mgr_unlock(mgr);
-			kthread_flush_work(commit_work);
-			kthread_flush_work(done_work);
-			sde_rot_mgr_lock(mgr);
-		}
-		SDEROT_EVTLOG(req->count, atomic_read(&req->pending_count),
-			atomic_read(&hw->num_active));
-	}
-}
-
 void sde_rotator_remove_request(struct sde_rot_mgr *mgr,
 	struct sde_rot_file_private *private,
 	struct sde_rot_entry_container *req)
@@ -2274,11 +2144,6 @@ static void sde_rotator_cancel_request(struct sde_rot_mgr *mgr,
 	struct sde_rot_entry *entry;
 	int i;
 
-	/*
-	 * Flush any active works before issuing
-	 * a cancel work.
-	 */
-	sde_rotator_complete_hwactive_job(mgr, req);
 	if (atomic_read(&req->pending_count)) {
 		/*
 		 * To avoid signal the rotation entry output fence in the wrong
@@ -2286,7 +2151,6 @@ static void sde_rotator_cancel_request(struct sde_rot_mgr *mgr,
 		 * canceled first, before signaling the output fence.
 		 */
 		SDEROT_DBG("cancel work start\n");
-		SDEROT_EVTLOG(atomic_read(&req->pending_count));
 		sde_rot_mgr_unlock(mgr);
 		for (i = req->count - 1; i >= 0; i--) {
 			entry = req->entries + i;
@@ -3275,11 +3139,7 @@ int sde_rotator_core_init(struct sde_rot_mgr **pmgr,
 		IS_SDE_MAJOR_SAME(mdata->mdss_version,
 			SDE_MDP_HW_REV_500) ||
 		IS_SDE_MAJOR_SAME(mdata->mdss_version,
-			SDE_MDP_HW_REV_600) ||
-		IS_SDE_MAJOR_SAME(mdata->mdss_version,
-			SDE_MDP_HW_REV_860) ||
-		IS_SDE_MAJOR_SAME(mdata->mdss_version,
-			SDE_MDP_HW_REV_870)) {
+			SDE_MDP_HW_REV_600)) {
 		mgr->ops_hw_init = sde_rotator_r3_init;
 		mgr->min_rot_clk = ROT_MIN_ROT_CLK;
 
@@ -3292,9 +3152,8 @@ int sde_rotator_core_init(struct sde_rot_mgr **pmgr,
 			SDE_MDP_HW_REV_500))
 			mgr->max_rot_clk = ROT_R3_MAX_ROT_CLK;
 
-		if (!(IS_SDE_MAJOR_SAME(mdata->mdss_version, SDE_MDP_HW_REV_600) ||
-			IS_SDE_MAJOR_SAME(mdata->mdss_version, SDE_MDP_HW_REV_870) ||
-			IS_SDE_MAJOR_SAME(mdata->mdss_version, SDE_MDP_HW_REV_860)) &&
+		if (!IS_SDE_MAJOR_SAME(mdata->mdss_version,
+					SDE_MDP_HW_REV_600) &&
 				!sde_rotator_get_clk(mgr,
 					SDE_ROTATOR_CLK_MDSS_AXI)) {
 			SDEROT_ERR("unable to get mdss_axi_clk\n");

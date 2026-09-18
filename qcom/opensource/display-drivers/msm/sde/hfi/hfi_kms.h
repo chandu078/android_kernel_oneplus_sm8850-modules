@@ -10,7 +10,6 @@
 #include "hfi_adapter.h"
 #include "hfi_msm_drv.h"
 #include "linux/completion.h"
-#include "hfi_connector.h"
 
 #define SDE_MAX_SSPP_COUNT  16
 
@@ -78,9 +77,6 @@ struct hfi_catalog_base {
  * @device_init_listener: HFI listener object for catalog parsing
  * @resource_vote_listener: HFI listener object for resource vote
  * @cat_init_done: atomic variable tracking catalog parse status
- * @catalog: structure holding parsed catalog data
- * @primary_connector: primary connector handle
- * @ssr_in_progress: atomic variable tracking ssr progress
  */
 struct hfi_kms {
 	struct sde_kms *base;
@@ -88,11 +84,8 @@ struct hfi_kms {
 	struct hfi_adapter_t *hfi_adapter;
 	struct hfi_prop_listener device_init_listener;
 	struct hfi_prop_listener resource_vote_listener;
-	struct hfi_prop_listener trace_cfg_listener;
 	atomic_t cat_init_done;
 	struct hfi_catalog_base *catalog;
-	struct hfi_connector *primary_connector;
-	atomic_t ssr_in_progress;
 };
 
 /**
@@ -167,14 +160,6 @@ struct hfi_cmdbuf_t *hfi_kms_get_cmd_buf(struct hfi_kms *hfi_kms,
 int hfi_kms_get_catalog_data(struct hfi_kms *hfi_kms);
 
 /**
- * hfi_kms_send_trace_cfg - enable/disable trace logs
- * @hfi_kms: Pointer to hfi_kms structure
- * @enable: HFI_TRUE to enable, HFI_FALSE to disable
- * Returns: 0 on success, or error code on failure
- */
-int hfi_kms_send_trace_cfg(struct hfi_kms *hfi_kms, u32 enable);
-
-/**
  * hfi_kms_get_plane_indices - get hfi plane indices
  * @hfi_kms: Pointer to hfi_kms structure
  * @vig_pipe: True if VIG pipe
@@ -193,12 +178,5 @@ int hfi_kms_get_plane_indices(struct hfi_kms *hfi_kms, bool vig_pipe, uint32_t p
  * Returns: 0 on success, or error code on failure
  */
 int hfi_kms_set_reg_dma_buffer(struct hfi_kms *hfi_kms, struct sde_reg_dma_buffer *buffer);
-
-/**
- * hfi_kms_send_idle_timer_ctrl - send HFI command to block/unblock idle timer
- * @hfi_kms: Pointer to hfi kms structure
- * @timer_state: True if block timer from expiring, False otherwise.
- */
-int hfi_kms_send_idle_timer_ctrl(struct hfi_kms *hfi_kms, bool timer_state);
 
 #endif // _HFI_KMS_H_
