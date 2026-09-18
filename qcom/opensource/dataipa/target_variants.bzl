@@ -1,16 +1,10 @@
 targets = [
     # keep sorted
-    "bengal",
     "canoe",
-    "chora",
     "gen3auto",
-    "lahaina",
-    "malabar",
-    "monaco",
-    "seraph",
-    "seraphvxr",
     "sun",
     "vienna",
+    "lahaina",
 ]
 
 la_variants = [
@@ -38,7 +32,6 @@ vm_target_bases = [
     "sun",
     "canoe",
     "lahaina",
-    "bengal",
 ]
 
 vm_targets = ["{}-{}".format(t, vt) for t in vm_target_bases for vt in vm_types]

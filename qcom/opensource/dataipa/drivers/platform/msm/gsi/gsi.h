@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ *
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef GSI_H
@@ -1882,14 +1883,6 @@ void gsi_ring_evt_doorbell_polling_mode(unsigned long chan_hdl);
 int gsi_config_channel_mode(unsigned long chan_hdl, enum gsi_chan_mode mode);
 
 /**
- * gsi_status_enabled() - Query GSI Status
- *
- * Returns:	true if ENABLED, false on DISABLED
- *
- */
-bool gsi_status_enabled(void);
-
-/**
  * gsi_queue_xfer - Peripheral should call this function
  * to queue transfers on the given channel
  *
@@ -2514,15 +2507,6 @@ void gsi_update_almst_empty_thrshold(unsigned long chan_hdl, unsigned short thre
 * @Return void
 */
 void gsi_dump_ch_info(unsigned long chan_hdl);
-
-/**
-* gsi_dump_ch_scratch - channel scratch information.
-*
-* @chan_id: channel id
-*
-* @Return void
-*/
-void gsi_dump_ch_scratch(u32 chan_hdl);
 
 /**
  * gsi_get_hw_profiling_stats() - Query GSI HW profiling stats

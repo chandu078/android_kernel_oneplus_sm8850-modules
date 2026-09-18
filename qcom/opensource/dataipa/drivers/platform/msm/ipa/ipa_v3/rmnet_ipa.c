@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
  *
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /*
@@ -1788,15 +1788,8 @@ static int ipa3_setup_apps_wan_cons_pipes(
 	}
 
 	ipa_wan_ep_cfg = &rmnet_ipa3_ctx->ipa_to_apps_ep_cfg;
-	if (ipa3_ctx_get_type(IPA_HW_TYPE) >= IPA_HW_v4_5)
-		ipa_wan_ep_cfg->ipa_ep_cfg.cfg.cs_offload_en =
-			IPA_ENABLE_CS_DL_QMAP;
-	else
-		ipa_wan_ep_cfg->ipa_ep_cfg.cfg.cs_offload_en =
-			IPA_ENABLE_CS_OFFLOAD_DL;
-
-	IPAWANDBG("DL chksum set\n");
-
+	ipa_wan_ep_cfg->ipa_ep_cfg.cfg.cs_offload_en =
+		IPA_ENABLE_CS_DL_QMAP;
 
 	if (!ipa3_disable_apps_wan_cons_deaggr(
 		ingress_param->agg_byte_limit,
@@ -1814,8 +1807,7 @@ static int ipa3_setup_apps_wan_cons_pipes(
 		}
 	}
 
-	if (ingress_param->cs_offload_en &&
-			ipa3_ctx_get_type(IPA_HW_TYPE) >= IPA_HW_v4_5) {
+	if (ingress_param->cs_offload_en) {
 		ipa_wan_ep_cfg->ipa_ep_cfg.hdr.hdr_len = 8;
 		rmnet_ipa3_ctx->dl_csum_offload_enabled = true;
 	} else {
@@ -2226,26 +2218,25 @@ static int ipa3_setup_apps_wan_prod_pipes(
 		return rc;
 	}
 	ipa_wan_ep_cfg = &rmnet_ipa3_ctx->apps_to_ipa_ep_cfg;
-	if (egress_param->cs_offload_en) {
+	if (egress_param->cs_offload_en &&
+		(dev->features & RMNET_IPA_ULCS_FEATURE)) {
 		IPAWANDBG("UL Chksum set\n");
 		ipa_wan_ep_cfg->ipa_ep_cfg.hdr.hdr_len = 8;
 		ipa_wan_ep_cfg->ipa_ep_cfg.cfg.cs_offload_en
 			= IPA_ENABLE_CS_OFFLOAD_UL;
 		ipa_wan_ep_cfg->ipa_ep_cfg.cfg.cs_metadata_hdr_offset
 			= 1;
+		if (egress_param->ulso_en &&
+			(dev->features & RMNET_IPA_ULSO_FEATURE)) {
+			IPAWANDBG("ULSO set\n");
+			ipa_wan_ep_cfg->ipa_ep_cfg.ulso.ipid_min_max_idx =
+				egress_param->ipid_min_max_idx;
+			ipa_wan_ep_cfg->ipa_ep_cfg.ulso.is_ulso_pipe = true;
+		}
 	} else {
 		ipa_wan_ep_cfg->ipa_ep_cfg.hdr.hdr_len = 4;
 		ipa_wan_ep_cfg->ipa_ep_cfg.cfg.cs_offload_en
 			= IPA_DISABLE_CS_OFFLOAD;
-	}
-
-	if (egress_param->ulso_en &&
-			(dev->features & RMNET_IPA_ULSO_FEATURE) &&
-			(dev->features & RMNET_IPA_ULCS_FEATURE)) {
-		IPAWANDBG("ULSO set\n");
-		ipa_wan_ep_cfg->ipa_ep_cfg.ulso.ipid_min_max_idx =
-			egress_param->ipid_min_max_idx;
-		ipa_wan_ep_cfg->ipa_ep_cfg.ulso.is_ulso_pipe = true;
 	}
 
 	if (egress_param->aggr_en) {
@@ -3461,7 +3452,7 @@ static int ipa3_q6_register_pm(void)
 	pm_reg.skip_clk_vote = true;
 	result = ipa_pm_register(&pm_reg, &rmnet_ipa3_ctx->q6_pm_hdl);
 	if (result) {
-		IPAERR_BOOTUP("failed to create IPA PM client %d\n", result);
+		IPAERR("failed to create IPA PM client %d\n", result);
 		return result;
 	}
 
@@ -3470,7 +3461,7 @@ static int ipa3_q6_register_pm(void)
 	pm_reg.skip_clk_vote = true;
 	result = ipa_pm_register(&pm_reg, &rmnet_ipa3_ctx->q6_teth_pm_hdl);
 	if (result) {
-		IPAERR_BOOTUP("failed to create IPA PM client %d\n", result);
+		IPAERR("failed to create IPA PM client %d\n", result);
 		return result;
 	}
 
@@ -3570,7 +3561,7 @@ static int get_ipa_rmnet_dts_configuration(struct platform_device *pdev,
 		pr_info("using default for wan-rx-desc-size = %u\n",
 				ipa_rmnet_drv_res->wan_rx_desc_size);
 	else
-		IPADBG_BOOTUP(": found ipa_drv_res->wan-rx-desc-size = %u\n",
+		IPAWANDBG(": found ipa_drv_res->wan-rx-desc-size = %u\n",
 				ipa_rmnet_drv_res->wan_rx_desc_size);
 
 	return 0;
@@ -3630,11 +3621,11 @@ static int ipa3_wwan_register_netdev_pm_client(struct net_device *dev)
 	pm_reg.group = IPA_PM_GROUP_APPS;
 	result = ipa_pm_register(&pm_reg, &rmnet_ipa3_ctx->pm_hdl);
 	if (result) {
-		IPAERR_BOOTUP("failed to create IPA PM client %d\n", result);
+		IPAWANERR("failed to create IPA PM client %d\n", result);
 		return result;
 	}
 
-	IPADBG_BOOTUP("%s register done\n", pm_reg.name);
+	IPAWANERR("%s register done\n", pm_reg.name);
 
 	return 0;
 }
@@ -3667,7 +3658,7 @@ static int ipa3_wwan_probe(struct platform_device *pdev)
 	pr_info("rmnet_ipa3 started initialization\n");
 
 	if (!ipa_is_ready()) {
-		IPADBG_BOOTUP("IPA driver not ready, registering callback\n");
+		IPAWANDBG("IPA driver not ready, registering callback\n");
 		ret = ipa_register_ipa_ready_cb(ipa3_ready_cb, (void *)pdev);
 
 		/*
@@ -3676,7 +3667,7 @@ static int ipa3_wwan_probe(struct platform_device *pdev)
 		 */
 		if (ret != -EEXIST) {
 			if (ret)
-				IPAERR_BOOTUP("IPA CB reg failed - %d\n", ret);
+				IPAWANERR("IPA CB reg failed - %d\n", ret);
 			return ret;
 		}
 	}
@@ -3691,7 +3682,7 @@ static int ipa3_wwan_probe(struct platform_device *pdev)
 
 	ret = ipa3_init_q6_smem();
 	if (ret) {
-		IPAERR_BOOTUP("ipa3_init_q6_smem failed\n");
+		IPAWANERR("ipa3_init_q6_smem failed\n");
 		return ret;
 	}
 
@@ -3742,14 +3733,14 @@ static int ipa3_wwan_probe(struct platform_device *pdev)
 			   NET_NAME_UNKNOWN,
 			   ipa3_wwan_setup, 1, 2);
 	if (!dev) {
-		IPAERR_BOOTUP("no memory for netdev\n");
+		IPAWANERR("no memory for netdev\n");
 		ret = -ENOMEM;
 		goto alloc_netdev_err;
 	}
 	rmnet_ipa3_ctx->wwan_priv = netdev_priv(dev);
 	memset(rmnet_ipa3_ctx->wwan_priv, 0,
 		sizeof(*(rmnet_ipa3_ctx->wwan_priv)));
-	IPADBG_BOOTUP("wwan_ptr (private) = %pK", rmnet_ipa3_ctx->wwan_priv);
+	IPAWANDBG("wwan_ptr (private) = %pK", rmnet_ipa3_ctx->wwan_priv);
 	rmnet_ipa3_ctx->wwan_priv->net = dev;
 	atomic_set(&rmnet_ipa3_ctx->wwan_priv->outstanding_pkts, 0);
 	spin_lock_init(&rmnet_ipa3_ctx->wwan_priv->lock);
@@ -3760,7 +3751,7 @@ static int ipa3_wwan_probe(struct platform_device *pdev)
 		/* IPA_PM configuration starts */
 		ret = ipa3_q6_register_pm();
 		if (ret) {
-			IPAERR_BOOTUP("ipa3_q6_register_pm failed, ret: %d\n",
+			IPAWANERR("ipa3_q6_register_pm failed, ret: %d\n",
 					ret);
 			goto q6_init_err;
 		}
@@ -3768,7 +3759,7 @@ static int ipa3_wwan_probe(struct platform_device *pdev)
 
 	ret = ipa3_wwan_register_netdev_pm_client(dev);
 	if (ret) {
-		IPAERR_BOOTUP("fail to create/register pm resources\n");
+		IPAWANERR("fail to create/register pm resources\n");
 		goto fail_pm;
 	}
 
@@ -3792,14 +3783,14 @@ static int ipa3_wwan_probe(struct platform_device *pdev)
 #endif
 	ret = register_netdev(dev);
 	if (ret) {
-		IPAERR_BOOTUP("unable to register ipa_netdev %d rc=%d\n",
+		IPAWANERR("unable to register ipa_netdev %d rc=%d\n",
 			0, ret);
 		goto set_perf_err;
 	}
 
-	IPADBG_BOOTUP("IPA-WWAN devices (%s) initialization ok :>>>>\n", dev->name);
+	IPAWANDBG("IPA-WWAN devices (%s) initialization ok :>>>>\n", dev->name);
 	if (ret) {
-		IPAERR_BOOTUP("default configuration failed rc=%d\n",
+		IPAWANERR("default configuration failed rc=%d\n",
 				ret);
 		goto config_err;
 	}
@@ -3834,7 +3825,7 @@ static int ipa3_wwan_probe(struct platform_device *pdev)
 		egress_pipe_status[j].status = 0;
 	}
 
-	IPAERR_BOOTUP("rmnet_ipa completed initialization\n");
+	IPAWANERR("rmnet_ipa completed initialization\n");
 	return 0;
 config_err:
 	if (ipa3_rmnet_res.ipa_napi_enable)
@@ -6785,7 +6776,7 @@ int ipa3_wwan_init(void)
 	int rc = 0;
 
 	if (!ipa3_ctx) {
-		IPAERR_BOOTUP("ipa3_ctx was not initialized\n");
+		IPAWANERR_RL("ipa3_ctx was not initialized\n");
 		return -EINVAL;
 	}
 	rmnet_ipa3_ctx = kzalloc(sizeof(*rmnet_ipa3_ctx), GFP_KERNEL);
@@ -6841,7 +6832,7 @@ int ipa3_wwan_init(void)
 		rmnet_ipa3_ctx->lcl_mdm_subsys_notify_handle = ssr_hdl;
 	else if (!rmnet_ipa3_ctx->ipa_config_is_apq) {
 		rc = PTR_ERR(ssr_hdl);
-		IPAERR_BOOTUP("local modem ssr register fail rc=%d\n", rc);
+		IPAWANERR_RL("local modem ssr register fail rc=%d\n", rc);
 		goto fail_dbgfs_rm;
 	}
 
@@ -6856,7 +6847,7 @@ int ipa3_wwan_init(void)
 	#endif
 		if (IS_ERR(ssr_hdl)) {
 			rc = PTR_ERR(ssr_hdl);
-			IPAERR_BOOTUP("remote modem ssr register fail rc=%d\n",
+			IPAWANERR_RL("remote modem ssr register fail rc=%d\n",
 				rc);
 			goto fail_unreg_lcl_mdm_ssr;
 		}

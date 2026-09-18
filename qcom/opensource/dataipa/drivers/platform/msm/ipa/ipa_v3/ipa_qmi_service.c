@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
  *
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -2094,9 +2094,8 @@ static void ipa3_q6_clnt_svc_arrive(struct work_struct *work)
 	/* Initialize modem IPA-driver */
 	IPAWANDBG("send ipa3_qmi_init_modem_send_sync_msg to modem\n");
 	rc = ipa3_qmi_init_modem_send_sync_msg();
-	IPAWANDBG("send ipa3_qmi_init_modem_send_sync_msg to modem rc:%d\n", rc);
 	if ((rc == -ENETRESET) || (rc == -ENODEV) || (rc == -ECONNRESET) ||
-		(rc == -EIO) ||  ((rc != 0) && (atomic_read(&ipa3_ctx->is_ssr)))) {
+		(rc == -EIO) || atomic_read(&ipa3_ctx->is_ssr)) {
 		IPAWANERR(
 		"ipa3_qmi_init_modem_send_sync_msg failed due to SSR!\n");
 		/* Cleanup when ipa3_wwan_remove is called */
@@ -2377,18 +2376,18 @@ static void ipa3_qmi_service_init_worker(struct work_struct *work)
 	/* start the QMI msg cache */
 	ipa3_qmi_ctx = vzalloc(sizeof(*ipa3_qmi_ctx));
 	if (!ipa3_qmi_ctx) {
-		IPAERR_BOOTUP("Failed to allocate ipa3_qmi_ctx\n");
+		IPAWANERR("Failed to allocate ipa3_qmi_ctx\n");
 		return;
 	}
 
 	if (ipa3_is_apq()) {
 		/* Only start QMI-client */
-		IPAERR_BOOTUP("Only start IPA A7 QMI client\n");
+		IPAWANDBG("Only start IPA A7 QMI client\n");
 		goto qmi_client_start;
 	}
 
 	/* Initialize QMI-service*/
-	IPADBG_BOOTUP("IPA A7 QMI init OK :>>>>\n");
+	IPAWANDBG("IPA A7 QMI init OK :>>>>\n");
 
 	ipa3_qmi_ctx->modem_cfg_emb_pipe_flt =
 		ipa3_get_modem_cfg_emb_pipe_flt();
@@ -2405,7 +2404,7 @@ static void ipa3_qmi_service_init_worker(struct work_struct *work)
 		server_handlers);
 
 	if (rc < 0) {
-		IPAERR_BOOTUP("Initializing ipa_a5 svc failed %d\n", rc);
+		IPAWANERR("Initializing ipa_a5 svc failed %d\n", rc);
 		goto destroy_qmi_handle;
 	}
 
@@ -2415,7 +2414,7 @@ static void ipa3_qmi_service_init_worker(struct work_struct *work)
 		IPA_A5_SERVICE_INS_ID);
 
 	if (rc < 0) {
-		IPAERR_BOOTUP("Registering ipa_a5 svc failed %d\n",
+		IPAWANERR("Registering ipa_a5 svc failed %d\n",
 				rc);
 		goto deregister_qmi_srv;
 	}
@@ -2424,7 +2423,7 @@ qmi_client_start:
 	/* Initialize QMI-client */
 	ipa_clnt_req_workqueue = create_singlethread_workqueue("clnt_req");
 	if (!ipa_clnt_req_workqueue) {
-		IPAERR_BOOTUP("Creating clnt_req workqueue failed\n");
+		IPAWANERR("Creating clnt_req workqueue failed\n");
 		goto deregister_qmi_srv;
 	}
 
@@ -2440,7 +2439,7 @@ qmi_client_start:
 		client_handlers);
 
 	if (rc < 0) {
-		IPAERR_BOOTUP("Creating clnt handle failed\n");
+		IPAWANERR("Creating clnt handle failed\n");
 		goto destroy_qmi_client_handle;
 	}
 
@@ -2450,12 +2449,12 @@ qmi_client_start:
 		IPA_Q6_SERVICE_INS_ID);
 
 	if (rc < 0) {
-		IPAERR_BOOTUP("Adding Q6 Svc failed\n");
+		IPAWANERR("Adding Q6 Svc failed\n");
 		goto deregister_qmi_client;
 	}
 
 	/* get Q6 service and start send modem-initial to Q6 */
-	IPADBG_BOOTUP("wait service available\n");
+	IPAWANDBG("wait service available\n");
 	return;
 
 deregister_qmi_client:
@@ -2501,7 +2500,7 @@ void ipa3_qmi_service_exit(void)
 
 	workqueues_stopped = true;
 
-	IPADBG_BOOTUP("Entry\n");
+	IPADBG("Entry\n");
 	/* qmi-service */
 	if (ipa3_svc_handle != NULL) {
 		qmi_handle_release(ipa3_svc_handle);
@@ -2534,7 +2533,7 @@ void ipa3_qmi_service_exit(void)
 	ipa3_qmi_indication_fin = false;
 	ipa3_modem_init_cmplt = false;
 	send_qmi_init_q6 = true;
-	IPADBG_BOOTUP("Exit\n");
+	IPADBG("Exit\n");
 }
 
 void ipa3_qmi_stop_workqueues(void)

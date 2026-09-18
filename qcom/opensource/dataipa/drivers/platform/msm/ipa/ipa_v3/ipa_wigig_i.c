@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  *
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ipa_i.h"
@@ -81,11 +81,11 @@ static struct notifier_block uc_loaded_notifier = {
 
 int ipa3_wigig_init_i(void)
 {
-	IPADBG_BOOTUP("\n");
+	IPADBG("\n");
 
 	ipa3_uc_register_ready_cb(&uc_loaded_notifier);
 
-	IPADBG_BOOTUP("exit\n");
+	IPADBG("exit\n");
 
 	return 0;
 }
@@ -1977,7 +1977,7 @@ int ipa3_wigig_init_debugfs_i(struct dentry *parent)
 
 	dent = debugfs_create_dir("ipa_wigig", parent);
 	if (IS_ERR_OR_NULL(dent)) {
-		IPAERR_BOOTUP("fail to create folder in debug_fs\n");
+		IPAERR("fail to create folder in debug_fs\n");
 		return -EFAULT;
 	}
 
