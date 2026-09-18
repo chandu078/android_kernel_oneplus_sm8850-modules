@@ -1,14 +1,10 @@
 targets = [
     # keep sorted
     "canoe",
-    "hamoa",
-    "hamoa_la",
     "gen3auto",
-    "shikra",
     "sun",
     "seraph",
     "vienna",
-    "malabar",
 ]
 
 la_variants = [

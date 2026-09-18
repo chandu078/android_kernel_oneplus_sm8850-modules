@@ -18,44 +18,6 @@
 
 #define VPP_MIN_FREQ_MARGIN_PERCENT                   5 /* to be tuned */
 
-static u32 msm_vidc_get_av1_ratio(struct msm_vidc_inst *inst)
-{
-	struct msm_vidc_picture_type_q *q;
-	struct msm_vidc_picture_type_entry *entry;
-	u32 start, i, idx, no_show_count = 0, sef_count = 0, normal_count = 0;
-	u32 weighted_ratio = 100;
-
-	if (!inst || inst->codec != MSM_VIDC_AV1)
-		return 100;
-
-	q = &inst->picture_type_q;
-	if (!q->count)
-		return 100;
-
-	start = (q->head + PICTURE_TYPE_SIZE - q->count) % PICTURE_TYPE_SIZE;
-	for (i = 0; i < q->count; i++) {
-		idx = (start + i) % PICTURE_TYPE_SIZE;
-		entry = &q->entries[idx];
-
-		if (entry->picture_type & HFI_PICTURE_NOSHOW)
-			no_show_count++;
-		else if (entry->picture_type & HFI_PICTURE_SEF)
-			sef_count++;
-		else
-			normal_count++;
-	}
-
-	if (sef_count + normal_count > 0)
-		weighted_ratio = ((no_show_count * 100) + (sef_count * 60) +
-			(normal_count * 100)) / (sef_count + normal_count);
-	i_vpr_l(inst,
-		"%s: av1 stats total_frames %u, no_show %u, sef %u, normal %u, ratio %u\n",
-		__func__, q->count, no_show_count, sef_count, normal_count,
-		weighted_ratio);
-
-	return weighted_ratio;
-}
-
 static int msm_vidc_get_hier_layer_val(struct msm_vidc_inst *inst)
 {
 	int hierachical_layer = CODEC_GOP_IPP;
@@ -230,10 +192,7 @@ static int msm_vidc_init_codec_input_freq(struct msm_vidc_inst *inst, u32 data_s
 	if (inst->capabilities[LOOKAHEAD_ENCODE_ENABLE].value)
 		codec_input->video_adv_feature = FEATURE_LOOKAHEAD_ENCODE;
 
-	if ((codec_input->codec == CODEC_APV) &&
-			(inst->capabilities[ROTATION].value ||
-			inst->capabilities[HFLIP].value ||
-			inst->capabilities[VFLIP].value))
+	if (inst->capabilities[ROTATION].value && codec_input->codec == CODEC_APV)
 		codec_input->video_adv_feature = FEATURE_APV_ROTATION;
 
 	core = inst->core;
@@ -488,7 +447,6 @@ msm_vidc_calc_freq_iris4(struct msm_vidc_inst *inst,
 	struct api_calculation_input codec_input;
 	struct api_calculation_freq_output codec_output;
 	u32 fps, mbpf;
-	u32 av1_ratio = 100;
 
 	core = inst->core;
 
@@ -497,10 +455,6 @@ msm_vidc_calc_freq_iris4(struct msm_vidc_inst *inst,
 
 	memset(&codec_input, 0, sizeof(struct api_calculation_input));
 	memset(&codec_output, 0, sizeof(struct api_calculation_freq_output));
-
-	if (inst->codec == MSM_VIDC_AV1)
-		av1_ratio = msm_vidc_get_av1_ratio(inst);
-
 	ret = msm_vidc_init_codec_input_freq(inst, clock_scaling_data->data_size, &codec_input);
 	if (ret)
 		return ret;
@@ -526,7 +480,7 @@ msm_vidc_calc_freq_iris4(struct msm_vidc_inst *inst,
 		}
 	}
 
-	vpp_freq = (u64)codec_output.vpp_min_freq * av1_ratio * 10000; /* Convert to Hz */
+	vpp_freq = (u64)codec_output.vpp_min_freq * 1000000; /* Convert to Hz */
 	apv_freq = (u64)codec_output.apv_min_freq * 1000000; /* Convert to Hz */
 	bse_freq = (u64)codec_output.vsp_min_freq * 1000000; /* Convert to Hz */
 	tensilica_freq = (u64)codec_output.tensilica_min_freq * 1000000; /* Convert to Hz */
@@ -599,7 +553,7 @@ static int get_clock_corner_index(struct msm_vidc_core *core, u64 vpp_freq, u64 
 		 * table rate >= requested rate
 		 */
 		if (vpp_freq && !strcmp(cl->name, "video_cc_mvs0_clk_src")) {
-			for (vpp_idx = cl->freq_count - 1; vpp_idx > 0; vpp_idx--) {
+			for (vpp_idx = cl->freq_count - 1; vpp_idx >= 0; vpp_idx--) {
 				rate = cl->freq[vpp_idx];
 				if (rate >= vpp_freq)
 					break;
@@ -607,7 +561,7 @@ static int get_clock_corner_index(struct msm_vidc_core *core, u64 vpp_freq, u64 
 		}
 
 		if (apv_freq && !strcmp(cl->name, "video_cc_mvs0a_clk_src")) {
-			for (apv_idx = cl->freq_count - 1; apv_idx > 0; apv_idx--) {
+			for (apv_idx = cl->freq_count - 1; apv_idx >= 0; apv_idx--) {
 				rate = cl->freq[apv_idx];
 				if (rate >= apv_freq)
 					break;
@@ -615,7 +569,7 @@ static int get_clock_corner_index(struct msm_vidc_core *core, u64 vpp_freq, u64 
 		}
 
 		if (bse_freq && !strcmp(cl->name, "video_cc_mvs0b_clk_src")) {
-			for (bse_idx = cl->freq_count - 1; bse_idx > 0; bse_idx--) {
+			for (bse_idx = cl->freq_count - 1; bse_idx >= 0; bse_idx--) {
 				rate = cl->freq[bse_idx];
 				if (rate >= bse_freq)
 					break;
@@ -623,7 +577,7 @@ static int get_clock_corner_index(struct msm_vidc_core *core, u64 vpp_freq, u64 
 		}
 
 		if (tensilica_freq && !strcmp(cl->name, "video_cc_mvs0c_clk_src")) {
-			for (tns_idx = cl->freq_count - 1; tns_idx > 0; tns_idx--) {
+			for (tns_idx = cl->freq_count - 1; tns_idx >= 0; tns_idx--) {
 				rate = cl->freq[tns_idx];
 				if (rate >= tensilica_freq)
 					break;

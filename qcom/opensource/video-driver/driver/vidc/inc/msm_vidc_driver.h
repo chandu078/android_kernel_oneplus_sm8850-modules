@@ -474,15 +474,6 @@ static inline bool is_enc_slice_delivery_mode(struct msm_vidc_inst *inst)
 			inst->capabilities[DELIVERY_MODE].value);
 }
 
-static inline bool is_multi_view_session(struct msm_vidc_inst *inst)
-{
-	return (inst->codec == MSM_VIDC_HEVC &&
-		(inst->capabilities[PROFILE].value ==
-		V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN_MULTIVIEW ||
-		inst->capabilities[PROFILE].value ==
-		V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN_10_MULTIVIEW));
-}
-bool is_ubwc_supported_platform(struct msm_vidc_inst *inst);
 const char *cap_name(enum msm_vidc_inst_capability_type cap_id);
 const char *v4l2_pixelfmt_name(struct msm_vidc_inst *inst, u32 pixelfmt);
 const char *v4l2_type_name(u32 port);
@@ -725,10 +716,6 @@ struct context_bank_info
 	*msm_vidc_get_context_bank_for_device(struct msm_vidc_core *core, struct device *dev);
 bool msm_vidc_check_input_fence_allowed(struct msm_vidc_inst *inst);
 int msm_vidc_pvm_event_handler(void *p);
-int msm_vidc_qbuf_cache_operation(struct msm_vidc_inst *inst,
-	struct msm_vidc_buffer *buf);
-int msm_vidc_dqbuf_cache_operation(struct msm_vidc_inst *inst,
-	struct msm_vidc_buffer *buf);
 
 #endif // _MSM_VIDC_DRIVER_H_
 

@@ -14,62 +14,6 @@ ddk_headers(
 )
 
 ddk_headers(
-    name = "hamoa_headers",
-    hdrs = glob([
-      "driver/platform/hamoa/inc/*.h",
-    ]),
-    includes = ["driver/platform/hamoa/inc"]
-)
-
-ddk_headers(
-    name = "hamoa_la_headers",
-    hdrs = glob([
-      "driver/platform/hamoa/inc/*.h",
-    ]),
-    includes = ["driver/platform/hamoa/inc"]
-)
-
-ddk_headers(
-    name = "chora_headers",
-    hdrs = glob([
-      "driver/platform/chora/inc/*.h",
-    ]),
-    includes = ["driver/platform/chora/inc"]
-)
-
-ddk_headers(
-    name = "ravelin_headers",
-    hdrs = glob([
-      "driver/platform/ravelin/inc/*.h",
-    ]),
-    includes = ["driver/platform/ravelin/inc"]
-)
-
-ddk_headers(
-    name = "bourtzi_headers",
-    hdrs = glob([
-      "driver/platform/bourtzi/inc/*.h",
-    ]),
-    includes = ["driver/platform/bourtzi/inc"]
-)
-
-ddk_headers(
-    name = "iris2_headers",
-    hdrs = glob([
-      "driver/variant/iris2/inc/*.h",
-    ]),
-    includes = ["driver/variant/iris2/inc"]
-)
-
-ddk_headers(
-    name = "ar50lt_headers",
-    hdrs = glob([
-      "driver/variant/ar50lt/inc/*.h",
-    ]),
-    includes = ["driver/variant/ar50lt/inc"]
-)
-
-ddk_headers(
     name = "niobe_headers",
     hdrs = glob([
       "driver/platform/niobe/inc/*.h",
@@ -118,27 +62,11 @@ ddk_headers(
 )
 
 ddk_headers(
-    name = "malabar_headers",
-    hdrs = glob([
-      "driver/platform/malabar/inc/*.h",
-    ]),
-    includes = ["driver/platform/malabar/inc"]
-)
-
-ddk_headers(
     name = "alor_headers",
     hdrs = glob([
       "driver/platform/alor/inc/*.h",
     ]),
     includes = ["driver/platform/alor/inc"]
-)
-
-ddk_headers(
-    name = "shikra_headers",
-    hdrs = glob([
-      "driver/platform/shikra/inc/*.h",
-    ]),
-    includes = ["driver/platform/shikra/inc"]
 )
 
 ddk_headers(
@@ -177,7 +105,7 @@ ddk_headers(
 
 ddk_headers(
     name = "video_driver_headers",
-    hdrs = [":uapi_headers", "hamoa_headers", "hamoa_la_headers", "niobe_headers", "pineapple_headers", "ravelin_headers", "bourtzi_headers", "sun_headers", "canoe_headers", "seraph_headers", "alor_headers", "chora_headers", "malabar_headers", "shikra_headers", "ar50lt_headers", "iris2_headers", "iris3_headers", "iris33_headers", "iris35_headers", "iris4_headers", "vidc_headers"]
+    hdrs = [":uapi_headers", "niobe_headers", "pineapple_headers", "sun_headers", "canoe_headers", "seraph_headers", "alor_headers", "iris3_headers", "iris33_headers", "iris35_headers", "iris4_headers", "vidc_headers"]
 )
 
 load(":target.bzl", "define_target_modules")

@@ -321,11 +321,9 @@ static u32 __get_hfi_subcache_type(u32 llcc_id)
 	case LLCC_VIDDEC:
 		subcache_type = HFI_BUF_SUBCACHE_VIDSC_DECODE;
 		break;
-#ifdef CONFIG_MSM_VIDC_LLCC
 	case LLCC_VIDEO_APV:
 		subcache_type = HFI_BUF_SUBCACHE_VIDEO_APV;
 		break;
-#endif
 #endif
 	default:
 		d_vpr_e("%s: Invalid llcc_id %u\n", __func__, llcc_id);
@@ -1094,9 +1092,6 @@ int venus_hfi_core_deinit(struct msm_vidc_core *core, bool force)
 	 */
 	if (msm_vidc_fw_dump)
 		fw_coredump(core);
-
-	if (core->capabilities[FW_UNLOAD].value)
-		venus_hfi_queue_deinit(core);
 
 	return 0;
 }

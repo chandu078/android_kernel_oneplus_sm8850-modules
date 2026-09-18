@@ -181,7 +181,7 @@ struct msm_vidc_compat_handle {
 	const char *compat;
 	int (*get_platform_data)(struct msm_vidc_core *core);
 	int (*init_platform)(struct msm_vidc_core *core);
-	int (*init_vpu)(struct msm_vidc_core *core);
+	int (*init_iris)(struct msm_vidc_core *core);
 };
 
 struct msm_vidc_csc_coeff {
@@ -216,9 +216,6 @@ enum vpu_version {
 	VPU_VERSION_IRIS33_2P, // IRIS3 2 PIPE
 	VPU_VERSION_IRIS2_2P, // IRIS2 2 PIPE
 	VPU_VERSION_IRIS4_1P, // IRIS4 1 PIPE
-	VENUS_VERSION_AR50LT_V1,
-	VENUS_VERSION_AR50LT_V2,
-	VPU_VERSION_IRIS2_1P, //IRIS2 1 PIPE
 };
 
 struct msm_vidc_platform_data {
@@ -228,7 +225,6 @@ struct msm_vidc_platform_data {
 	unsigned int regulator_tbl_size;
 	struct pd_table *pd_tbl;
 	unsigned int pd_tbl_size;
-	unsigned int gdsc_hw_ctrl_by_default;
 	const char * const *opp_tbl;
 	unsigned int opp_tbl_size;
 	struct dev_pm_domain_list *opp_pmdomain_tbl;
@@ -278,10 +274,6 @@ struct msm_vidc_platform_data {
 	unsigned int psc_av1_tbl_size;
 	const u32 *psc_mpeg2_tbl;
 	unsigned int psc_mpeg2_tbl_size;
-	const u32 *enc_input_prop;
-	unsigned int enc_input_prop_size;
-	const u32 *enc_output_prop;
-	unsigned int enc_output_prop_size;
 	const u32 *dec_input_prop_avc;
 	unsigned int dec_input_prop_size_avc;
 	const u32 *dec_input_prop_hevc;
@@ -348,7 +340,6 @@ static inline bool is_mmrm_supported(struct msm_vidc_core *core)
 }
 
 int msm_vidc_init_platform_capabilities(struct msm_vidc_core *core);
-enum msm_vidc_hw_version msm_vidc_get_hw_version(void);
 int msm_vidc_read_efuse(struct msm_vidc_core *core);
 
 /* control framework support functions */
@@ -370,8 +361,6 @@ int msm_vidc_packetize_control(struct msm_vidc_inst *inst,
 			       enum msm_vidc_inst_capability_type cap_id, u32 payload_type,
 			       void *hfi_val, u32 payload_size, const char *func);
 int msm_vidc_adjust_bitrate(void *instance, struct v4l2_ctrl *ctrl);
-int msm_vidc_adjust_bitrate_apv(void *instance, struct v4l2_ctrl *ctrl);
-int msm_vidc_adjust_constant_quality(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_layer_bitrate(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_bitrate_mode(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_entropy_mode(void *instance, struct v4l2_ctrl *ctrl);
@@ -463,7 +452,5 @@ int msm_vidc_adjust_lookahead_encode_enable(void *instance, struct v4l2_ctrl *ct
 int msm_vidc_adjust_lookahead_encode_size(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_set_lookahead_encode_size(void *instance, enum msm_vidc_inst_capability_type cap_id);
 int msm_vidc_adjust_log_mode(void *instance, struct v4l2_ctrl *ctrl);
-int msm_vidc_adjust_bitdepth(void *instance, struct v4l2_ctrl *ctrl);
-int msm_vidc_adjust_req_sync_frame(void *instance, struct v4l2_ctrl *ctrl);
 
 #endif // _MSM_VIDC_PLATFORM_H_

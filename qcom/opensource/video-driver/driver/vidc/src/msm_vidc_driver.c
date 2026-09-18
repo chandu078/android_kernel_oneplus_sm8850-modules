@@ -1196,147 +1196,6 @@ bool res_is_less_than_or_equal_to(u32 width, u32 height,
 		return false;
 }
 
-bool is_ubwc_supported_platform(struct msm_vidc_inst *inst)
-{
-	u32 formats = inst->capabilities[PIX_FMTS].step_or_mask;
-	enum msm_vidc_colorformat_type colorformat;
-	u32 i = 0;
-
-	for (i = 0; i <= 31; i++) {
-		if (formats & BIT(i)) {
-			colorformat = formats & BIT(i);
-			if (colorformat == MSM_VIDC_FMT_NV12C ||
-				colorformat == MSM_VIDC_FMT_TP10C ||
-				colorformat == MSM_VIDC_FMT_RGBA8888C) {
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
-int msm_vidc_qbuf_cache_operation(struct msm_vidc_inst *inst,
-	struct msm_vidc_buffer *buf)
-{
-	int rc = 0;
-	struct msm_vidc_core *core;
-	enum msm_memory_cache_op_type cache_op_type;
-	u32 offset, data_size;
-
-	if (!inst || !buf) {
-		d_vpr_e("%s: Invalid params\n", __func__);
-		return -EINVAL;
-	}
-	core = inst->core;
-
-	/* skip cache operations on coherent systems */
-	if (!core->capabilities[CACHE_OPS_REQUIRED].value)
-		return 0;
-
-	if (is_decode_session(inst)) {
-		switch (buf->type) {
-		case MSM_VIDC_BUF_INPUT:
-		case MSM_VIDC_BUF_INPUT_META:
-			cache_op_type = MSM_MEM_CACHE_CLEAN_INVALIDATE;
-			break;
-		case MSM_VIDC_BUF_OUTPUT_META:
-			cache_op_type = MSM_MEM_CACHE_CLEAN_INVALIDATE;
-			break;
-		case MSM_VIDC_BUF_OUTPUT:
-			cache_op_type = MSM_MEM_CACHE_INVALIDATE;
-			break;
-		default:
-			i_vpr_e(inst, "%s: invalid driver buffer type %d\n",
-				__func__, buf->type);
-			return -EINVAL;
-		}
-	} else if (is_encode_session(inst)) {
-		switch (buf->type) {
-		case MSM_VIDC_BUF_INPUT:
-		case MSM_VIDC_BUF_INPUT_META:
-			cache_op_type = MSM_MEM_CACHE_CLEAN_INVALIDATE;
-			break;
-		case MSM_VIDC_BUF_OUTPUT:
-			cache_op_type = MSM_MEM_CACHE_INVALIDATE;
-			break;
-		case MSM_VIDC_BUF_OUTPUT_META:
-			cache_op_type = MSM_MEM_CACHE_INVALIDATE;
-			break;
-		default:
-			i_vpr_e(inst, "%s: invalid driver buffer type %d\n",
-				__func__, buf->type);
-			return -EINVAL;
-		}
-	} else {
-		i_vpr_e(inst, "%s: invalid session type %d\n", __func__, inst->domain);
-		return -EINVAL;
-	}
-
-	offset = buf->data_offset;
-	data_size = buf->buffer_size - buf->data_offset;
-
-	rc = call_mem_op(core, memory_cache, inst, buf->dmabuf, cache_op_type,
-				offset, data_size);
-	if (rc)
-		print_vidc_buffer(VIDC_ERR, "err ", "qbuf cache ops failed", inst, buf);
-
-	return rc;
-}
-
-int msm_vidc_dqbuf_cache_operation(struct msm_vidc_inst *inst,
-	struct msm_vidc_buffer *buf)
-{
-	int rc = 0;
-	enum msm_memory_cache_op_type cache_op_type = MSM_MEM_CACHE_INVALIDATE;
-	bool skip = false;
-	struct msm_vidc_core *core;
-	u32 offset, data_size;
-
-	if (!inst || !buf) {
-		d_vpr_e("%s: Invalid params\n", __func__);
-		return -EINVAL;
-	}
-	core = inst->core;
-
-	/* skip cache operations on coherent systems */
-	if (!core->capabilities[CACHE_OPS_REQUIRED].value)
-		return 0;
-
-	if (is_decode_session(inst) || is_encode_session(inst)) {
-		switch (buf->type) {
-		case MSM_VIDC_BUF_INPUT:
-			skip = true;
-			break;
-		case MSM_VIDC_BUF_OUTPUT:
-		case MSM_VIDC_BUF_INPUT_META:
-		case MSM_VIDC_BUF_OUTPUT_META:
-			cache_op_type = MSM_MEM_CACHE_INVALIDATE;
-			break;
-		default:
-			i_vpr_e(inst, "%s: invalid driver buffer type %d\n",
-				__func__, buf->type);
-			return -EINVAL;
-		}
-	} else {
-		i_vpr_e(inst, "%s: invalid session type %d\n", __func__, inst->domain);
-		return -EINVAL;
-	}
-
-	/* skip caching for input buffer done(both encode & decode session) */
-	if (skip)
-		return 0;
-
-	offset = buf->data_offset;
-	data_size = buf->buffer_size - buf->data_offset;
-
-	rc = call_mem_op(core, memory_cache, inst, buf->dmabuf, cache_op_type,
-				offset, data_size);
-	if (rc)
-		print_vidc_buffer(VIDC_ERR, "err ", "dqbuf cache ops failed", inst, buf);
-
-	return rc;
-}
-
 int signal_session_msg_receipt(struct msm_vidc_inst *inst,
 	enum signal_session_response cmd)
 {
@@ -2081,10 +1940,6 @@ int msm_vidc_get_control(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 	case CODED_FRAMES:
 		ctrl->val = inst->capabilities[CODED_FRAMES].value;
 		i_vpr_h(inst, "%s: coded frames: %d\n", __func__, ctrl->val);
-		break;
-	case PROFILE:
-		ctrl->val = inst->capabilities[PROFILE].value;
-		i_vpr_h(inst, "%s: profile: %d\n", __func__, ctrl->val);
 		break;
 	case LEVEL:
 		ctrl->val = inst->capabilities[LEVEL].value;
@@ -3201,12 +3056,6 @@ static int msm_vidc_queue_buffer(struct msm_vidc_inst *inst, struct msm_vidc_buf
 	if (rc)
 		return rc;
 
-	/* if cache ops fails ignore the error */
-	msm_vidc_qbuf_cache_operation(inst, buf);
-
-	if (meta)
-		msm_vidc_qbuf_cache_operation(inst, meta);
-
 	if (msm_vidc_is_super_buffer(inst) && is_input_buffer(buf->type))
 		rc = venus_hfi_queue_super_buffer(inst, buf, meta);
 	else if (is_input_buffer(buf->type))
@@ -3654,9 +3503,6 @@ int msm_vidc_vb2_buffer_done(struct msm_vidc_inst *inst,
 	struct vb2_v4l2_buffer *vbuf;
 	bool found;
 
-	/* if cache ops fails ignore the error */
-	 msm_vidc_dqbuf_cache_operation(inst, buf);
-
 	type = v4l2_type_from_driver(buf->type, __func__);
 	if (!type)
 		return -EINVAL;
@@ -3961,7 +3807,7 @@ int msm_vidc_remove_session(struct msm_vidc_inst *inst)
 
 	core_lock(core, __func__);
 	list_for_each_entry_safe(i, temp, &core->instances, list) {
-		if (i == inst) {
+		if (i->session_id == inst->session_id) {
 			list_move_tail(&i->list, &core->dangling_instances);
 			i_vpr_h(inst, "%s: removed session %#x\n",
 				__func__, i->session_id);
@@ -3981,20 +3827,11 @@ int msm_vidc_remove_dangling_session(struct msm_vidc_inst *inst)
 	struct msm_vidc_core *core;
 	u32 count = 0, dcount = 0;
 
-	if (!inst) {
-		d_vpr_e("%s: Invalid instance\n", __func__);
-		return -EINVAL;
-	}
-
 	core = inst->core;
-	if (!core) {
-		d_vpr_e("%s: session is probably cleaned up\n", __func__);
-		return 0;
-	}
 
 	core_lock(core, __func__);
 	list_for_each_entry_safe(i, temp, &core->dangling_instances, list) {
-		if (i == inst) {
+		if (i->session_id == inst->session_id) {
 			list_del_init(&i->list);
 			i_vpr_h(inst, "%s: removed dangling session %#x\n",
 				__func__, i->session_id);
@@ -4334,12 +4171,6 @@ static int update_inst_cap_dependency(
 	return 0;
 }
 
-static void msm_vidc_devm_free_inst_caps(void *inst_caps)
-{
-	if (inst_caps)
-		kvfree(inst_caps);
-}
-
 int msm_vidc_init_instance_caps(struct msm_vidc_core *core)
 {
 	int rc = 0;
@@ -4381,20 +4212,10 @@ int msm_vidc_init_instance_caps(struct msm_vidc_core *core)
 	core->dec_codecs_count = dec_codecs_count;
 
 	codecs_count = enc_codecs_count + dec_codecs_count;
-	core->inst_caps = kvcalloc(codecs_count,
-			sizeof(struct msm_vidc_inst_capability), GFP_KERNEL);
+	core->inst_caps = devm_kzalloc(&core->pdev->dev,
+		codecs_count * sizeof(struct msm_vidc_inst_capability), GFP_KERNEL);
 	if (!core->inst_caps) {
 		d_vpr_e("%s: failed to alloc memory for instance caps\n", __func__);
-		rc = -ENOMEM;
-		goto error;
-	}
-
-	if (devm_add_action_or_reset(&core->pdev->dev,
-			msm_vidc_devm_free_inst_caps,
-			core->inst_caps)) {
-		d_vpr_e("%s: add action or reset failed for instance caps\n", __func__);
-		kvfree(core->inst_caps);
-		core->inst_caps = NULL;
 		rc = -ENOMEM;
 		goto error;
 	}
@@ -6014,11 +5835,9 @@ u32 msm_vidc_get_max_bitrate(struct msm_vidc_inst *inst)
 		max_bitrate = min(max_bitrate,
 			(u32)inst->capabilities[LOWLATENCY_MAX_BITRATE].max);
 
-	if (inst->capabilities[ALL_INTRA].value) {
+	if (inst->capabilities[ALL_INTRA].value)
 		max_bitrate = min(max_bitrate,
 			(u32)inst->capabilities[ALLINTRA_MAX_BITRATE].max);
-		goto exit;
-	}
 
 	if (inst->codec == MSM_VIDC_HEVC) {
 		max_bitrate = min(max_bitrate,
@@ -6035,8 +5854,6 @@ u32 msm_vidc_get_max_bitrate(struct msm_vidc_inst *inst)
 		max_bitrate = min_t(u32, max_bitrate,
 			inst->capabilities[BIT_RATE].max);
 	}
-
-exit:
 	if (max_bitrate == 0x7fffffff || !max_bitrate)
 		max_bitrate = min(max_bitrate, (u32)inst->capabilities[BIT_RATE].max);
 
@@ -6235,8 +6052,8 @@ static int msm_vidc_check_max_sessions(struct msm_vidc_inst *inst)
 					       1088 + (1088 >> 1))) {
 			num_4k_sessions += 1;
 			num_1080p_sessions += 2;
-		} else if (res_is_greater_than(width, height, 1280 + (1280 >> 2),
-					       736 + (736 >> 2))) {
+		} else if (res_is_greater_than(width, height, 1280 + (1280 >> 1),
+					       736 + (736 >> 1))) {
 			num_1080p_sessions += 1;
 		}
 	}

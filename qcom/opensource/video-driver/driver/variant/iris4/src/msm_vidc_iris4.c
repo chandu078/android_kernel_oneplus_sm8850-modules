@@ -167,7 +167,6 @@ typedef enum {
  */
 #define NOC_BASE_OFFS                                      0x00010000
 #define NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_MAINCTL_LOW   (NOC_BASE_OFFS + 0xA008)
-#define NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRVLD_LOW    (NOC_BASE_OFFS + 0xA010)
 #define NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRCLR_LOW    (NOC_BASE_OFFS + 0xA018)
 #define NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG0_LOW   (NOC_BASE_OFFS + 0xA020)
 #define NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG0_HIGH  (NOC_BASE_OFFS + 0xA024)
@@ -338,8 +337,7 @@ static int __program_bootup_registers_iris4(struct msm_vidc_core *core)
 	}
 
 	/* Based on below register programming, firmware WA for canoe-v2 would be enabled */
-	if (of_device_is_compatible(dev->of_node, "qcom,canoe-vidc-v2")
-			|| of_device_is_compatible(dev->of_node, "qcom,canoe-vidc-v3")) {
+	if (of_device_is_compatible(dev->of_node, "qcom,canoe-vidc-v2")) {
 		rc = __write_register(core, WRAPPER_IRIS_VCODEC_VPU_WRAPPER_SPARE_0_IRIS4, 0x1);
 		if (rc)
 			return rc;
@@ -587,8 +585,7 @@ fail_read_efuse:
 static int __power_off_iris4_hardware(struct msm_vidc_core *core)
 {
 	int rc = 0, i = 0;
-	u32 value = 0, mvp_noc_reset_value = 0, vcodec_idle_status = 0;
-
+	u32 value = 0;
 	bool pwr_collapsed = false;
 	u32 count = 0;
 
@@ -606,7 +603,7 @@ static int __power_off_iris4_hardware(struct msm_vidc_core *core)
 				__func__, core->sub_state_name);
 			goto disable_power;
 		} else {
-			d_vpr_h("%s: video hw is power ON, try power collpase hw %s\n",
+			d_vpr_e("%s: video hw is power ON, try power collpase hw %s\n",
 				__func__, core->sub_state_name);
 		}
 	}
@@ -632,13 +629,8 @@ static int __power_off_iris4_hardware(struct msm_vidc_core *core)
 	 * add MNoC idle check before collapsing MVS0 per HPG update
 	 * poll for VCODEC_SS_IDLE_STATUS -> HPG 3.4.4
 	 */
-	if (is_vpu_iris4_1p(core))
-		vcodec_idle_status = 0x7101;
-	else
-		vcodec_idle_status = 0x7103;
-
 	rc = __read_register_with_poll_timeout(core, VCODEC_SS_IDLE_STATUSn_IRIS4,
-			vcodec_idle_status, vcodec_idle_status, 2000, 20000);
+			0x7103, 0x7103, 2000, 20000);
 	if (rc)
 		d_vpr_e("%s: VCODEC_SS_IDLE_STATUS (%d) is not idle (%#x)\n",
 			__func__, i, value);
@@ -679,34 +671,24 @@ static int __power_off_iris4_hardware(struct msm_vidc_core *core)
 
 	rc = __read_register_with_poll_timeout(core, AON_WRAPPER_MVP_NOC_LPI_STATUS_IRIS4,
 					       0x1, 0x1, 200, 2000);
- 	if (rc)
- 		d_vpr_e("%s: AON_WRAPPER_MVP_NOC_LPI_CONTROL_IRIS4 failed1\n", __func__);
- 
- 	rc = __write_register_masked(core, AON_WRAPPER_MVP_NOC_LPI_CONTROL_IRIS4,
- 					0x0, BIT(0));
- 	if (rc)
- 		return rc;
+	if (rc)
+		d_vpr_e("%s: AON_WRAPPER_MVP_NOC_LPI_CONTROL_IRIS4 failed1\n", __func__);
 
-	/*
-	 * In case of alor since APV
-	 * ports is not present MVP_NOC_RESET request
-	 * should be programmed with a different value
-	 */
-	if (is_vpu_iris4_1p(core))
-		mvp_noc_reset_value = 0x50003;
-	else
-		mvp_noc_reset_value = 0x070103;
+	rc = __write_register_masked(core, AON_WRAPPER_MVP_NOC_LPI_CONTROL_IRIS4,
+					0x0, BIT(0));
+	if (rc)
+		return rc;
 
-	rc = __write_register(core, AON_WRAPPER_MVP_NOC_RESET_REQ_IRIS4, mvp_noc_reset_value);
+	rc = __write_register(core, AON_WRAPPER_MVP_NOC_RESET_REQ_IRIS4, 0x070103);
 	if (rc)
 		return rc;
 
 	rc = __read_register_with_poll_timeout(core, AON_WRAPPER_MVP_NOC_RESET_ACK_IRIS4,
-					       0xffffffff, mvp_noc_reset_value, 200, 2000);
+					       0xffffffff, 0x070103, 200, 2000);
 	if (rc)
 		d_vpr_e("%s: AON_WRAPPER_MVP_NOC_RESET_ACK_IRIS4 failed1\n", __func__);
 
-	rc = __write_register(core, AON_WRAPPER_MVP_NOC_RESET_SYNCRST_IRIS4, mvp_noc_reset_value);
+	rc = __write_register(core, AON_WRAPPER_MVP_NOC_RESET_SYNCRST_IRIS4 , 0x070103);
 	if (rc)
 		return rc;
 
@@ -920,37 +902,34 @@ static int __power_off_iris4_controller(struct msm_vidc_core *core)
 		return rc;
 
 	rc = call_res_op(core, clk_disable, core, "gcc_video_axi1_clk");
- 	if (rc) {
- 		d_vpr_e("%s: disable unprepare gcc_video_axi1_clk failed\n", __func__);
- 		rc = 0;
- 	}
- 
- 	rc = call_res_op(core, clk_disable, core, "gcc_video_axi0_clk");
- 	if (rc) {
- 		d_vpr_e("%s: disable unprepare gcc_video_axi0_clk failed\n", __func__);
- 		rc = 0;
- 	}
- 
- 	rc = call_res_op(core, clk_disable, core, "video_cc_mvs0c_freerun_clk");
- 	if (rc) {
- 		d_vpr_e("%s: disable unprepare video_cc_mvs0c_freerun_clk failed\n", __func__);
- 		rc = 0;
- 	}
- 
- 	rc = call_res_op(core, clk_disable, core, "video_cc_mvs0_freerun_clk");
- 	if (rc) {
- 		d_vpr_e("%s: disable unprepare video_cc_mvs0_freerun_clk failed\n", __func__);
- 		rc = 0;
- 	}
+	if (rc) {
+		d_vpr_e("%s: disable unprepare gcc_video_axi1_clk failed\n", __func__);
+		rc = 0;
+	}
 
- 	rc = call_res_op(core, clk_disable, core, "video_cc_mvs0c_clk");
- 	if (rc) {
- 		d_vpr_e("%s: disable unprepare video_cc_mvs0c_clk failed\n", __func__);
- 		rc = 0;
- 	}
+	rc = call_res_op(core, clk_disable, core, "gcc_video_axi0_clk");
+	if (rc) {
+		d_vpr_e("%s: disable unprepare gcc_video_axi0_clk failed\n", __func__);
+		rc = 0;
+	}
 
-	if (is_vpu_iris4_1p(core))
-		goto exit;
+	rc = call_res_op(core, clk_disable, core, "video_cc_mvs0c_freerun_clk");
+	if (rc) {
+		d_vpr_e("%s: disable unprepare video_cc_mvs0c_freerun_clk failed\n", __func__);
+		rc = 0;
+	}
+
+	rc = call_res_op(core, clk_disable, core, "video_cc_mvs0_freerun_clk");
+	if (rc) {
+		d_vpr_e("%s: disable unprepare video_cc_mvs0_freerun_clk failed\n", __func__);
+		rc = 0;
+	}
+
+	rc = call_res_op(core, clk_disable, core, "video_cc_mvs0c_clk");
+	if (rc) {
+		d_vpr_e("%s: disable unprepare video_cc_mvs0c_clk failed\n", __func__);
+		rc = 0;
+	}
 
 	rc = call_res_op(core, reset_control_assert, core, "video_axi1_reset");
 	if (rc)
@@ -985,7 +964,7 @@ static int __power_off_iris4_controller(struct msm_vidc_core *core)
 	rc = call_res_op(core, reset_control_deassert, core, "video_axi1_reset");
 	if (rc)
 		d_vpr_e("%s: deassert video_axi1_reset failed\n", __func__);
-exit:
+
 	return rc;
 }
 
@@ -1132,29 +1111,29 @@ static int __power_on_iris4_hardware(struct msm_vidc_core *core)
 	return 0;
 
 fail_clk_vpp1:
- 	if (is_hw_enabled(core, "vpp0") && !(value & BIT(29)))
- 		call_res_op(core, clk_disable, core, "video_cc_mvs0_vpp0_clk");
+	if (is_hw_enabled(core, "vpp0") && !(value & BIT(29)))
+		call_res_op(core, clk_disable, core, "video_cc_mvs0_vpp0_clk");
 fail_clk_vpp0:
- 	call_res_op(core, clk_disable, core, "video_cc_mvs0b_clk");
+	call_res_op(core, clk_disable, core, "video_cc_mvs0b_clk");
 fail_clk_bse_controller:
- 	call_res_op(core, clk_disable, core, "video_cc_mvs0_clk");
+	call_res_op(core, clk_disable, core, "video_cc_mvs0_clk");
 fail_clk_controller:
- 	call_res_op(core, clk_disable, core, "video_cc_mvs0_freerun_clk");
+	call_res_op(core, clk_disable, core, "video_cc_mvs0_freerun_clk");
 fail_clk_freerun:
- 	call_res_op(core, clk_disable, core, "gcc_video_axi0_clk");
+	call_res_op(core, clk_disable, core, "gcc_video_axi0_clk");
 fail_clk_axi:
 fail_sw_ctrl:
- 	if (is_hw_enabled(core, "vpp1") && (!is_vpu_iris4_1p(core) || !(value & BIT(28))))
- 		call_res_op(core, gdsc_off, core, "vpp1");
+	if (is_hw_enabled(core, "vpp1") && (!is_vpu_iris4_1p(core) || !(value & BIT(28))))
+		call_res_op(core, gdsc_off, core, "vpp1");
 fail_regulator_vpp1:
- 	if (is_hw_enabled(core, "vpp0") && !(value & BIT(29)))
- 		call_res_op(core, gdsc_off, core, "vpp0");
+	if (is_hw_enabled(core, "vpp0") && !(value & BIT(29)))
+		call_res_op(core, gdsc_off, core, "vpp0");
 fail_regulator_vpp0:
 fail_read_efuse:
 fail_power_on_substate:
- 	call_res_op(core, gdsc_off, core, "vcodec");
+	call_res_op(core, gdsc_off, core, "vcodec");
 fail_regulator:
- 	return rc;
+	return rc;
 }
 
 static int __power_on_iris4_apv(struct msm_vidc_core *core)
@@ -1335,144 +1314,6 @@ static int __watchdog_iris4(struct msm_vidc_core *core, u32 intr_status)
 	return rc;
 }
 
-static int __reset_assert_deassert(struct msm_vidc_core *core)
-{
-	int rc = 0;
-
-	rc = call_res_op(core, reset_control_assert, core, "video_axi1_reset");
-	if (rc)
-		d_vpr_e("%s: assert video_axi1_reset failed\n", __func__);
-
-	rc = call_res_op(core, reset_control_assert, core, "video_axi0_reset");
-	if (rc)
-		d_vpr_e("%s: assert video_axi0_reset failed\n", __func__);
-
-	rc = call_res_op(core, reset_control_assert, core, "video_mvs0c_freerun_reset");
-	if (rc)
-		d_vpr_e("%s: assert video_mvs0c_reset failed\n", __func__);
-
-	rc = call_res_op(core, reset_control_assert, core, "video_mvs0_freerun_reset");
-	if (rc)
-		d_vpr_e("%s: assert video_mvs0_reset failed\n", __func__);
-
-	rc = call_res_op(core, reset_control_assert, core, "video_cc_xo_ares_reset");
-	if (rc)
-		d_vpr_e("%s: assert video_cc_xo_ares_reset failed\n", __func__);
-
-	rc = call_res_op(core, reset_control_assert, core, "gcc_video_xo_ares_reset");
-	if (rc)
-		d_vpr_e("%s: assert gcc_video_xo_ares_reset failed\n", __func__);
-
-	usleep_range(400, 500);
-
-	rc = call_res_op(core, reset_control_deassert, core, "gcc_video_xo_ares_reset");
-	if (rc)
-		d_vpr_e("%s: deassert gcc_video_xo_ares_reset failed\n", __func__);
-
-	rc = call_res_op(core, reset_control_deassert, core, "video_cc_xo_ares_reset");
-	if (rc)
-		d_vpr_e("%s: deassert video_cc_xo_ares_reset failed\n", __func__);
-
-	rc = call_res_op(core, reset_control_deassert, core, "video_mvs0_freerun_reset");
-	if (rc)
-		d_vpr_e("%s: deassert video_mvs0_reset failed\n", __func__);
-
-	rc = call_res_op(core, reset_control_deassert, core, "video_mvs0c_freerun_reset");
-	if (rc)
-		d_vpr_e("%s: deassert video_mvs0c_reset failed\n", __func__);
-
-	rc = call_res_op(core, reset_control_deassert, core, "video_axi0_reset");
-	if (rc)
-		d_vpr_e("%s: deassert video_axi0_reset failed\n", __func__);
-
-	rc = call_res_op(core, reset_control_deassert, core, "video_axi1_reset");
-	if (rc)
-		d_vpr_e("%s: deassert video_axi1_reset failed\n", __func__);
-
-	return rc;
-}
-
-static int __noc_error_info_iris4_1p(struct msm_vidc_core *core)
-{
-	u32 value, intr_status = 0, err_vld_status = 0;
-	int rc = 0;
-
-	rc = __write_register_masked(core, NOC_SIDEBANDMANAGER_MAIN_SIDEBANDMANAGER_FAULTINEN0_LOW,
-				0x1, BIT(0));
-	if (rc)
-		return rc;
-
-	rc = __write_register_masked(core, NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_MAINCTL_LOW, 0x1, BIT(0));
-	if (rc)
-		return rc;
-
-	rc = __write_register_masked(core, WRAPPER_INTR_MASK_IRIS4, 0x0, BIT(5));
-	if (rc)
-		return rc;
-
-	rc = __read_register(core, WRAPPER_INTR_STATUS_IRIS4, &intr_status);
-	if (rc)
-		return rc;
-
-	if (intr_status & BIT(5)) {
-		rc = __read_register(core, NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRVLD_LOW, &err_vld_status);
-		if (rc) {
-			d_vpr_e("%s: Failed to read NOC error valid status\n", __func__);
-			return rc;
-		}
-
-		if (err_vld_status & BIT(0)) {
-			rc = __read_register(core, NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG0_LOW, &value);
-			if (!rc)
-				d_vpr_e("%s: NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG0_LOW: %#x\n", __func__, value);
-
-			rc = __read_register(core, NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG0_HIGH, &value);
-			if (!rc)
-				d_vpr_e("%s: NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG0_HIGH: %#x\n",
-								 __func__, value);
-
-			rc = __read_register(core, NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG1_LOW, &value);
-			if (!rc)
-				d_vpr_e("%s: NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG1_LOW: %#x\n",
-								__func__, value);
-
-			rc = __read_register(core, NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG1_HIGH, &value);
-			if (!rc)
-				d_vpr_e("%s: NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG1_HIGH: %#x\n",
-								__func__, value);
-
-			rc = __read_register(core, NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG2_LOW, &value);
-			if (!rc)
-				d_vpr_e("%s: NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG2_LOW: %#x\n",
-								__func__, value);
-
-			rc = __read_register(core, NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG2_HIGH, &value);
-			if (!rc)
-				d_vpr_e("%s: NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG2_HIGH: %#x\n",
-								__func__, value);
-
-			rc = __read_register(core, NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG3_LOW, &value);
-			if (!rc)
-				d_vpr_e("%s: NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG3_LOW: %#x\n",
-								__func__, value);
-
-			rc = __read_register(core, NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG3_HIGH, &value);
-			if (!rc)
-				d_vpr_e("%s: NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG3_HIGH: %#x\n",
-								__func__, value);
-		}
-	}
-
-	__power_off_iris4_hardware(core);
-	__power_off_iris4_controller(core);
-	__reset_assert_deassert(core);
-	__power_on_iris4_controller(core);
-	__power_on_iris4_hardware(core);
-	__set_registers(core);
-
-	return rc;
-}
-
 static int __noc_error_info_iris4(struct msm_vidc_core *core)
 {
 	u32 value;
@@ -1480,12 +1321,6 @@ static int __noc_error_info_iris4(struct msm_vidc_core *core)
 
 	if (is_iris4_hw_power_collapsed(core)) {
 		d_vpr_e("%s: video hardware already power collapsed\n", __func__);
-		return rc;
-	}
-
-	/* Decoupled power off and noc error recovery for iris4 1p */
-	if(is_vpu_iris4_1p(core)) {
-		rc = __noc_error_info_iris4_1p(core);
 		return rc;
 	}
 
@@ -2051,7 +1886,6 @@ static struct msm_vidc_session_ops msm_session_ops = {
 	.decide_work_mode = msm_vidc_decide_work_mode_iris4,
 	.decide_quality_mode = msm_vidc_decide_quality_mode_iris4,
 	.decide_scaling = msm_vidc_decide_scaling_iris4,
-	.decide_slice_max_mb = msm_vidc_encoder_decide_slice_max_mb_iris4,
 };
 
 int msm_vidc_init_iris4(struct msm_vidc_core *core)

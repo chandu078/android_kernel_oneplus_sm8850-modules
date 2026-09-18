@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _MSM_VIDC_INTERNAL_H_
@@ -81,7 +81,7 @@ enum msm_vidc_metadata_bits {
 
 enum msm_vidc_log_encode_mode {
 	MSM_VIDC_LOG_VIDEO_TYPE_NONE    = 0x0,
-	MSM_VIDC_LOG_VIDEO_TYPE_HDR  = 0x1,
+	MSM_VIDC_LOG_VIDEO_TYPE_COMMON  = 0x1,
 };
 
 #define MSM_VIDC_METADATA_SIZE             (4 * 4096) /* 16 KB */
@@ -150,7 +150,6 @@ enum msm_vidc_log_encode_mode {
 #define ENC_FPS_WINDOW 3
 #define DEC_FPS_WINDOW 10
 #define INPUT_TIMER_LIST_SIZE 30
-#define PICTURE_TYPE_SIZE 30
 
 #define DEFAULT_COMPLEXITY 50
 
@@ -191,7 +190,6 @@ enum msm_vidc_log_encode_mode {
 #define BUFFER_ALIGNMENT_SIZE(x) x
 #define NUM_MBS_360P (((480 + 15) >> 4) * ((360 + 15) >> 4))
 #define NUM_MBS_720P (((1280 + 15) >> 4) * ((720 + 15) >> 4))
-#define NUM_MBS_FHD (((1920 + 15) >> 4) * ((1080 + 15) >> 4))
 #define NUM_MBS_4k (((4096 + 15) >> 4) * ((2304 + 15) >> 4))
 #define MB_SIZE_IN_PIXEL (16 * 16)
 
@@ -448,7 +446,6 @@ enum msm_vidc_log_encode_mode {
 	CAP(NUM_COMV)                             \
 	CAP(SIGNAL_COLOR_INFO)                    \
 	CAP(OPEN_GOP)                             \
-	CAP(MULTI_SLICE_MULTI_TILE_MODE)          \
 	CAP(CAPTURE_DATA_OFFSET)                  \
 	CAP(HEIF_TILES)                           \
 	CAP(CORE_ID_MASK)                         \
@@ -697,7 +694,6 @@ enum msm_vidc_core_capability_type {
 	SUPPORTS_DEEPSLEEP,
 	NUM_VPU,
 	SKIP_DELAYED_UNMAP,
-	CACHE_OPS_REQUIRED,
 	CORE_CAP_MAX,
 };
 
@@ -894,17 +890,6 @@ struct msm_vidc_hfi_frame_info {
 	bool                   av1_non_uniform_tile_spacing;
 	u64                    fence_id[MAX_FENCE_COUNT];
 	u32                    fence_count;
-};
-
-struct msm_vidc_picture_type_entry {
-	u32                    frame_num;
-	u32                    picture_type;
-};
-
-struct msm_vidc_picture_type_q {
-	struct msm_vidc_picture_type_entry entries[PICTURE_TYPE_SIZE];
-	u32                                head;
-	u32                                count;
 };
 
 struct msm_vidc_decode_vpp_delay {

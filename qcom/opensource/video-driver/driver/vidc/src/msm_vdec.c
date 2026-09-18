@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <media/v4l2-event.h>
@@ -287,7 +287,7 @@ static int msm_vdec_set_bit_depth(struct msm_vidc_inst *inst,
 {
 	int rc = 0;
 	u32 pix_fmt;
-	u32 bitdepth = BIT_DEPTH_8;
+	u32 bitdepth = 8 << 16 | 8;
 	enum msm_vidc_colorformat_type colorformat;
 
 	if (port != INPUT_PORT && port != OUTPUT_PORT) {
@@ -298,7 +298,7 @@ static int msm_vdec_set_bit_depth(struct msm_vidc_inst *inst,
 	pix_fmt = inst->fmts[OUTPUT_PORT].fmt.pix_mp.pixelformat;
 	colorformat = v4l2_colorformat_to_driver(inst, pix_fmt, __func__);
 	if (is_10bit_colorformat(colorformat))
-		bitdepth = BIT_DEPTH_10;
+		bitdepth = 10 << 16 | 10;
 
 	inst->subcr_params[port].bit_depth = bitdepth;
 	msm_vidc_update_cap_value(inst, BIT_DEPTH, bitdepth, __func__);
@@ -1491,9 +1491,6 @@ static int msm_vdec_read_input_subcr_params(struct msm_vidc_inst *inst)
 	/* update output port info */
 	inst->fw_min_count = subsc_params.fw_min_count;
 
-	if (subsc_params.bit_depth == BIT_DEPTH_10)
-		inst->fmts[OUTPUT_PORT].fmt.pix_mp.pixelformat = V4L2_PIX_FMT_P010;
-
 	/* decide scaling needs fw_min_count, crop, input port resolution */
 	call_session_op(core, decide_scaling, inst);
 
@@ -1524,11 +1521,7 @@ static int msm_vdec_read_input_subcr_params(struct msm_vidc_inst *inst)
 		extra_count, inst, MSM_VIDC_BUF_OUTPUT);
 	inst->buffers.output_meta.min_count = inst->buffers.output.min_count;
 	inst->buffers.output_meta.extra_count = inst->buffers.output.extra_count;
-	/*
-	 * ignore the thumbnail min count check for VP9 and interlace cases
-	 */
-	if (is_thumbnail_session(inst) && inst->codec != MSM_VIDC_VP9 &&
-	    !(inst->capabilities[CODED_FRAMES].value && CODED_FRAMES_INTERLACE)) {
+	if (is_thumbnail_session(inst) && inst->codec != MSM_VIDC_VP9) {
 		if (inst->buffers.output.min_count != 1) {
 			i_vpr_e(inst, "%s: invalid min count %d in thumbnail case\n",
 				__func__, inst->buffers.output.min_count);
@@ -1888,7 +1881,6 @@ int msm_vdec_streamon_output(struct msm_vidc_inst *inst)
 	}
 
 	if (inst->capabilities[CODED_FRAMES].value == CODED_FRAMES_INTERLACE &&
-		is_ubwc_supported_platform(inst) &&
 		!is_ubwc_colorformat(inst->capabilities[PIX_FMTS].value)) {
 		i_vpr_e(inst,
 			"%s: interlace with non-ubwc color format is unsupported\n",
@@ -2225,7 +2217,6 @@ int msm_vdec_start_cmd(struct msm_vidc_inst *inst)
 	vb2_clear_last_buffer_dequeued(inst->bufq[OUTPUT_PORT].vb2q);
 
 	if (inst->capabilities[CODED_FRAMES].value == CODED_FRAMES_INTERLACE &&
-		is_ubwc_supported_platform(inst) &&
 		!is_ubwc_colorformat(inst->capabilities[PIX_FMTS].value)) {
 		i_vpr_e(inst,
 			"%s: interlace with non-ubwc color format is unsupported\n",
@@ -2294,23 +2285,19 @@ int msm_vdec_try_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 	if (f->type == INPUT_MPLANE) {
 		pix_fmt = v4l2_codec_to_driver(inst, f->fmt.pix_mp.pixelformat, __func__);
 		if (!pix_fmt) {
-			i_vpr_e(inst, "%s: unsupported codec: 0x%x\n",
-					__func__, f->fmt.pix_mp.pixelformat);
+			i_vpr_e(inst, "%s: unsupported codec, set current params\n", __func__);
 			f->fmt.pix_mp.width = inst->fmts[INPUT_PORT].fmt.pix_mp.width;
 			f->fmt.pix_mp.height = inst->fmts[INPUT_PORT].fmt.pix_mp.height;
 			f->fmt.pix_mp.pixelformat = inst->fmts[INPUT_PORT].fmt.pix_mp.pixelformat;
 			pix_fmt = v4l2_codec_to_driver(inst, f->fmt.pix_mp.pixelformat, __func__);
-			rc = -EINVAL;
 		}
 	} else if (f->type == OUTPUT_MPLANE) {
 		pix_fmt = v4l2_colorformat_to_driver(inst, f->fmt.pix_mp.pixelformat, __func__);
 		if (!pix_fmt) {
-			i_vpr_e(inst, "%s: unsupported format: 0x%x\n",
-					__func__, f->fmt.pix_mp.pixelformat);
+			i_vpr_e(inst, "%s: unsupported format, set current params\n", __func__);
 			f->fmt.pix_mp.pixelformat = inst->fmts[OUTPUT_PORT].fmt.pix_mp.pixelformat;
 			f->fmt.pix_mp.width = inst->fmts[OUTPUT_PORT].fmt.pix_mp.width;
 			f->fmt.pix_mp.height = inst->fmts[OUTPUT_PORT].fmt.pix_mp.height;
-			rc = -EINVAL;
 		}
 		if (inst->bufq[INPUT_PORT].vb2q->streaming && !is_image_decode_session(inst)) {
 			f->fmt.pix_mp.height = inst->fmts[INPUT_PORT].fmt.pix_mp.height;
@@ -2676,8 +2663,7 @@ static int msm_vdec_check_colorformat_supported(struct msm_vidc_inst *inst,
 	/*
 	 * bit_depth 8 bit supports 8 bit colorformats only
 	 * bit_depth 10 bit supports 10 bit colorformats only
-	 * interlace supports ubwc colorformats only for
-	 * ubwc supported platforms.
+	 * interlace supports ubwc colorformats only
 	 */
 	if (inst->capabilities[BIT_DEPTH].value == BIT_DEPTH_8 &&
 		!is_8bit_colorformat(colorformat))
@@ -2687,7 +2673,6 @@ static int msm_vdec_check_colorformat_supported(struct msm_vidc_inst *inst,
 		supported = false;
 	if (inst->capabilities[CODED_FRAMES].value ==
 		CODED_FRAMES_INTERLACE &&
-		is_ubwc_supported_platform(inst) &&
 		!is_ubwc_colorformat(colorformat))
 		supported = false;
 
@@ -2819,8 +2804,7 @@ int msm_vdec_inst_init(struct msm_vidc_inst *inst)
 	f = &inst->fmts[OUTPUT_PORT];
 	f->type = OUTPUT_MPLANE;
 	f->fmt.pix_mp.pixelformat =
-		v4l2_colorformat_from_driver(inst,
-		core->inst_caps[MSM_VIDC_H264].cap[PIX_FMTS].value, __func__);
+		v4l2_colorformat_from_driver(inst, MSM_VIDC_FMT_NV12C, __func__);
 	colorformat = v4l2_colorformat_to_driver(inst,
 		f->fmt.pix_mp.pixelformat, __func__);
 	f->fmt.pix_mp.width = video_y_stride_pix(colorformat, DEFAULT_WIDTH);

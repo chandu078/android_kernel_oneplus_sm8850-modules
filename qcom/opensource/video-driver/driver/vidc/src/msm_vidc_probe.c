@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of_platform.h>
@@ -33,7 +33,6 @@
 #include <linux/reboot.h>
 
 #define BASE_DEVICE_NUMBER 32
-#define DMA_MASK (0xe0000000 - 1)
 
 struct msm_vidc_core *g_core;
 
@@ -54,18 +53,10 @@ static inline bool is_video_device(struct device *dev)
 		of_device_is_compatible(dev->of_node, "qcom,sm8750-vidc-v2") ||
 		of_device_is_compatible(dev->of_node, "qcom,canoe-vidc") ||
 		of_device_is_compatible(dev->of_node, "qcom,canoe-vidc-v2") ||
-		of_device_is_compatible(dev->of_node, "qcom,canoe-vidc-v3") ||
 		of_device_is_compatible(dev->of_node, "qcom,seraph-vidc") ||
 		of_device_is_compatible(dev->of_node, "qcom,sa8797-vidc") ||
 		of_device_is_compatible(dev->of_node, "qcom,niobe-vidc") ||
-		of_device_is_compatible(dev->of_node, "qcom,alor-vidc") ||
-		of_device_is_compatible(dev->of_node, "qcom,x1e80100-vidc") ||
-		of_device_is_compatible(dev->of_node, "qcom,sa8775p-iris") ||
-		of_device_is_compatible(dev->of_node, "qcom,chora-vidc") ||
-		of_device_is_compatible(dev->of_node, "qcom,msm-vidc-ravelin") ||
-		of_device_is_compatible(dev->of_node, "qcom,msm-vidc-bourtzi") ||
-		of_device_is_compatible(dev->of_node, "qcom,malabar-vidc") ||
-		of_device_is_compatible(dev->of_node, "qcom,msm-vidc-shikra"));
+		of_device_is_compatible(dev->of_node, "qcom,alor-vidc"));
 }
 
 static inline bool is_video_context_bank_device_node(struct device_node *of_node)
@@ -154,20 +145,12 @@ static const struct of_device_id msm_vidc_dt_match[] = {
 	{.compatible = "qcom,sm8750-vidc-v2"},
 	{.compatible = "qcom,canoe-vidc"},
 	{.compatible = "qcom,canoe-vidc-v2"},
-	{.compatible = "qcom,canoe-vidc-v3"},
 	{.compatible = "qcom,seraph-vidc"},
 	{.compatible = "qcom,alor-vidc"},
-	{.compatible = "qcom,chora-vidc"},
 	{.compatible = "qcom,sa8797-vidc"},
 	{.compatible = "qcom,cliffs-vidc"},
 	{.compatible = "qcom,volcano-vidc"},
 	{.compatible = "qcom,niobe-vidc"},
-	{.compatible = "qcom,x1e80100-vidc"},
-	{.compatible = "qcom,sa8775p-iris"},
-	{.compatible = "qcom,msm-vidc-ravelin"},
-	{.compatible = "qcom,msm-vidc-bourtzi"},
-	{.compatible = "qcom,malabar-vidc"},
-	{.compatible = "qcom,msm-vidc-shikra"},
 	{.compatible = "qcom,vidc,cb-ns-pxl"},
 	{.compatible = "qcom,vidc,cb-ns"},
 	{.compatible = "qcom,vidc,cb-ns-bitstream"},
@@ -431,7 +414,7 @@ static int msm_vidc_initialize_core(struct msm_vidc_core *core)
 	}
 
 	core->response_packet = devm_kzalloc(&core->pdev->dev, core->packet_size, GFP_KERNEL);
-	if (!core->response_packet) {
+	if (!core->packet) {
 		d_vpr_e("%s: failed to alloc core response packet\n", __func__);
 		rc = -ENOMEM;
 		goto exit;
@@ -649,12 +632,10 @@ static int msm_vidc_component_master_bind(struct device *dev)
 
 	d_vpr_h("%s(): %s\n", __func__, dev_name(dev));
 
-	if (core->cb_count) {
-		rc = component_bind_all(dev, core);
-		if (rc) {
-			d_vpr_e("%s: sub-device bind failed. rc %d\n", __func__, rc);
-			return rc;
-		}
+	rc = component_bind_all(dev, core);
+	if (rc) {
+		d_vpr_e("%s: sub-device bind failed. rc %d\n", __func__, rc);
+		return rc;
 	}
 
 	rc = msm_vidc_initialize_media(core);
@@ -710,9 +691,7 @@ static void msm_vidc_component_master_unbind(struct device *dev)
 	synchronize_irq(core->resource->irq);
 	venus_hfi_queue_deinit(core);
 	msm_vidc_deinitialize_media(core);
-	if (core->cb_count)
-		component_unbind_all(dev, core);
-
+	component_unbind_all(dev, core);
 
 	d_vpr_h("%s(): successful\n", __func__);
 }
@@ -745,19 +724,15 @@ static int msm_vidc_remove_video_device(struct platform_device *pdev)
 	d_vpr_h("%s()\n", __func__);
 
 	/* destroy component master and deallocate match data */
-	if (core->cb_count) {
-		component_master_del(&pdev->dev, &msm_vidc_component_master_ops);
+	component_master_del(&pdev->dev, &msm_vidc_component_master_ops);
 
-		d_vpr_h("depopulating sub devices\n");
-		/*
-		 * Trigger remove for each sub-device i.e. qcom,context-bank,xxxx
-		 * When msm_vidc_remove is called for each sub-device, destroy
-		 * context-bank mappings.
-		 */
-		of_platform_depopulate(&pdev->dev);
-	} else {
-		msm_vidc_component_master_unbind(&pdev->dev);
-	}
+	d_vpr_h("depopulating sub devices\n");
+	/*
+	 * Trigger remove for each sub-device i.e. qcom,context-bank,xxxx
+	 * When msm_vidc_remove is called for each sub-device, destroy
+	 * context-bank mappings.
+	 */
+	of_platform_depopulate(&pdev->dev);
 
 	sysfs_remove_group(&pdev->dev.kobj, &msm_vidc_core_attr_group);
 	call_fence_op(core, fence_deregister, core);
@@ -835,41 +810,13 @@ static struct notifier_block msm_vidc_reboot_nb = {
 };
 #endif
 
-static int msm_vidc_probe_without_context_bank(struct platform_device *pdev,
-					       struct msm_vidc_core *core)
-{
-	int rc = 0;
-	struct context_bank_info *cb = NULL;
-
-	venus_hfi_for_each_context_bank(core, cb) {
-		cb->dev = &pdev->dev;
-		cb->domain = iommu_get_domain_for_dev(cb->dev);
-		if (!cb->domain) {
-			d_vpr_e("%s: Failed to get iommu domain for %s\n",
-				__func__, dev_name(cb->dev));
-			return -EIO;
-		}
-		iommu_set_fault_handler(cb->domain, msm_vidc_smmu_fault_handler, (void *)core);
-	}
-
-	dma_set_mask_and_coherent(&pdev->dev, DMA_MASK);
-	dma_set_max_seg_size(&pdev->dev, (unsigned int)DMA_BIT_MASK(32));
-	dma_set_seg_boundary(&pdev->dev, (unsigned long)DMA_BIT_MASK(64));
-	rc = msm_vidc_component_master_bind(&pdev->dev);
-	if (rc < 0) {
-		d_vpr_e("%s: component master bind failed\n", __func__);
-		return rc;
-	}
-	d_vpr_h("%s(): successful\n", __func__);
-	return rc;
-}
-
 static int msm_vidc_probe_video_device(struct platform_device *pdev)
 {
 	int rc = 0;
 	struct component_match *match = NULL;
 	struct msm_vidc_core *core = NULL;
 	struct device_node *child = NULL;
+	int cb_count = 0;
 
 	d_vpr_h("%s: %s\n", __func__, dev_name(&pdev->dev));
 
@@ -879,13 +826,6 @@ static int msm_vidc_probe_video_device(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 	g_core = core;
-
-	/* Allot session ID as 0x1F000000 here and increment sequentially
-	 * by 1 in msm_vidc_open()
-	 */
-	core->session_id = 0x1F000000;
-
-	core->hw_version = MSM_VIDC_HW_VERSION_V1;
 
 	core->pdev = pdev;
 	dev_set_drvdata(&pdev->dev, core);
@@ -973,21 +913,10 @@ static int msm_vidc_probe_video_device(struct platform_device *pdev)
 		}
 
 		/* count context bank devices */
-		core->cb_count++;
+		cb_count++;
 	}
 
-	d_vpr_h("populating sub devices. count %d\n", core->cb_count);
-
-	if (!(core->cb_count)) {
-		rc = msm_vidc_probe_without_context_bank(pdev, core);
-		if (rc) {
-			d_vpr_e("%s: component master bind failed\n", __func__);
-			goto init_group_failed;
-		}
-		d_vpr_h("%s(): successful\n", __func__);
-		return rc;
-	}
-
+	d_vpr_h("populating sub devices. count %d\n", cb_count);
 	/*
 	 * Trigger probe for each sub-device i.e. qcom,msm-vidc,context-bank.
 	 * When msm_vidc_probe is called for each sub-device, parse the
@@ -999,23 +928,20 @@ static int msm_vidc_probe_video_device(struct platform_device *pdev)
 		d_vpr_e("Failed to trigger probe for sub-devices\n");
 		goto sub_dev_failed;
 	}
+
 	/**
-	 * create and try to bring up aggregate device for master
-	 * if sub nodes available in device tree.
+	 * create and try to bring up aggregate device for master.
 	 * match is a component_match_array and acts as a placeholder for
 	 * components added via component_add().
 	 */
-	if (!match) {
-		d_vpr_e("match is null.\n");
-		goto master_add_failed;
-	}
-
 	rc = component_master_add_with_match(&pdev->dev, &msm_vidc_component_master_ops, match);
 	if (rc) {
 		d_vpr_e("%s: component master add with match failed\n", __func__);
 		goto master_add_failed;
 	}
+
 	d_vpr_h("%s(): successful\n", __func__);
+
 	return rc;
 
 master_add_failed:

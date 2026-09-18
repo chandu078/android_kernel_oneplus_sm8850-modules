@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _MSM_VIDC_CORE_H_
@@ -38,7 +38,6 @@ struct msm_vidc_venus_ops {
 	int (*sw_ctrl_gdsc)(struct msm_vidc_core *core);
 	int (*scm_mem_protect)(struct msm_vidc_core *core);
 	int (*enable_intr)(struct msm_vidc_core *core);
-	int (*setup_ucregion_memmap)(struct msm_vidc_core *core);
 };
 
 struct msm_vidc_md_ops {
@@ -78,11 +77,6 @@ struct msm_vidc_core_power {
 	u32 clk_freq_idx;
 	u64 bw_ddr;
 	u64 bw_llcc;
-};
-
-enum msm_vidc_hw_version {
-	MSM_VIDC_HW_VERSION_V1 = 1, // chipset versions v1
-	MSM_VIDC_HW_VERSION_V2 = 2, // chipset versions v2
 };
 
 struct msm_vidc_core {
@@ -153,10 +147,6 @@ struct msm_vidc_core {
 	u32                                    packet_id;
 	u32                                    sys_init_id;
 	struct msm_vidc_synx_fence_data        synx_fence_data;
-	/* hw_version: distinguish chip versions: v1, v2 */
-	enum msm_vidc_hw_version               hw_version;
-	int                                    cb_count;
-	u32                                    session_id;
 };
 
 #endif // _MSM_VIDC_CORE_H_

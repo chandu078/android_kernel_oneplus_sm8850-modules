@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <media/v4l2-event.h>
@@ -441,10 +441,7 @@ static int msm_venc_set_ring_buffer_count(struct msm_vidc_inst *inst)
 
 static int msm_venc_set_input_properties(struct msm_vidc_inst *inst)
 {
-	int i, j, num_input_set_prop = 0, rc = 0;
-	const u32 *input_set_prop;
-	struct msm_vidc_core *core;
-
+	int i, j, rc = 0;
 	static const struct msm_venc_prop_type_handle prop_type_handle_arr[] = {
 		{HFI_PROP_COLOR_FORMAT,               msm_venc_set_colorformat                 },
 		{HFI_PROP_RAW_RESOLUTION,             msm_venc_set_raw_resolution              },
@@ -454,30 +451,10 @@ static int msm_venc_set_input_properties(struct msm_vidc_inst *inst)
 	};
 
 	i_vpr_h(inst, "%s()\n", __func__);
-
-	core = inst->core;
-	if (!core->platform) {
-		i_vpr_e(inst, "%s: platform data not initialized\n", __func__);
-		return -EINVAL;
-	}
-
-	if (!core->platform->data.enc_input_prop ||
-	    core->platform->data.enc_input_prop_size == 0) {
-		input_set_prop = msm_venc_input_set_prop;
-		num_input_set_prop = ARRAY_SIZE(msm_venc_input_set_prop);
-		i_vpr_h(inst, "%s: default num_input_set_prop %d\n",
-			__func__, num_input_set_prop);
-	} else {
-		input_set_prop = core->platform->data.enc_input_prop;
-		num_input_set_prop = core->platform->data.enc_input_prop_size;
-		i_vpr_h(inst, "%s: num_input_set_prop %d\n",
-			__func__, num_input_set_prop);
-	}
-
-	for (i = 0; i < num_input_set_prop; i++) {
+	for (i = 0; i < ARRAY_SIZE(msm_venc_input_set_prop); i++) {
 		/* set session input properties */
 		for (j = 0; j < ARRAY_SIZE(prop_type_handle_arr); j++) {
-			if (prop_type_handle_arr[j].type == input_set_prop[i]) {
+			if (prop_type_handle_arr[j].type == msm_venc_input_set_prop[i]) {
 				rc = prop_type_handle_arr[j].handle(inst, INPUT_PORT);
 				if (rc)
 					goto exit;
@@ -488,7 +465,7 @@ static int msm_venc_set_input_properties(struct msm_vidc_inst *inst)
 		/* is property type unknown ? */
 		if (j == ARRAY_SIZE(prop_type_handle_arr))
 			i_vpr_e(inst, "%s: unknown property %#x\n", __func__,
-				input_set_prop[i]);
+				msm_venc_input_set_prop[i]);
 	}
 
 exit:
@@ -497,41 +474,17 @@ exit:
 
 static int msm_venc_set_output_properties(struct msm_vidc_inst *inst)
 {
-	int i, j, num_output_set_prop = 0, rc = 0;
-	const u32 *output_set_prop;
-	struct msm_vidc_core *core;
-
+	int i, j, rc = 0;
 	static const struct msm_venc_prop_type_handle prop_type_handle_arr[] = {
 		{HFI_PROP_BITSTREAM_RESOLUTION,       msm_venc_set_bitstream_resolution    },
 		{HFI_PROP_CROP_OFFSETS,               msm_venc_set_crop_offsets            },
 	};
 
 	i_vpr_h(inst, "%s()\n", __func__);
-
-	core = inst->core;
-	if (!core->platform) {
-		i_vpr_e(inst, "%s: platform data not initialized\n", __func__);
-		return -EINVAL;
-	}
-
-	if (!core->platform->data.enc_output_prop ||
-	    core->platform->data.enc_output_prop_size == 0) {
-		output_set_prop = msm_venc_output_set_prop;
-		num_output_set_prop = ARRAY_SIZE(msm_venc_output_set_prop);
-		i_vpr_h(inst, "%s: default num_output_set_prop %d\n",
-			__func__, num_output_set_prop);
-	} else {
-		output_set_prop = core->platform->data.enc_output_prop;
-		num_output_set_prop = core->platform->data.enc_output_prop_size;
-		i_vpr_h(inst, "%s: num_output_set_prop %d\n",
-			__func__, num_output_set_prop);
-
-	}
-
-	for (i = 0; i < num_output_set_prop; i++) {
+	for (i = 0; i < ARRAY_SIZE(msm_venc_output_set_prop); i++) {
 		/* set session output properties */
 		for (j = 0; j < ARRAY_SIZE(prop_type_handle_arr); j++) {
-			if (prop_type_handle_arr[j].type == output_set_prop[i]) {
+			if (prop_type_handle_arr[j].type == msm_venc_output_set_prop[i]) {
 				rc = prop_type_handle_arr[j].handle(inst, OUTPUT_PORT);
 				if (rc)
 					goto exit;
@@ -542,7 +495,7 @@ static int msm_venc_set_output_properties(struct msm_vidc_inst *inst)
 		/* is property type unknown ? */
 		if (j == ARRAY_SIZE(prop_type_handle_arr))
 			i_vpr_e(inst, "%s: unknown property %#x\n", __func__,
-				output_set_prop[i]);
+				msm_venc_output_set_prop[i]);
 	}
 
 exit:
@@ -1099,24 +1052,20 @@ int msm_venc_try_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 	if (f->type == INPUT_MPLANE) {
 		pix_fmt = v4l2_colorformat_to_driver(inst, f->fmt.pix_mp.pixelformat, __func__);
 		if (!pix_fmt) {
-			i_vpr_e(inst, "%s: unsupported format: 0x%x\n",
-					__func__, f->fmt.pix_mp.pixelformat);
+			i_vpr_e(inst, "%s: unsupported format, set current params\n", __func__);
 			f->fmt.pix_mp.pixelformat = inst->fmts[INPUT_PORT].fmt.pix_mp.pixelformat;
 			f->fmt.pix_mp.width = inst->fmts[INPUT_PORT].fmt.pix_mp.width;
 			f->fmt.pix_mp.height = inst->fmts[INPUT_PORT].fmt.pix_mp.height;
 			pix_fmt = v4l2_colorformat_to_driver(inst,
 				f->fmt.pix_mp.pixelformat, __func__);
-			rc = -EINVAL;
 		}
 	} else if (f->type == OUTPUT_MPLANE) {
 		pix_fmt = v4l2_codec_to_driver(inst, f->fmt.pix_mp.pixelformat, __func__);
 		if (!pix_fmt) {
-			i_vpr_e(inst, "%s: unsupported codec: 0x%x\n",
-					__func__, f->fmt.pix_mp.pixelformat);
+			i_vpr_e(inst, "%s: unsupported codec, set current params\n", __func__);
 			f->fmt.pix_mp.width = inst->fmts[OUTPUT_PORT].fmt.pix_mp.width;
 			f->fmt.pix_mp.height = inst->fmts[OUTPUT_PORT].fmt.pix_mp.height;
 			f->fmt.pix_mp.pixelformat = inst->fmts[OUTPUT_PORT].fmt.pix_mp.pixelformat;
-			rc = -EINVAL;
 		}
 	} else if (f->type == INPUT_META_PLANE) {
 		f->fmt.meta.dataformat = inst->fmts[INPUT_META_PORT].fmt.meta.dataformat;
@@ -1859,8 +1808,7 @@ int msm_venc_inst_init(struct msm_vidc_inst *inst)
 	f = &inst->fmts[INPUT_PORT];
 	f->type = INPUT_MPLANE;
 	f->fmt.pix_mp.pixelformat =
-			v4l2_colorformat_from_driver(inst,
-			core->inst_caps[MSM_VIDC_H264].cap[PIX_FMTS].value, __func__);
+		v4l2_colorformat_from_driver(inst, MSM_VIDC_FMT_NV12C, __func__);
 	f->fmt.pix_mp.width = DEFAULT_WIDTH;
 	f->fmt.pix_mp.height = DEFAULT_HEIGHT;
 	f->fmt.pix_mp.num_planes = 1;

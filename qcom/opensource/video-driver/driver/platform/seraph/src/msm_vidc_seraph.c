@@ -785,12 +785,6 @@ static struct msm_platform_inst_capability instance_cap_data_seraph[] = {
 		HFI_PROP_EARLY_NOTIFY_FENCE_COUNT,
 		CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED},
 
-	{MULTI_SLICE_MULTI_TILE_MODE, ENC, HEVC,
-		0, 1, 1, 0,
-		V4L2_CID_MPEG_VIDEO_VIDC_MULTI_SLICE_MULTI_TILE,
-		HFI_PROP_MULTI_SLICE_MULTI_TILE,
-		CAP_FLAG_OUTPUT_PORT},
-
 	{HEADER_MODE, ENC, H264 | HEVC | HEIC,
 		V4L2_MPEG_VIDEO_HEADER_MODE_SEPARATE,
 		V4L2_MPEG_VIDEO_HEADER_MODE_JOINED_WITH_1ST_FRAME,
@@ -1786,7 +1780,7 @@ static struct msm_platform_inst_capability instance_cap_data_seraph[] = {
 		HFI_PROP_CODED_FRAMES,
 		CAP_FLAG_VOLATILE},
 
-	{BIT_DEPTH, DEC | ENC, CODECS_ALL, BIT_DEPTH_8, BIT_DEPTH_10, 1, BIT_DEPTH_8,
+	{BIT_DEPTH, DEC, CODECS_ALL, BIT_DEPTH_8, BIT_DEPTH_10, 1, BIT_DEPTH_8,
 		0,
 		HFI_PROP_LUMA_CHROMA_BIT_DEPTH},
 
@@ -2205,22 +2199,18 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_sera
 	 */
 
 	{PIX_FMTS, ENC, H264,
-		{IR_PERIOD, CSC, BIT_DEPTH}},
+		{IR_PERIOD, CSC}},
 
 	{PIX_FMTS, ENC, HEVC,
 		{PROFILE, MIN_FRAME_QP, MAX_FRAME_QP, I_FRAME_QP, P_FRAME_QP,
 			B_FRAME_QP, MIN_QUALITY, BLUR_TYPES, IR_PERIOD,
-			LTR_COUNT, CSC, BIT_DEPTH}},
+			LTR_COUNT, CSC}},
 
 	{PIX_FMTS, ENC, HEIC,
-		{PROFILE, CSC, BIT_DEPTH}},
+		{PROFILE, CSC}},
 
 	{PIX_FMTS, DEC, HEVC | HEIC,
 		{PROFILE}},
-
-	{BIT_DEPTH, ENC, CODECS_ALL,
-		{0},
-		msm_vidc_adjust_bitdepth},
 
 	{FRAME_RATE, ENC, CODECS_ALL,
 		{LEVEL},
@@ -2333,11 +2323,6 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_sera
 	{EARLY_NOTIFY_FENCE_COUNT, DEC, H264|HEVC|AV1,
 		{0},
 		msm_vidc_adjust_early_notify_fence_count,
-		msm_vidc_set_u32},
-
-	{MULTI_SLICE_MULTI_TILE_MODE, ENC, HEVC,
-		{0},
-		NULL,
 		msm_vidc_set_u32},
 
 	{HEADER_MODE, ENC, H264 | HEVC | HEIC,

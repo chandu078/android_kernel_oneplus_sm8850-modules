@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/sort.h>
@@ -416,6 +416,7 @@ static int __init_power_domains(struct msm_vidc_core *core)
 #else
 	/* populate opp power domains(for rails) */
 	rc = devm_pm_opp_attach_genpd(&core->pdev->dev, opp_tbl, &opp_vdevs);
+	rc = -EINVAL;
 	if (rc)
 		return rc;
 
@@ -724,7 +725,6 @@ static int __init_context_banks(struct msm_vidc_core *core)
 	struct context_bank_info *cbinfo = NULL;
 	u32 cb_count = 0, cnt = 0;
 	int rc = 0;
-	bool is_dma_coherent = false;
 
 	cbs = &core->resource->context_bank_set;
 
@@ -759,13 +759,6 @@ static int __init_context_banks(struct msm_vidc_core *core)
 		cbs->context_bank_tbl[cnt].dma_coherant = cb_tbl[cnt].dma_coherant;
 		cbs->context_bank_tbl[cnt].region = cb_tbl[cnt].region;
 		cbs->context_bank_tbl[cnt].dma_mask = cb_tbl[cnt].dma_mask;
-		if (cbs->context_bank_tbl[cnt].dma_coherant)
-			is_dma_coherent = true;
-	}
-	/* dma coherency is enabled */
-	if (is_dma_coherent) {
-		core->capabilities[CACHE_OPS_REQUIRED].value = 0;
-		d_vpr_h("%s: dma buffer cache operations not required\n", __func__);
 	}
 
 	/* print context_bank fiels */
@@ -971,16 +964,18 @@ static int __disable_power_domains(struct msm_vidc_core *core, const char *name)
 
 static int __switch_gdsc_to_swmode(struct msm_vidc_core *core, struct power_domain_info *pdinfo)
 {
-	int rc = -EOPNOTSUPP;
+	int rc = 0;
 
+	if (core->venus_ops && core->venus_ops->switch_gdsc_mode) {
+		rc = call_venus_op(core, switch_gdsc_mode, core, true);
+	} else {
 #if (KERNEL_VERSION(6, 11, 0) <= LINUX_VERSION_CODE)
-	rc = dev_pm_genpd_set_hwmode(pdinfo->genpd_dev, false);
+		rc = dev_pm_genpd_set_hwmode(pdinfo->genpd_dev, false);
+#else
+		d_vpr_e("%s: unexpected %s\n", __func__, pdinfo->name);
+		rc = -EINVAL;
 #endif
-	if (rc == -EOPNOTSUPP) {
-		if (core->venus_ops && core->venus_ops->switch_gdsc_mode)
-			rc = call_venus_op(core, switch_gdsc_mode, core, true);
 	}
-
 	if (rc < 0) {
 		d_vpr_e("%s: failed to set sw mode: %s\n",
 			__func__, pdinfo->name);
@@ -1034,16 +1029,18 @@ static int __acquire_power_domains(struct msm_vidc_core *core)
 
 static int __switch_gdsc_to_hwmode(struct msm_vidc_core *core, struct power_domain_info *pdinfo)
 {
-	int rc = -EOPNOTSUPP;
+	int rc = 0;
 
+	if (core->venus_ops && core->venus_ops->switch_gdsc_mode) {
+		rc = call_venus_op(core, switch_gdsc_mode, core, false);
+	} else {
 #if (KERNEL_VERSION(6, 11, 0) <= LINUX_VERSION_CODE)
-	rc = dev_pm_genpd_set_hwmode(pdinfo->genpd_dev, true);
+		rc = dev_pm_genpd_set_hwmode(pdinfo->genpd_dev, true);
+#else
+		d_vpr_e("%s: unexpected %s\n", __func__, pdinfo->name);
+		rc = -EINVAL;
 #endif
-	if (rc == -EOPNOTSUPP) {
-		if (core->venus_ops && core->venus_ops->switch_gdsc_mode)
-			rc = call_venus_op(core, switch_gdsc_mode, core, false);
 	}
-
 	if (rc < 0) {
 		d_vpr_e("%s: failed to set hw mode: %s\n",
 			__func__, pdinfo->name);
@@ -1172,8 +1169,7 @@ static int llcc_enable(struct msm_vidc_core *core, bool enable)
 	return ret;
 }
 
-static int __vote_bandwidth(struct bus_info *bus, unsigned long bw_kbps,
-	unsigned long ib_kbps)
+static int __vote_bandwidth(struct bus_info *bus, unsigned long bw_kbps)
 {
 	int rc = 0;
 
@@ -1182,12 +1178,12 @@ static int __vote_bandwidth(struct bus_info *bus, unsigned long bw_kbps,
 		return -EINVAL;
 	}
 
-	d_vpr_p("Voting bus %s to ab %lu ib %lu kBps\n", bus->name, bw_kbps, ib_kbps);
+	d_vpr_p("Voting bus %s to ab %lu kBps\n", bus->name, bw_kbps);
 
-	rc = icc_set_bw(bus->icc, bw_kbps, ib_kbps);
+	rc = icc_set_bw(bus->icc, bw_kbps, 0);
 	if (rc)
-		d_vpr_e("Failed voting bus %s to ab %lu ib %lu, rc=%d\n",
-				bus->name, bw_kbps, ib_kbps, rc);
+		d_vpr_e("Failed voting bus %s to ab %lu, rc=%d\n",
+			bus->name, bw_kbps, rc);
 
 	return rc;
 }
@@ -1201,7 +1197,7 @@ static int __unvote_buses(struct msm_vidc_core *core)
 	core->power.bw_llcc = 0;
 
 	venus_hfi_for_each_bus(core, bus) {
-		rc = __vote_bandwidth(bus, 0, 0);
+		rc = __vote_bandwidth(bus, 0);
 		if (rc)
 			goto err_unknown_device;
 	}
@@ -1215,7 +1211,7 @@ static int __vote_buses(struct msm_vidc_core *core,
 {
 	int rc = 0;
 	struct bus_info *bus = NULL;
-	unsigned long bw_kbps = 0, ib_kbps = 0, bw_prev = 0;
+	unsigned long bw_kbps = 0, bw_prev = 0;
 	enum vidc_bus_type type;
 
 	venus_hfi_for_each_bus(core, bus) {
@@ -1243,13 +1239,8 @@ static int __vote_buses(struct msm_vidc_core *core,
 					bus->name, bw_kbps);
 				continue;
 			}
-			/* For other platforms, IB is set to 0 (AB-only voting) */
-			/* Here bw_kbps is ab_kbps */
-			if (core->platform->data.vpu_ver == VENUS_VERSION_AR50LT_V1 ||
-				core->platform->data.vpu_ver == VENUS_VERSION_AR50LT_V2)
-				ib_kbps = 2 * bw_kbps;
 
-			rc = __vote_bandwidth(bus, bw_kbps, ib_kbps);
+			rc = __vote_bandwidth(bus, bw_kbps);
 
 			if (type == DDR)
 				core->power.bw_ddr = bw_kbps;

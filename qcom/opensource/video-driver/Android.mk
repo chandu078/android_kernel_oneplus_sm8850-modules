@@ -18,7 +18,6 @@ ifeq ($(TARGET_VIDC_ENABLE),true)
 VIDEO_BLD_DIR := $(shell pwd)/vendor/qcom/opensource/video-driver
 VIDEO_SELECT := CONFIG_MSM_VIDC_V4L2=m
 VIDEO_SELECT += CONFIG_MSM_VIDC_ANDROID=m
-VIDEO_SELECT += CONFIG_MSM_VIDC_LLCC=m
 
 # Build msm_video.ko
 ###########################################################
@@ -29,25 +28,13 @@ KBUILD_OPTIONS += $(VIDEO_SELECT)
 KBUILD_OPTIONS += TARGET_BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 
 ifneq ($(TARGET_BOARD_PLATFORM),canoe)
-ifneq ($(TARGET_BOARD_PLATFORM),hamoa)
-ifneq ($(TARGET_BOARD_PLATFORM),malabar)
-ifneq ($(TARGET_BOARD_PLATFORM),shikra)
-ifneq ($(TARGET_BOARD_PLATFORM),hamoa_la)
-ifneq ($(TARGET_BOARD_PLATFORM),parrot)
 KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS+=$(shell pwd)/$(call intermediates-dir-for,DLKM,hw-fence-module-symvers)/Module.symvers
-endif
 ifneq ($(TARGET_BOARD_PLATFORM), gen5)
 KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS=$(shell pwd)/$(call intermediates-dir-for,DLKM,mmrm-module-symvers)/Module.symvers
-ifneq ($(TARGET_BOARD_PLATFORM),parrot)
 KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS+=$(shell pwd)/$(call intermediates-dir-for,DLKM,synx-driver-symvers)/synx-driver-symvers
-endif
-endif
 else
 ifeq ($(ENABLE_HYP), true)
 KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS=$(PWD)/$(call intermediates-dir-for,DLKM,virtio-video-symvers)/Module.symvers
-endif
-endif
-endif
 endif
 endif
 endif
@@ -61,6 +48,7 @@ include $(CLEAR_VARS)
 # For incremental compilation
 LOCAL_SRC_FILES           := $(wildcard $(LOCAL_PATH)/**/*) $(wildcard $(LOCAL_PATH)/*)
 LOCAL_MODULE              := msm_video.ko
+LOCAL_MULTILIB := first
 LOCAL_MODULE_KBUILD_NAME  := msm_video/msm_video.ko
 LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
@@ -70,35 +58,20 @@ LOCAL_MODULE_DDK_SUBTARGET_REGEX := "video.*"
 LOCAL_MODULE_KO_DIRS      := msm_video/msm_video.ko
 
 ifneq ($(TARGET_BOARD_PLATFORM),canoe)
-ifneq ($(TARGET_BOARD_PLATFORM),hamoa)
-ifneq ($(TARGET_BOARD_PLATFORM),malabar)
-ifneq ($(TARGET_BOARD_PLATFORM),shikra)
-ifneq ($(TARGET_BOARD_PLATFORM),hamoa_la)
-ifneq ($(TARGET_BOARD_PLATFORM),parrot)
 LOCAL_REQUIRED_MODULES    += hw-fence-module-symvers
-endif
 ifneq ($(TARGET_BOARD_PLATFORM), gen5)
 LOCAL_REQUIRED_MODULES    := mmrm-module-symvers
-ifneq ($(TARGET_BOARD_PLATFORM),parrot)
 LOCAL_REQUIRED_MODULES    += synx-driver-symvers
-endif
 LOCAL_ADDITIONAL_DEPENDENCIES := $(call intermediates-dir-for,DLKM,mmrm-module-symvers)/Module.symvers
-ifneq ($(TARGET_BOARD_PLATFORM),parrot)
 LOCAL_ADDITIONAL_DEPENDENCIES += $(call intermediates-dir-for,DLKM,synx-driver-symvers)/synx-driver-symvers
-endif
 else
 ifeq ($(ENABLE_HYP), true)
 LOCAL_REQUIRED_MODULES := virtio-video-symvers
 LOCAL_ADDITIONAL_DEPENDENCIES += $(call intermediates-dir-for,DLKM,virtio-video-symvers)/Module.symvers
 endif
 endif
-ifneq ($(TARGET_BOARD_PLATFORM),parrot)
 LOCAL_ADDITIONAL_DEPENDENCIES += $(call intermediates-dir-for,DLKM,hw-fence-module-symvers)/Module.symvers
 endif
-endif
-endif
-endif
-endif
-endif
+
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif

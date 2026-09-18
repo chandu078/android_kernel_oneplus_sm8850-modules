@@ -1583,7 +1583,7 @@ static struct msm_platform_inst_capability instance_cap_data_lemans[] = {
 		HFI_PROP_CODED_FRAMES,
 		CAP_FLAG_VOLATILE},
 
-	{BIT_DEPTH, DEC | ENC, CODECS_ALL, BIT_DEPTH_8, BIT_DEPTH_10, 1, BIT_DEPTH_8,
+	{BIT_DEPTH, DEC, CODECS_ALL, BIT_DEPTH_8, BIT_DEPTH_10, 1, BIT_DEPTH_8,
 		0,
 		HFI_PROP_LUMA_CHROMA_BIT_DEPTH},
 
@@ -1986,22 +1986,18 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_lema
 	 */
 
 	{PIX_FMTS, ENC, H264,
-		{META_ROI_INFO, IR_PERIOD, CSC, BIT_DEPTH}},
+		{META_ROI_INFO, IR_PERIOD, CSC}},
 
 	{PIX_FMTS, ENC, HEVC,
 		{PROFILE, MIN_FRAME_QP, MAX_FRAME_QP, I_FRAME_QP, P_FRAME_QP,
 			B_FRAME_QP, META_ROI_INFO, MIN_QUALITY, BLUR_TYPES, IR_PERIOD,
-			LTR_COUNT, CSC, BIT_DEPTH}},
+			LTR_COUNT, CSC}},
 
 	{PIX_FMTS, ENC, HEIC,
-		{PROFILE, CSC, BIT_DEPTH}},
+		{PROFILE, CSC}},
 
 	{PIX_FMTS, DEC, HEVC | HEIC,
 		{PROFILE}},
-
-	{BIT_DEPTH, ENC, CODECS_ALL,
-		{0},
-		msm_vidc_adjust_bitdepth},
 
 	{FRAME_RATE, ENC, CODECS_ALL,
 		{LEVEL},
@@ -2596,29 +2592,29 @@ static struct msm_vidc_format_capability format_data_lemans = {
 
 /* name, min_kbps, max_kbps */
 static const struct bw_table lemans_bw_table[] = {
-	{ "cpu-cfg",     1000, 1000     },
-	{ "video-mem",   1000, 15000000 },
+	{ "venus-cnoc",  1000, 1000     },
+	{ "venus-ddr",   1000, 15000000 },
 	{ "venus-llcc",  1000, 15000000 },
 };
 
 /* name, hw_trigger, hw_enable */
 static struct pd_table lemans_pd_table[] = {
-	{ "venus",     0, 1 },
-	{ "vcodec0",   1, 1 },
+	{ "iris-ctl", 0, 1 },
+	{ "vcodec",   1, 1 },
 };
 
 /* name, clock id, scaling */
 static const struct clk_table lemans_clk_table[] = {
-	{ "iface",                   GCC_VIDEO_AXI0_CLK,           0},
-	{ "core",                    VIDEO_CC_MVS0C_CLK,           0},
-	{ "vcodec0_core"             VIDEO_CC_MVS0_CLK,            0},
-	{ "video_cc_mvs0_clk_src",   VIDEO_CC_MVS0_CLK_SRC,        1,
+	{ "gcc_video_axi0",         GCC_VIDEO_AXI0_CLK,     0},
+	{ "core_clk",               VIDEO_CC_MVS0C_CLK,     0},
+	{ "vcodec_clk",             VIDEO_CC_MVS0_CLK,      0},
+	{ "video_cc_mvs0_clk_src",  VIDEO_CC_MVS0_CLK_SRC,  1,
 	 (u64[]) {560000000, 533000000, 444000000, 366000000, 338000000, 240000000}, 6},
 };
 
 /* name, exclusive_release */
 static const struct clk_rst_table lemans_clk_reset_table[] = {
-	{ "bus", 0 },
+	{ "video_axi_reset", 0 },
 };
 
 /* name, llcc_id */
@@ -2777,7 +2773,6 @@ static const struct msm_vidc_platform_data lemans_data = {
 	.bw_tbl_size = ARRAY_SIZE(lemans_bw_table),
 	.pd_tbl = lemans_pd_table,
 	.pd_tbl_size = ARRAY_SIZE(lemans_pd_table),
-	.gdsc_hw_ctrl_by_default = 1,
 	.clk_tbl = lemans_clk_table,
 	.clk_tbl_size = ARRAY_SIZE(lemans_clk_table),
 	.clk_rst_tbl = lemans_clk_reset_table,

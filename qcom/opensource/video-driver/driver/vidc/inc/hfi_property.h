@@ -559,8 +559,6 @@ enum hfi_picture_type {
 	HFI_PICTURE_CRA = 0x00000010,
 	HFI_PICTURE_BLA = 0x00000020,
 	HFI_PICTURE_NOSHOW = 0x00000040,
-	HFI_PICTURE_NEW = 0x00000080,
-	HFI_PICTURE_SEF = 0x00000100,
 };
 
 #define HFI_PROP_PICTURE_TYPE                                   0x03000162
@@ -734,12 +732,10 @@ enum hfi_codec_mode_type {
 #define HFI_PROP_HEIF_TILES                                     0x030001B3
 
 enum hfi_log_video_encode_mode {
-	HFI_LOG_VIDEO_TYPE_NONE    = 0x0,
-	HFI_LOG_VIDEO_TYPE_HDR  = 0x1,
+	HFI_LOG_VIDEO_TYPE_NONE = 0x0,
+	HFI_LOG_VIDEO           = 0x1,
 };
-#define HFI_PROP_LOG_VIDEO_ENCODE                               0x030001C0
-
-#define HFI_PROP_MULTI_SLICE_MULTI_TILE                         0x030001C5
+#define HFI_PROP_LOG_VIDEO_ENCODE                               0x030001B4
 
 #define HFI_PROP_END                                            0x03FFFFFF
 
