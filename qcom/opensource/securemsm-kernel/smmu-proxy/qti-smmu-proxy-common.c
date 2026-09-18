@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/cdev.h>
@@ -37,7 +37,6 @@ int smmu_proxy_get_csf_version(struct csf_version *csf_version)
 	if (ret) {
 		pr_err("%s: Failed to get env object rc: %d\n", __func__,
 		       ret);
-		client_env = Object_NULL;
 		goto cleanup;
 	}
 
@@ -45,7 +44,6 @@ int smmu_proxy_get_csf_version(struct csf_version *csf_version)
 	if (ret) {
 		pr_err("%s: Failed to get seccam object rc: %d\n", __func__,
 		       ret);
-		sc_object = Object_NULL;
 		goto cleanup;
 	}
 
@@ -62,8 +60,8 @@ int smmu_proxy_get_csf_version(struct csf_version *csf_version)
 	cached_csf_version.arch_ver = csf_version->arch_ver;
 
 cleanup:
-	Object_ASSIGN_NULL(sc_object);
-	Object_ASSIGN_NULL(client_env);
+	Object_RELEASE_IF(sc_object);
+	Object_RELEASE_IF(client_env);
 	return ret;
 }
 EXPORT_SYMBOL(smmu_proxy_get_csf_version);

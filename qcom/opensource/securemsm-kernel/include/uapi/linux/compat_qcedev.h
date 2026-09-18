@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
  * Copyright (c) 2014,2017-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _UAPI_COMPAT_QCEDEV__H
@@ -10,6 +10,7 @@
 #include <linux/types.h>
 #include <linux/ioctl.h>
 #include <linux/qcedev.h>
+#include <asm-generic/posix_types.h>
 
 /**
  * struct compat_buf_info - Buffer information
@@ -20,10 +21,10 @@
  */
 struct compat_buf_info {
 	union {
-		__u32	offset;
+		__kernel_ulong_t	offset;
 		__u32	vaddr;
 	};
-	__u32	len;
+	__kernel_ulong_t	len;
 };
 
 /**
@@ -107,14 +108,14 @@ struct compat_qcedev_cipher_op_req {
 		struct compat_qcedev_pmem_info	pmem;
 		struct compat_qcedev_vbuf_info	vbuf;
 	};
-	__u32				entries;
-	__u32				data_len;
+	__kernel_ulong_t				entries;
+	__kernel_ulong_t				data_len;
 	__u8							in_place_op;
 	__u8							enckey[QCEDEV_MAX_KEY_SIZE];
-	__u32				encklen;
+	__kernel_ulong_t				encklen;
 	__u8							iv[QCEDEV_MAX_IV_SIZE];
-	__u32				ivlen;
-	__u32				byteoffset;
+	__kernel_ulong_t				ivlen;
+	__kernel_ulong_t				byteoffset;
 	enum qcedev_cipher_alg_enum		alg;
 	enum qcedev_cipher_mode_enum		mode;
 	enum qcedev_oper_enum			op;
@@ -133,12 +134,12 @@ struct compat_qcedev_cipher_op_req {
  */
 struct compat_qcedev_sha_op_req {
 	struct compat_buf_info			data[QCEDEV_MAX_BUFFERS];
-	__u32							entries;
-	__u32							data_len;
+	__kernel_ulong_t				entries;
+	__kernel_ulong_t				data_len;
 	__u8							digest[QCEDEV_MAX_SHA_DIGEST];
-	__u32							diglen;
+	__kernel_ulong_t				diglen;
 	__u32							authkey;
-	__u32							authklen;
+	__kernel_ulong_t				authklen;
 	enum qcedev_sha_alg_enum		alg;
 };
 
@@ -152,10 +153,10 @@ struct compat_qcedev_sha_op_req {
  *                     each fd in fd[].
  */
 struct compat_qcedev_map_buf_req {
-	__s32	fd[QCEDEV_MAX_BUFFERS];
-	__u32	num_fds;
-	__u32	fd_size[QCEDEV_MAX_BUFFERS];
-	__u32	fd_offset[QCEDEV_MAX_BUFFERS];
+	__kernel_long_t	fd[QCEDEV_MAX_BUFFERS];
+	__kernel_ulong_t	num_fds;
+	__kernel_ulong_t	fd_size[QCEDEV_MAX_BUFFERS];
+	__kernel_ulong_t	fd_offset[QCEDEV_MAX_BUFFERS];
 	__u64      buf_vaddr[QCEDEV_MAX_BUFFERS];
 };
 
@@ -165,8 +166,8 @@ struct compat_qcedev_map_buf_req {
  * num_fds (IN):       Number of fds in fd[].
  */
 struct compat_qcedev_unmap_buf_req {
-	__s32	fd[QCEDEV_MAX_BUFFERS];
-	__u32	num_fds;
+	__kernel_long_t	fd[QCEDEV_MAX_BUFFERS];
+	__kernel_ulong_t	num_fds;
 };
 
 struct file;

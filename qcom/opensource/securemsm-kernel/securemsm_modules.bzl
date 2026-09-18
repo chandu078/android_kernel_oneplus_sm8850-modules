@@ -11,7 +11,6 @@ SI_CORE_TEST_PATH = "securemsm_tests/si_core_tests"
 SECCAM_PATH = "securemsm_tests/seccam_test_driver"
 HDCP_TEST_PATH="securemsm_tests/hdcp2p2_test"
 TORNADO_MOD_PATH="securemsm_tests/tornado_mod"
-HIBERNATE_TZDATA_MGR_PATH = "hibernate_tzdata_mgr"
 QSEECOM_ENABLED=False
 
 # This dictionary holds all the securemsm-kernel  modules included by calling register_securemsm_module
@@ -75,6 +74,12 @@ register_securemsm_module(
 register_securemsm_module(
     name = "smcinvoke_dlkm",
     path = SMCINVOKE_PATH,
+    default_srcs = [
+        "IQSEEComCompat.h",
+        "smci_qseecomcompat.h",
+        "IQSEEComCompatAppLoader.h",
+        "smci_qseecomcompatapploader.h",
+    ],
     config_srcs = {
         "CONFIG_QCOM_SI_CORE": {
             True: [
@@ -88,10 +93,6 @@ register_securemsm_module(
                 "compat/smcinvoke.c",
                 "compat/smcinvoke_kernel.c",
                 "compat/trace_smcinvoke.h",
-                "IQSEEComCompat.h",
-                "smci_qseecomcompat.h",
-                "IQSEEComCompatAppLoader.h",
-                "smci_qseecomcompatapploader.h",
             ],
         }
     },
@@ -213,7 +214,7 @@ register_securemsm_module(
     path = QCEDEV_FE_PATH,
     srcs = [
                 "qcedev_fe.c",
-                "qcedev_fe_virt.c"],
+                "qcedev_smmu.c"],
     deps = [":qcedev_fe_local_headers"],
 )
 
@@ -221,14 +222,7 @@ register_securemsm_module(
 register_securemsm_module(
     name = "si_core_test",
     path = SI_CORE_TEST_PATH,
-    default_srcs = [
-                    "si_core_test.c",
-                    "si_core_test.h",
-                    "si_core_test_cbo.c",
-                    "si_core_test_cbo_impl.c",
-                    "si_core_test_smo.c",
-                    "si_core_test_smo_impl.c"
-    ],
+    default_srcs = ["si_core_test.c"],
 )
 
 register_securemsm_module(
@@ -263,11 +257,3 @@ register_securemsm_module(
     deps = [":smcinvoke_kernel_headers", ":%b_smcinvoke_dlkm", ":smmu_proxy_headers", "%b_smmu_proxy_dlkm"],
 )
 
-register_securemsm_module(
-    name = "hibernate_tzdata_mgr_dlkm",
-    path = HIBERNATE_TZDATA_MGR_PATH,
-    default_srcs = [
-        "hibernate_tzdata_mgr.c",
-    ],
-    deps = [":hibernate_tzdata_mgr_headers", "%b_smcinvoke_dlkm"],
-)

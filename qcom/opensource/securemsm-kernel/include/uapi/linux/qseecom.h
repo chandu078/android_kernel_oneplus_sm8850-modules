@@ -54,10 +54,7 @@ struct qseecom_update_key_userinfo_req {
 	enum qseecom_key_management_usage_type usage;
 };
 
-#ifndef SHA256_DIGEST_LENGTH
-#define SHA256_DIGEST_LENGTH  (256/8)
-#endif
-
+#define SHA256_DIGEST_LENGTH	(256/8)
 /*
  * struct qseecom_save_partition_hash_req
  * @partition_id - partition id.

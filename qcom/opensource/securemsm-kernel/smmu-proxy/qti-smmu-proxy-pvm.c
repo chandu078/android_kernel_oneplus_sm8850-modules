@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "qti-smmu-proxy-common.h"
@@ -11,8 +11,6 @@
 #include <linux/of.h>
 #include <linux/delay.h>
 #include <linux/version.h>
-#include <linux/pm_wakeup.h>
-
 #define DELAY_MS 30
 #define GH_MSGQ_RECV_RETRY_CNT 10
 
@@ -21,14 +19,6 @@ static void *msgq_hdl;
 DEFINE_MUTEX(sender_mutex);
 
 static const struct file_operations smmu_proxy_dev_fops;
-
-/*
- * During PVM suspend, the proxy scheduler threads get frozen, which means the
- * VM will not reply to any messages smmu-proxy sends. This driver blocks
- * suspend to prevent this, although since suspend 'polls' pm_wakeup_pending()
- * the above situation may still temporarily occur.
- */
-static struct device *smmu_proxy_pvm_dev;
 
 int smmu_proxy_unmap(void *data)
 {
@@ -41,14 +31,13 @@ int smmu_proxy_unmap(void *data)
 	int retry_cnt;
 
 	mutex_lock(&sender_mutex);
-	pm_stay_awake(smmu_proxy_pvm_dev);
-
 	buf = kzalloc(GH_MSGQ_MAX_MSG_SIZE_BYTES, GFP_KERNEL);
 	if (!buf) {
 		ret = -ENOMEM;
 		pr_err("%s: Failed to allocate memory!\n", __func__);
 		goto out;
 	}
+
 	req = buf;
 
 	dmabuf = data;
@@ -74,7 +63,7 @@ int smmu_proxy_unmap(void *data)
 	 */
 	retry_cnt = GH_MSGQ_RECV_RETRY_CNT;
 	do {
-		ret = gh_msgq_recv_killable(msgq_hdl, buf, sizeof(*resp), &size, 0);
+		ret = gh_msgq_recv(msgq_hdl, buf, sizeof(*resp), &size, 0);
 		if (ret >= 0)
 			break;
 
@@ -110,7 +99,6 @@ int smmu_proxy_unmap(void *data)
 free_buf:
 	kfree(buf);
 out:
-	pm_relax(smmu_proxy_pvm_dev);
 	mutex_unlock(&sender_mutex);
 
 	return ret;
@@ -166,7 +154,7 @@ int smmu_proxy_switch_sid(struct device *client_dev, u32 op)
 	}
 
 	/*
-	 * No need to validate size -  gh_msgq_recv_killable() ensures that sizeof(*resp) <
+	 * No need to validate size -  gh_msgq_recv() ensures that sizeof(*resp) <
 	 * GH_MSGQ_MAX_MSG_SIZE_BYTES
 	 */
 	retry_cnt = GH_MSGQ_RECV_RETRY_CNT;
@@ -243,13 +231,9 @@ int smmu_proxy_map(struct device *client_dev, struct sg_table *proxy_iova,
 	n_acl_entries = csf_version.min_ver == 1 ? 2 : 1;
 
 	mutex_lock(&sender_mutex);
-	pm_stay_awake(smmu_proxy_pvm_dev);
-
 	buf = kzalloc(GH_MSGQ_MAX_MSG_SIZE_BYTES, GFP_KERNEL);
 	if (!buf) {
 		ret = -ENOMEM;
-		pr_err("%s: Failed to allocate memory!\n", __func__);
-		pm_relax(smmu_proxy_pvm_dev);
 		goto out;
 	}
 
@@ -264,8 +248,9 @@ int smmu_proxy_map(struct device *client_dev, struct sg_table *proxy_iova,
 			goto free_buf;
 		}
 	}
-	req = buf;
+
 	/* Prepare the message */
+	req = buf;
 	req->acl_desc.n_acl_entries = n_acl_entries;
 	for (i = 0; i < n_acl_entries; i++) {
 		req->acl_desc.acl_entries[i].vmid = vmids[i];
@@ -306,7 +291,7 @@ int smmu_proxy_map(struct device *client_dev, struct sg_table *proxy_iova,
 	resp = buf;
 	flags = 0;
 	do {
-		ret = gh_msgq_recv_killable(msgq_hdl, buf, sizeof(*resp), &size, flags);
+		ret = gh_msgq_recv(msgq_hdl, buf, sizeof(*resp), &size, flags);
 		if (ret >= 0) {
 			if (size != sizeof(struct smmu_proxy_map_resp) || resp == NULL) {
 				pr_err_ratelimited("%s: Map call failed with invalid response: %d\n",
@@ -359,7 +344,6 @@ int smmu_proxy_map(struct device *client_dev, struct sg_table *proxy_iova,
 free_buf:
 	kfree(buf);
 out:
-	pm_relax(smmu_proxy_pvm_dev);
 	mutex_unlock(&sender_mutex);
 
 	return ret;
@@ -423,7 +407,6 @@ static int sender_probe_handler(struct platform_device *pdev)
 {
 	int ret;
 	struct csf_version csf_version;
-	struct device *dev = &pdev->dev;
 
 	msgq_hdl = gh_msgq_register(GH_MSGQ_LABEL_SMMU_PROXY);
 	if (IS_ERR(msgq_hdl)) {
@@ -453,23 +436,15 @@ static int sender_probe_handler(struct platform_device *pdev)
 		goto free_msgq;
 	}
 
-	ret = device_init_wakeup(dev, true);
-	if (ret) {
-		dev_err(dev, "Failed to register wake-up source!\n");
-		goto set_callbacks_null;
-	}
 	ret = smmu_proxy_create_dev(&smmu_proxy_dev_fops);
 	if (ret) {
 		pr_err("%s: Failed to create character device rc: %d\n", __func__,
 		       ret);
-		goto free_ws;
+		goto set_callbacks_null;
 	}
 
-	smmu_proxy_pvm_dev = dev;
 	return 0;
 
-free_ws:
-	device_init_wakeup(dev, false);
 set_callbacks_null:
 	qti_smmu_proxy_register_callbacks(NULL, NULL);
 free_msgq:
