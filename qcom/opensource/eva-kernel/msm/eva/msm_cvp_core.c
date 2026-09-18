@@ -184,7 +184,7 @@ struct msm_cvp_inst *msm_cvp_open(int session_type, struct task_struct *task)
 		return NULL;
 	}
 
-	inst = kzalloc(sizeof(*inst), GFP_KERNEL);
+	inst = kvzalloc(sizeof(*inst), GFP_KERNEL);
 	if (!inst) {
 		rc = -ENOMEM;
 		dprintk(CVP_ERR, "Failed to allocate memory %d\n", rc);
@@ -254,7 +254,7 @@ struct msm_cvp_inst *msm_cvp_open(int session_type, struct task_struct *task)
 fail_init:
 	kref_put(&inst->kref, close_helper);
 err_invalid_core:
-	return NULL;
+	return inst;
 }
 EXPORT_SYMBOL(msm_cvp_open);
 
@@ -290,38 +290,31 @@ check_again:
 static int msm_cvp_cleanup_instance(struct msm_cvp_inst *inst)
 {
 	bool empty;
-	int rc = 0, max_retries;
+	int rc, max_retries;
 	struct msm_cvp_frame *frame;
 	struct cvp_session_queue *sq, *sqf;
 	struct cvp_hfi_ops *ops_tbl;
-	struct msm_cvp_core *core = NULL;
+	struct msm_cvp_inst *tmp;
 
 	if (!inst) {
 		dprintk(CVP_ERR, "%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	core = cvp_driver->cvp_core;
-	if (!core) {
-		dprintk(CVP_ERR, "%s: core is NULL", __func__);
-		return -EINVAL;
-	}
+	sqf = &inst->session_queue_fence;
+	sq = &inst->session_queue;
 
-	inst = cvp_get_inst(core, inst);
-	if (!inst) {
+	tmp = cvp_get_inst_validate(inst->core, inst);
+	if (!tmp) {
 		dprintk(CVP_ERR, "%s has a invalid session %llx\n",
 			__func__, inst);
 		goto exit;
 	}
 
-	sqf = &inst->session_queue_fence;
-	sq = &inst->session_queue;
-
 	rc = msm_cvp_session_flush_stop(inst);
-	if (rc == -ECONNRESET)
-		goto exit;
 	if (rc)
 		goto err_timeout;
+	cvp_put_inst(tmp);
 
 	max_retries =  inst->core->resources.msm_cvp_hw_rsp_timeout >> 1;
 wait_frame:
@@ -350,22 +343,17 @@ wait_frame:
 	}
 
 exit:
+	if (cvp_release_arp_buffers(inst))
+		dprintk_rl(CVP_WARN,
+			"Failed to release persist buffers\n");
 
-	if (inst) {
-		if (rc == 0 || rc == -ECONNRESET) {
-			if (cvp_release_arp_buffers(inst))
-				dprintk_rl(CVP_WARN,
-					"Failed to release persist buffers\n");
+	inst->pm_qos_latency = PM_QOS_RESUME_LATENCY_DEFAULT_VALUE;
+	ops_tbl = inst->core->dev_ops;
+	call_hfi_op(ops_tbl, pm_qos_update, ops_tbl->hfi_device_data);
 
-			inst->pm_qos_latency = PM_QOS_RESUME_LATENCY_DEFAULT_VALUE;
-			ops_tbl = inst->core->dev_ops;
-			call_hfi_op(ops_tbl, pm_qos_update, ops_tbl->hfi_device_data);
-		}
-		cvp_put_inst(inst);
-	}
 	return 0;
 err_timeout:
-	cvp_put_inst(inst);
+	cvp_put_inst(tmp);
 	return rc;
 }
 
@@ -383,13 +371,6 @@ int msm_cvp_destroy(struct msm_cvp_inst *inst)
 	if (inst->session_type == MSM_CVP_DSP) {
 		cvp_dsp_del_sess(inst->dsp_handle, inst);
 		inst->task = NULL;
-	}
-	if (atomic_read(&inst->persist_usage) > 0 || atomic_read(&inst->frame_usage) > 0) {
-		dprintk(CVP_WARN,
-			"%s: Memleak detected for sess_id 0x%x persist_usage %d, frame_usage %d\n",
-			__func__, inst->sess_id,
-			atomic_read(&inst->persist_usage), atomic_read(&inst->frame_usage));
-
 	}
 
 	/* Ensure no path has core->clk_lock and core->lock sequence */
@@ -421,7 +402,7 @@ int msm_cvp_destroy(struct msm_cvp_inst *inst)
 
 	pr_info(CVP_PID_TAG
 		"closed cvp instance: %pK session_id = %d type %d %d\n",
-		current->pid, current->tgid, inst->proc_name, inst, inst->sess_id,
+		current->pid, current->tgid, inst->proc_name, inst, hash32_ptr(inst->session),
 		inst->session_type, core->smem_leak_count);
 	inst->session = (void *)0xdeadbeef;
 	if (atomic_read(&inst->smem_count) > 0) {
@@ -429,7 +410,7 @@ int msm_cvp_destroy(struct msm_cvp_inst *inst)
 			atomic_read(&inst->smem_count));
 		core->smem_leak_count += atomic_read(&inst->smem_count);
 	}
-	kfree(inst);
+	kvfree(inst);
 	inst = NULL;
 	dprintk(CVP_SESS,
 		"sys-stat: nr_insts %d msgs %d, frames %d, bufs %d, smems %d\n",
@@ -453,7 +434,7 @@ int msm_cvp_close(void *instance)
 
 	pr_info(CVP_PID_TAG
 		"to close instance: %pK session_id = %#x type %d state %d\n",
-		current->pid, current->tgid, inst->proc_name, inst, inst->sess_id,
+		current->pid, current->tgid, inst->proc_name, inst, hash32_ptr(inst->session),
 		inst->session_type, inst->state);
 
 	if (inst->session == 0) {
@@ -472,7 +453,7 @@ int msm_cvp_close(void *instance)
 		if (rc) {
 			dprintk(CVP_ERR,
 				"%s: cleanup instance failed for session %llx (%#x) rc %d\n",
-				__func__, inst, inst->sess_id, rc);
+				__func__, inst, hash32_ptr(inst->session), rc);
 			return -EINVAL;
 		}
 		msm_cvp_session_deinit(inst);

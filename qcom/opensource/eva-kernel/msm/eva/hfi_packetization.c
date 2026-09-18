@@ -207,10 +207,6 @@ inline int cvp_create_pkt_cmd_sys_session_init(
 		struct cvp_hal_session *session)
 {
 	int rc = 0;
-
-	if (!session)
-		return -EINVAL;
-
 	struct msm_cvp_inst *inst = session->session_id;
 
 	if (!pkt || !inst)
@@ -218,7 +214,7 @@ inline int cvp_create_pkt_cmd_sys_session_init(
 
 	pkt->size = sizeof(struct cvp_hfi_cmd_sys_session_init_packet);
 	pkt->packet_type = HFI_CMD_SYS_SESSION_INIT;
-	pkt->session_id = inst->sess_id;
+	pkt->session_id = hash32_ptr(session);
 	pkt->session_type = inst->prop.type;
 	pkt->session_kmask = inst->prop.kernel_mask;
 	pkt->session_prio = inst->prop.priority;
@@ -277,17 +273,12 @@ int cvp_create_pkt_cmd_session_cmd(struct cvp_hal_session_cmd_pkt *pkt,
 {
 	int rc = 0;
 
-	if (!session)
-		return -EINVAL;
-
-	struct msm_cvp_inst *inst = session->session_id;
-
-	if (!pkt || !inst)
+	if (!pkt)
 		return -EINVAL;
 
 	pkt->size = sizeof(struct cvp_hal_session_cmd_pkt);
 	pkt->packet_type = pkt_type;
-	pkt->session_id = inst->sess_id;
+	pkt->session_id = hash32_ptr(session);
 
 	return rc;
 }
@@ -298,17 +289,12 @@ int cvp_session_cmd_ktid(struct cvp_hfi_cmd_session_hdr *pkt,
 {
 	int rc = 0;
 
-	if (!session)
-		return -EINVAL;
-
-	struct msm_cvp_inst *inst = session->session_id;
-
-	if (!pkt || !inst)
+	if (!pkt)
 		return -EINVAL;
 
 	pkt->header.size = sizeof(struct cvp_hfi_cmd_session_hdr);
 	pkt->header.packet_type = pkt_type;
-	pkt->header.session_id = inst->sess_id;
+	pkt->header.session_id = hash32_ptr(session);
 	pkt->header.client_data.kdata = ktid;
 
 	return rc;
@@ -342,19 +328,13 @@ int cvp_create_pkt_cmd_session_set_buffers(
 {
 	int rc = 0;
 	struct cvp_hfi_cmd_session_set_buffers_packet *pkt;
-	struct msm_cvp_inst *inst;
 
-	if (!session)
-		return -EINVAL;
-
-	inst = session->session_id;
-
-	if (!cmd || !inst)
+	if (!cmd || !session)
 		return -EINVAL;
 
 	pkt = (struct cvp_hfi_cmd_session_set_buffers_packet *)cmd;
 	pkt->packet_type = HFI_CMD_SESSION_CVP_SET_BUFFERS;
-	pkt->session_id = inst->sess_id;
+	pkt->session_id = hash32_ptr(session);
 
 	pkt->buf_type.size = size;
 	pkt->size = sizeof(struct cvp_hfi_cmd_session_set_buffers_packet);
@@ -375,19 +355,13 @@ int cvp_create_pkt_cmd_session_release_buffers(
 		struct cvp_hal_session *session)
 {
 	struct cvp_session_release_buffers_packet *pkt;
-	struct msm_cvp_inst *inst;
 
-	if (!session)
-		return -EINVAL;
-
-	inst = session->session_id;
-
-	if (!cmd || !inst)
+	if (!cmd || !session)
 		return -EINVAL;
 
 	pkt = (struct cvp_session_release_buffers_packet *)cmd;
 	pkt->packet_type = HFI_CMD_SESSION_CVP_RELEASE_BUFFERS;
-	pkt->session_id = inst->sess_id;
+	pkt->session_id = hash32_ptr(session);
 	pkt->num_buffers = 1;
 	pkt->buffer_type = 0;
 	pkt->size = sizeof(struct cvp_session_release_buffers_packet) +
@@ -403,20 +377,14 @@ int cvp_create_pkt_cmd_session_send(
 	int def_idx;
 	struct cvp_hal_session_cmd_pkt *ptr =
 		(struct cvp_hal_session_cmd_pkt *)in_pkt;
-	struct msm_cvp_inst *inst;
 
-	if (!session)
-		return -EINVAL;
-
-	inst = session->session_id;
-
-	if (!in_pkt || !inst)
+	if (!in_pkt || !session)
 		return -EINVAL;
 
 	if (ptr->size > MAX_HFI_PKT_SIZE * sizeof(unsigned int))
 		goto error_hfi_packet;
 
-	if (ptr->session_id != inst->sess_id)
+	if (ptr->session_id != hash32_ptr(session))
 		goto error_hfi_packet;
 
 	def_idx = get_pkt_index(ptr);

@@ -376,7 +376,7 @@ exit:
 static struct cvp_dsp_fastrpc_driver_entry *pop_frpc_node_with_handle(uint32_t handle)
 {
 	struct cvp_dsp_apps *me = &gfa_cv;
-	struct cvp_dsp_fastrpc_driver_entry *frpc_node = NULL, *tmp_node = NULL;
+	struct cvp_dsp_fastrpc_driver_entry *frpc_node = NULL;
 	struct list_head *ptr = NULL, *next = NULL;
 	u32 refcount, max_count = 10;
 
@@ -393,11 +393,11 @@ search_again:
 			frpc_node = NULL;
 			break;
 		}
-		tmp_node = list_entry(ptr,
+		frpc_node = list_entry(ptr,
 			struct cvp_dsp_fastrpc_driver_entry, list);
 
-		if (tmp_node && tmp_node->handle == handle) {
-			refcount = atomic_read(&tmp_node->refcount);
+		if (frpc_node && frpc_node->handle == handle) {
+			refcount = atomic_read(&frpc_node->refcount);
 			if (refcount > 0) {
 				mutex_unlock(&me->fastrpc_driver_list.lock);
 				usleep_range(5000, 10000);
@@ -409,7 +409,6 @@ search_again:
 				}
 				goto search_again;
 			}
-			frpc_node = tmp_node;
 			list_del(&frpc_node->list);
 			break;
 		}
@@ -978,22 +977,14 @@ static int cvp_fastrpc_probe(struct fastrpc_device *rpc_dev)
 {
 	struct cvp_dsp_fastrpc_driver_entry *frpc_node = NULL;
 
-	if (rpc_dev) {
-		dprintk(CVP_DSP, "%s fastrpc probe handle 0x%x\n",
+	dprintk(CVP_DSP, "%s fastrpc probe handle 0x%x\n",
 		__func__, rpc_dev->handle);
 
-		frpc_node = cvp_get_fastrpc_node_with_handle(rpc_dev->handle);
-		if (frpc_node) {
-			frpc_node->cvp_fastrpc_device = rpc_dev;
-			complete(&frpc_node->fastrpc_probe_completion);
-			cvp_put_fastrpc_node(frpc_node);
-		}
-	} else {
-		/*
-		 * Race condition between fastRPC register and fastRPC unregister.
-		 * Need to find the root cause and fix it.
-		 */
-		dprintk(CVP_ERR, "%s : fastrpc_dev is NULL", __func__);
+	frpc_node = cvp_get_fastrpc_node_with_handle(rpc_dev->handle);
+	if (frpc_node) {
+		frpc_node->cvp_fastrpc_device = rpc_dev;
+		complete(&frpc_node->fastrpc_probe_completion);
+		cvp_put_fastrpc_node(frpc_node);
 	}
 
 	return 0;
@@ -1221,11 +1212,11 @@ static int eva_fastrpc_driver_register(uint32_t handle)
 		init_completion(&frpc_node->fastrpc_probe_completion);
 
 		mutex_lock(&me->fastrpc_driver_list.lock);
+		list_add_tail(&frpc_node->list, &me->fastrpc_driver_list.list);
 		INIT_MSM_CVP_LIST(&frpc_node->dsp_sessions);
 		INIT_MSM_CVP_LIST(&frpc_node->cvpdspbufs);
 		dprintk(CVP_DSP, "Add frpc node 0x%x to list\n", frpc_node);
 		atomic_inc(&frpc_node->refcount);
-		list_add_tail(&frpc_node->list, &me->fastrpc_driver_list.list);
 		mutex_unlock(&me->fastrpc_driver_list.lock);
 
 		/* register fastrpc device to this session */
@@ -1364,7 +1355,6 @@ static void eva_fastrpc_driver_unregister(uint32_t handle, bool force_exit)
 					msm_cvp_smem_put_dma_buf(smem->dma_buf);
 			} else if (cbuf->ownership == DSP) {
 				int rc = cvp_release_dsp_buffers(cbuf);
-				atomic_sub(cbuf->size, &frpc_node->dsp_usage);
 
 				if (rc)
 					dprintk(CVP_ERR,
@@ -1384,7 +1374,6 @@ static void eva_fastrpc_driver_unregister(uint32_t handle, bool force_exit)
 		eva_fastrpc_driver_release_name(frpc_node);
 		mutex_unlock(&me->driver_name_lock);
 		kfree(frpc_node);
-		frpc_node = NULL;
 	} else {
 		dprintk(CVP_WARN, "%s Fastrpc driver hdl %#x hdl %#x, f %d, session count is %d, abort unregistration\n",
 						__func__, handle, dsp2cpu_cmd->pid, (uint32_t)force_exit, frpc_node->session_cnt);
@@ -1744,17 +1733,15 @@ fail_get_session_info:
 		list_del(&inst->dsp_list);
 		frpc_node->session_cnt--;
 		/* close dsp inst */
-		mutex_unlock(&frpc_node->dsp_sessions.lock);
 		msm_cvp_close(inst);
 	} else {
-		mutex_unlock(&frpc_node->dsp_sessions.lock);
 		dprintk(CVP_WARN, "Failed DSP session %llx already deleted\n", inst);
 	}
+	mutex_unlock(&frpc_node->dsp_sessions.lock);
 fail_msm_cvp_open:
 	put_task_struct(task);
 fail_pid:
 	cvp_put_fastrpc_node(frpc_node);
-	cmd->ret = -1;
 	return;
 fail_lookup:
 	/* unregister fastrpc driver */
@@ -1797,6 +1784,8 @@ void __dsp_cvp_sess_delete(struct cvp_dsp_cmd_msg *cmd)
 			__func__, dsp2cpu_cmd->pid);
 		cmd->ret = -1;
 		goto dsp_fail_delete;
+	} else {
+		cvp_put_fastrpc_node(frpc_node);
 	}
 
 	mutex_lock(&frpc_node->dsp_sessions.lock);
@@ -1828,7 +1817,6 @@ void __dsp_cvp_sess_delete(struct cvp_dsp_cmd_msg *cmd)
 	if (rc) {
 		cmd->ret = -1;
 	}
-	cvp_put_fastrpc_node(frpc_node);
 
 dsp_fail_delete:
 	return;
@@ -2012,7 +2000,6 @@ void __dsp_cvp_buf_register(struct cvp_dsp_cmd_msg *cmd)
 	}
 	dprintk(CVP_DSP, "%s register buffer done\n", __func__);
 
-	atomic_add(kmd_buf->size, &frpc_node->dsp_usage);
 	atomic_inc(&frpc_node->smem_count);
 
 	cmd->sbuf.iova = kmd_buf->reserved[0];
@@ -2088,7 +2075,7 @@ void __dsp_cvp_buf_deregister(struct cvp_dsp_cmd_msg *cmd)
 		cmd->ret = -1;
 		goto fail_dsp_buf_dereg;
 	}
-	atomic_sub(kmd_buf->size, &frpc_node->dsp_usage);
+
 	atomic_dec(&frpc_node->smem_count);
 
 	dprintk(CVP_DSP, "%s deregister buffer done\n", __func__);
@@ -2145,7 +2132,6 @@ void __dsp_cvp_mem_alloc(struct cvp_dsp_cmd_msg *cmd)
 	list_add_tail(&buf->list, &frpc_node->cvpdspbufs.list);
 	mutex_unlock(&frpc_node->cvpdspbufs.lock);
 
-	atomic_add(buf->smem->size, &frpc_node->dsp_usage);
 	atomic_inc(&frpc_node->smem_count);
 
 	dprintk(CVP_DSP, "%s allocate buffer done, addr 0x%llx\n",
@@ -2168,9 +2154,9 @@ fail_fastrpc_dev_map_dma:
 fail_allocate_dsp_buf:
 	cvp_kmem_cache_free(&cvp_driver->buf_cache, buf);
 fail_kzalloc_buf:
-	cvp_put_fastrpc_node(frpc_node);
 fail_fastrpc_node:
 	cmd->ret = -1;
+	cvp_put_fastrpc_node(frpc_node);
 	return;
 
 }
@@ -2242,7 +2228,6 @@ void __dsp_cvp_mem_free(struct cvp_dsp_cmd_msg *cmd)
 			}
 
 			list_del(&buf->list);
-			atomic_sub(buf->size, &frpc_node->dsp_usage);
 			atomic_dec(&frpc_node->smem_count);
 
 			cvp_kmem_cache_free(&cvp_driver->buf_cache, buf);

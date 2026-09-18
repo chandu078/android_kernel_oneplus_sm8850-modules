@@ -52,7 +52,7 @@ bool msm_cvp_dcvs_disable = !true;
 int msm_cvp_minidump_enable = !1;
 int cvp_kernel_fence_enabled = 2;
 int msm_cvp_hw_wd_recovery = 1;
-int msm_cvp_smmu_fault_recovery = 1;
+int msm_cvp_smmu_fault_recovery = !1;
 int msm_cvp_session_error_recovery = 1;
 int msm_cvp_hw_hang_recovery = 1;
 #ifdef CVP_SW_DBG_BUF_ENABLED
@@ -296,13 +296,13 @@ static ssize_t session_info_read(struct file *file, char __user *buf,
 			inst->session_type == MSM_CVP_USER ? "User" : "Kernel");
 		cur += write_str(cur, end - cur, "proc name: %s\n", inst->proc_name);
 		cur += write_str(cur, end - cur, "session name: %s\n", inst->prop.session_name);
-		cur += write_str(cur, end - cur, "session id: %#x\n", inst->sess_id);
+		cur += write_str(cur, end - cur, "session id: %#x\n",hash32_ptr(inst->session));
 		cur += write_str(cur, end - cur, "is secure: %u\n", inst->prop.is_secure);
 		cur += write_str(cur, end - cur, "priority: %u\n", inst->prop.priority);
 		cur += write_str(cur, end - cur, "qos latency: %u\n", inst->pm_qos_latency);
 		cur += write_str(cur, end - cur, "state: %d\n", inst->state);
-		cur += write_str(cur, end - cur, "total persist_usage %d bytes, frame_usage %d\n",
-					inst->persist_usage, inst->frame_usage);
+		cur += write_str(cur, end - cur, "total internal memory size: %d bytes\n",
+					inst->persist_usage);
 		list_for_each_entry(list_node, &inst->persist_list.list, list) {
 			cur += write_str(cur, end - cur, "%s size: %d bytes\n",
 				list_node->info.feature, list_node->info.persist_size);

@@ -1,4 +1,3 @@
-load(":repo_paths.bzl", "modules_label")
 load(":eva_module_build.bzl", "create_module_registry")
 
 EVA_KERNEL_ROOT = "eva-kernel"
@@ -41,18 +40,18 @@ register_eva_module(
     ],
     config_deps = {
        "TARGET_SYNX_ENABLE": [
-          modules_label("qcom/opensource/synx-kernel:synx_headers"),
-           modules_label("qcom/opensource/synx-kernel:%b_modules")
+          "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:synx_headers",
+           "//vendor/qcom/sm8850-modules/qcom/opensource/synx-kernel:%b_modules"
         ],
 	"TARGET_PRESIL_ENABLE": [
-            modules_label("qcom/opensource/camera-kernel:camera_src_headers"),
-	    modules_label("qcom/opensource/camera-kernel:%b_camera"),
+            "//vendor/qcom/sm8850-modules/qcom/opensource/camera-kernel:camera_src_headers",
+	    "//vendor/qcom/sm8850-modules/qcom/opensource/camera-kernel:%b_camera",
 	],
         "TARGET_DSP_ENABLE": [
-             modules_label("qcom/opensource/dsp-kernel:%b_frpc-adsprpc")
+             "//vendor/qcom/sm8850-modules/qcom/opensource/dsp-kernel:%b_frpc-adsprpc"
         ],
 	"TARGET_MMRM_ENABLE": [
-             modules_label("qcom/opensource/mmrm-driver:%b_mmrm_driver")
+             "//vendor/qcom/sm8850-modules/qcom/opensource/mmrm-driver:%b_mmrm_driver"
 	],
     },
 )

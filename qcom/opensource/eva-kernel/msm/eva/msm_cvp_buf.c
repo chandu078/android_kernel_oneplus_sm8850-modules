@@ -72,7 +72,7 @@ int print_smem(u32 tag, const char *str, struct msm_cvp_inst *inst,
 		} else {
 			dprintk(tag,
 				"%s: %x : 0x%llx size %d flags %#x iova %#x\n",
-				str, inst->sess_id, smem->dma_buf,
+				str, hash32_ptr(inst->session), smem->dma_buf,
 				smem->size, smem->flags, smem->device_addr);
 
 			dprintk(tag,
@@ -171,13 +171,13 @@ static void print_internal_buffer(u32 tag, const char *str,
 	if (cbuf->smem->dma_buf) {
 		dprintk(tag,
 		"%s: %x : fd %d off %d 0x%llx %s size %d iova %#x\n",
-		str, inst->sess_id, cbuf->fd,
+		str, hash32_ptr(inst->session), cbuf->fd,
 		cbuf->offset, cbuf->smem->dma_buf, cbuf->smem->dma_buf->name,
 		cbuf->size, cbuf->smem->device_addr);
 	} else {
 		dprintk(tag,
 		"%s: %x : idx %2d fd %d off %d size %d iova %#x\n",
-		str, inst->sess_id, cbuf->index, cbuf->fd,
+		str, hash32_ptr(inst->session), cbuf->index, cbuf->fd,
 		cbuf->offset, cbuf->size, cbuf->smem->device_addr);
 	}
 }
@@ -268,7 +268,7 @@ void print_client_buffer(u32 tag, const char *str,
 	dprintk(tag,
 		"%s: %x : idx %2d fd %d off %d size %d type %d flags 0x%x"
 		" reserved[0] %u\n",
-		str, inst->sess_id, cbuf->index, cbuf->fd,
+		str, hash32_ptr(inst->session), cbuf->index, cbuf->fd,
 		cbuf->offset, cbuf->size, cbuf->type, cbuf->flags,
 		cbuf->reserved[0]);
 }
@@ -285,7 +285,7 @@ void print_persist_buffer_info(u32 tag, const char *str, u32 buffer_size,
 	if (persist_pkt == NULL)
 		dprintk(tag, "%s size %d total persist size = %d for session %s (%x)",
 			str, buffer_size, atomic_read(&inst->persist_usage),
-			inst->prop.session_name, inst->sess_id);
+			inst->prop.session_name, hash32_ptr(inst->session));
 	else {
 		dprintk(tag, "Feature: %s :{Persist 1 %lu Persist 2 %lu Persist 3 %lu}",
 			get_feature_name_from_type(persist_pkt->nCVKernelType),
@@ -1636,12 +1636,12 @@ static int msm_cvp_map_user_persist_buf(struct msm_cvp_inst *inst,
 			atomic_add(pbuf->size, &inst->persist_usage);
 			print_persist_buffer_info(CVP_MEM, "MAP user persist",
 					pbuf->size, inst, NULL);
+			mutex_unlock(&inst->persistbufs.lock);
 			atomic_inc(&pbuf->smem->refcount);
+			dma_buf_put(dma_buf);
 			dprintk(CVP_MEM,
 				"map persist Reuse fd %d, dma_buf %#llx\n",
 				pbuf->fd, pbuf->smem->dma_buf);
-			mutex_unlock(&inst->persistbufs.lock);
-			dma_buf_put(dma_buf);
 			return 0;
 		}
 	}
@@ -1682,6 +1682,7 @@ static int msm_cvp_map_user_persist_buf(struct msm_cvp_inst *inst,
 		inst, NULL);
 	mutex_lock(&inst->persistbufs.lock);
 	list_add_tail(&pbuf->list, &inst->persistbufs.list);
+	mutex_unlock(&inst->persistbufs.lock);
 
 	print_internal_buffer(CVP_MEM, "map persist", inst, pbuf);
 
@@ -1690,7 +1691,6 @@ static int msm_cvp_map_user_persist_buf(struct msm_cvp_inst *inst,
 #endif
 
 	*iova = smem->device_addr + buf->offset;
-	mutex_unlock(&inst->persistbufs.lock);
 
 	return 0;
 
@@ -1755,7 +1755,6 @@ static u32 msm_cvp_map_frame_buf(struct msm_cvp_inst *inst,
 	frame->bufs[nr].offset = buf->offset;
 
 	print_internal_buffer(CVP_MEM, "map cpu", inst, &frame->bufs[nr]);
-	atomic_add(buf->size, &inst->frame_usage);
 
 	frame->nr++;
 
@@ -1829,7 +1828,6 @@ static void msm_cvp_unmap_frame_buf(struct msm_cvp_inst *inst,
 					buf->smem = NULL;
 				}
 			}
-			atomic_sub(buf->size, &inst->frame_usage);
 	}
 	cvp_kmem_cache_free(&cvp_driver->frame_cache, frame);
 }
@@ -1873,7 +1871,7 @@ void msm_cvp_unmap_frame(struct msm_cvp_inst *inst, u64 ktid)
 
 	ktid &= (FENCE_BIT - 1);
 	dprintk(CVP_MEM, "%s: (%#x) unmap frame %llu\n",
-			__func__, inst->sess_id, ktid);
+			__func__, hash32_ptr(inst->session), ktid);
 
 	found = false;
 	mutex_lock(&inst->frames.lock);
@@ -1884,7 +1882,7 @@ void msm_cvp_unmap_frame(struct msm_cvp_inst *inst, u64 ktid)
 			dprintk(CVP_CMD, "%s: "
 				"pkt_type %08x sess_id %08x trans_id <> ktid %llu\n",
 				__func__, frame->pkt_type,
-				inst->sess_id,
+				hash32_ptr(inst->session),
 				frame->ktid);
 			/* Save the previous frame mappings for debug */
 			backup_frame_buffers(inst, frame);
@@ -1914,9 +1912,6 @@ int msm_cvp_unmap_user_persist(struct msm_cvp_inst *inst,
 	struct msm_cvp_persist_list *list_node, *dummy1;
 	struct cvp_hfi_persist_buffer_packet *persist_pkt =
 		(struct cvp_hfi_persist_buffer_packet *) in_pkt;
-
-	dprintk(CVP_ERR, "%s: Unsupported request\n", __func__);
-	return -EINVAL;
 
 	if (!offset || !buf_num)
 		return 0;
@@ -2108,6 +2103,7 @@ int msm_cvp_map_frame(struct msm_cvp_inst *inst,
 			msm_cvp_unmap_frame_buf(inst, frame);
 			return -EINVAL;
 		}
+
 #ifdef USE_PRESIL42
 		presil42_set_buf_fd(buf, iova, "cvp_map_frame");
 #else
@@ -2159,8 +2155,8 @@ int msm_cvp_session_deinit_buffers(struct msm_cvp_inst *inst)
 		}
 		if (cbuf->ownership != DRIVER) {
 			dprintk(CVP_MEM,
-			"%s: sess_id %x : fd %d %pK size %d",
-			"free user persistent", inst->sess_id, cbuf->fd,
+			"%s: %x : fd %d %pK size %d",
+			"free user persistent", hash32_ptr(inst->session), cbuf->fd,
 			smem->dma_buf, cbuf->size);
 			atomic_sub(cbuf->size, &inst->persist_usage);
 			print_persist_buffer_info(CVP_MEM, "FREE user persist", cbuf->size,
@@ -2332,16 +2328,14 @@ void msm_cvp_print_inst_bufs(struct msm_cvp_inst *inst, bool log)
 		return;
 	}
 	session = (struct cvp_hal_session *)inst->session;
-	session_id = inst->sess_id;
+	session_id = hash32_ptr(session);
 
 	core = cvp_driver->cvp_core;
-	if (core->kmd_trace.kmd_debug_log.log) {
-		if (log && core->kmd_trace.kmd_debug_log.log->snapshot_index < 16) {
-			snap = &core->kmd_trace.kmd_debug_log.log->snapshot[
-				core->kmd_trace.kmd_debug_log.log->snapshot_index];
-			snap->session = inst->sess_id;
-			core->kmd_trace.kmd_debug_log.log->snapshot_index++;
-		}
+	if (log && core->kmd_trace.kmd_debug_log.log.snapshot_index < 16) {
+		snap = &core->kmd_trace.kmd_debug_log.log.snapshot[
+			core->kmd_trace.kmd_debug_log.log.snapshot_index];
+		snap->session = hash32_ptr(inst->session);
+		core->kmd_trace.kmd_debug_log.log.snapshot_index++;
 	}
 
 	dprintk(CVP_ERR,
@@ -2587,7 +2581,7 @@ int cvp_release_arp_buffers(struct msm_cvp_inst *inst)
 		if (buf->ownership == DRIVER) {
 			dprintk(CVP_MEM,
 			"%s: %x : fd %d %pK size %d",
-			"free arp", inst->sess_id, buf->fd,
+			"free arp", hash32_ptr(inst->session), buf->fd,
 			smem->dma_buf, buf->size);
 			atomic_sub(buf->size, &inst->persist_usage);
 			print_persist_buffer_info(CVP_MEM, "FREE ARP buffer",
@@ -2699,7 +2693,7 @@ int cvp_release_dsp_buffers(struct cvp_internal_buf *buf)
 		}
 	} else {
 		dprintk(CVP_ERR,
-			"%s: wrong owner %d : fd %x %s size %d",
+			"%s: wrong owner %d %x : fd %x %s size %d",
 			__func__, buf->ownership, buf->fd, smem->dma_buf->name, buf->size);
 	}
 
@@ -2712,21 +2706,14 @@ int msm_cvp_register_buffer(struct msm_cvp_inst *inst,
 	struct cvp_hfi_ops *ops_tbl;
 	struct cvp_hal_session *session;
 	struct msm_cvp_inst *s;
-	struct msm_cvp_core *core = NULL;
 	int rc = 0;
 
-	if (!inst || !buf) {
+	if (!inst || !inst->core || !buf) {
 		dprintk(CVP_ERR, "%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	core = cvp_driver->cvp_core;
-	if (!core) {
-		dprintk(CVP_ERR, "%s: core is NULL", __func__);
-		return -EINVAL;
-	}
-
-	s = cvp_get_inst_validate(core, inst);
+	s = cvp_get_inst_validate(inst->core, inst);
 	if (!s)
 		return -ECONNRESET;
 
@@ -2754,21 +2741,14 @@ int msm_cvp_unregister_buffer(struct msm_cvp_inst *inst,
 		struct eva_kmd_buffer *buf)
 {
 	struct msm_cvp_inst *s;
-	struct msm_cvp_core *core = NULL;
 	int rc = 0;
 
-	if (!inst || !buf) {
+	if (!inst || !inst->core || !buf) {
 		dprintk(CVP_ERR, "%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	core = cvp_driver->cvp_core;
-	if (!core) {
-		dprintk(CVP_ERR, "%s: core is NULL", __func__);
-		return -EINVAL;
-	}
-
-	s = cvp_get_inst_validate(core, inst);
+	s = cvp_get_inst_validate(inst->core, inst);
 	if (!s)
 		return -ECONNRESET;
 

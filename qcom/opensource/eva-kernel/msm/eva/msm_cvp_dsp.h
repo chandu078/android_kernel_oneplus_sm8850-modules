@@ -296,7 +296,6 @@ struct cvp_dsp_fastrpc_driver_entry {
 	struct msm_cvp_list cvpdspbufs;
 	struct cvp_frame_bufs unused_dsp_bufs;
 	atomic_t smem_count;
-	atomic_t dsp_usage;
 };
 
 struct cvp_dsp_apps {

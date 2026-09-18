@@ -27,72 +27,24 @@ static int cvp_enqueue_pkt(struct msm_cvp_inst* inst,
 	unsigned int in_offset,
 	unsigned int in_buf_num);
 
-void *get_sess_from_idr(struct msm_cvp_inst *inst)
-{
-	void *sess = NULL;
-	struct msm_cvp_core *core = NULL;
-
-	if (!inst || !inst->core) {
-		dprintk(CVP_ERR, "%s: invalid params\n", __func__);
-		return NULL;
-	}
-
-	core = inst->core;
-	mutex_lock(&core->idr_lock);
-	sess = idr_find(&core->sess_idr, inst->sess_id);
-	mutex_unlock(&core->idr_lock);
-	if (!sess)
-		dprintk(CVP_ERR, "%s: Could not find the sess obj for given idr id\n",
-				__func__);
-
-	return sess;
-}
-
-u32 get_sess_id_from_idr(void *session)
-{
-	void *ptr = NULL;
-	u32 sess_id = 0;
-	struct msm_cvp_core *core = NULL;
-
-	core = cvp_driver->cvp_core;
-	mutex_lock(&core->idr_lock);
-	idr_for_each_entry(&core->sess_idr, ptr, sess_id) {
-		if (ptr == session) {
-			mutex_unlock(&core->idr_lock);
-			return sess_id;
-		}
-	}
-	mutex_unlock(&core->idr_lock);
-	return -EINVAL;
-}
-
 int msm_cvp_get_session_info(struct msm_cvp_inst *inst, u32 *session)
 {
 	int rc = 0;
 	struct msm_cvp_inst *s;
-	struct msm_cvp_core *core = NULL;
-	CVPKERNEL_ATRACE_BEGIN("msm_cvp_get_session_info");
 
-	if (!inst || !session) {
+	if (!inst || !inst->core || !session) {
 		dprintk(CVP_ERR, "%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	core = cvp_driver->cvp_core;
-	if (!core) {
-		dprintk(CVP_ERR, "%s: core is NULL", __func__);
-		return -EINVAL;
-	}
-
-	s = cvp_get_inst_validate(core, inst);
+	s = cvp_get_inst_validate(inst->core, inst);
 	if (!s)
 		return -ECONNRESET;
 
-	*session = inst->sess_id;
+	*session = hash32_ptr(inst->session);
 	dprintk(CVP_SESS, "%s: id 0x%x\n", __func__, *session);
 
 	cvp_put_inst(s);
-	CVPKERNEL_ATRACE_END("msm_cvp_get_session_info");
 	return rc;
 }
 
@@ -160,9 +112,8 @@ static int cvp_wait_process_message(struct msm_cvp_inst *inst,
 
 	if (wait_event_timeout(sq->wq,
 		cvp_msg_pending(sq, &msg, ktid), timeout) == 0) {
-		dprintk(CVP_WARN,
-			"session queue wait timeout and session_id = %#x sq %pK, sq->wq %pK\n",
-			inst->sess_id, sq, &sq->wq);
+		dprintk(CVP_WARN, "session queue wait timeout and session_id = %#x\n",
+					hash32_ptr(inst->session));
 		if (inst && inst->core && inst->core->dev_ops &&
 				inst->state != MSM_CVP_CORE_INVALID)
 			print_hfi_queue_info(inst->core->dev_ops);
@@ -212,7 +163,6 @@ static int msm_cvp_session_receive_hfi(struct msm_cvp_inst *inst,
 	struct msm_cvp_inst *s;
 	int rc = 0;
 	struct cvp_hfi_msg_session_hdr *msg_hdr = NULL;
-	struct msm_cvp_core *core = NULL;
 	CVPKERNEL_ATRACE_BEGIN("msm_cvp_session_receive_hfi");
 
 	if (!inst) {
@@ -220,13 +170,7 @@ static int msm_cvp_session_receive_hfi(struct msm_cvp_inst *inst,
 		return -EINVAL;
 	}
 
-	core = cvp_driver->cvp_core;
-	if (!core) {
-		dprintk(CVP_ERR, "%s: core is NULL", __func__);
-		return -EINVAL;
-	}
-
-	s = cvp_get_inst_validate(core, inst);
+	s = cvp_get_inst_validate(inst->core, inst);
 	if (!s)
 		return -ECONNRESET;
 
@@ -241,20 +185,12 @@ static int msm_cvp_session_receive_hfi(struct msm_cvp_inst *inst,
 		u32 pkt_id = 0;
 		u64 aontimer = 0;
 		const char *command_name = "";
-		u32 session_id = 0;
-		u32 stream_idx = 0;
-		u64 transaction_id = 0;
 
-		session_id = msg_hdr->header.session_id;
-		stream_idx = msg_hdr->header.stream_idx;
-		transaction_id = msg_hdr->header.client_data.transaction_id;
 		pkt_id  = msg_hdr->header.packet_type;
 		command_name = get_pkt_name_from_type(pkt_id);
 		aontimer = get_aon_time();
-		dprintk(CVP_PERF,
-			"%s: msg packet %s sent back to umd at aontimer %llu session_id 0x%x, stream_idx 0x%x transaction_id 0x%x\n",
-			__func__, command_name, aontimer, session_id,
-			stream_idx, transaction_id);
+		dprintk(CVP_PERF, "%s: msg packet %s sent back to umd at aontimer %llu\n",
+			__func__, command_name, aontimer);
 	}
 	msm_cvp_msg_tracing_from_sw(msg_hdr, "EVA_KMD_REV_END");
 
@@ -273,33 +209,26 @@ static int msm_cvp_session_process_hfi(
 
 	unsigned int offset = 0, buf_num = 0, signal;
 	struct cvp_session_queue *sq;
+	struct msm_cvp_inst *s;
 	struct cvp_hfi_cmd_session_hdr *pkt_hdr;
 	bool is_config_pkt;
 	struct cvp_hfi_cmd_session_hdr *cmd_hdr = NULL;
-	struct msm_cvp_core *core = NULL;
 
 	CVPKERNEL_ATRACE_BEGIN("msm_cvp_session_process_hfi");
 
-	if (!inst || !in_pkt) {
+	if (!inst || !inst->core || !in_pkt) {
 		dprintk(CVP_ERR, "%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	core = cvp_driver->cvp_core;
-	if (!core) {
-		dprintk(CVP_ERR, "%s: core is NULL", __func__);
-		return -EINVAL;
-	}
-
-	inst = cvp_get_inst_validate(core, inst);
-	if (!inst)
-		return -ECONNRESET;
-
 	if (inst->state == MSM_CVP_CORE_INVALID) {
 		dprintk(CVP_ERR, "sess %pK INVALIDim reject new HFIs\n", inst);
-		rc = -ECONNRESET;
-		goto exit;
+		return -ECONNRESET;
 	}
+
+	s = cvp_get_inst_validate(inst->core, inst);
+	if (!s)
+		return -ECONNRESET;
 
 	sq = &inst->session_queue;
 	spin_lock(&sq->lock);
@@ -475,15 +404,8 @@ receive_msg:
 
 	hfi_err = hdr.error_type;
 	if (rc) {
-		dprintk(CVP_ERR, "%s %s: msg timeout rc: %d, sess_id: 0x%x, tran_id: %d",
-			current->comm, __func__, rc,
-			pkt->header.session_id,
-			pkt->header.client_data.data1);
-
-		dprintk(CVP_ERR, "pkt_type: 0x%x, frame_id: %llu, ktid: %llu\n",
-			pkt->header.packet_type, pkt->header.client_data.transaction_id,
-			ktid);
-
+		dprintk(CVP_ERR, "%s %s: cvp_wait_process_message rc %d\n",
+			current->comm, __func__, rc);
 		synx_state = SYNX_STATE_SIGNALED_CANCEL;
 		goto exit;
 	}
@@ -507,7 +429,6 @@ exit:
 	if (fc->signature == 0xFEEDFACE)
 		rc = inst->core->synx_ftbl->cvp_synx_ops(
 			inst, CVP_OUTPUT_SYNX, fc, &synx_state);
-	fc->msg_pkt = NULL;
 	CVPKERNEL_ATRACE_END("cvp_synx_ops CVP_OUTPUT_SYNX");
 	CVPKERNEL_ATRACE_END("cvp_fence_proc");
 	return rc;
@@ -900,13 +821,8 @@ static int cvp_enqueue_pkt(struct msm_cvp_inst* inst,
 					/* Update the in_pkt s.t iova is replaced back with fd */
 					buf = (struct cvp_buf_type *)&in_pkt->pkt_data[offset];
 					offset += sizeof(*buf) >> 2;
-
-					if (offset > MAX_HFI_PKT_SIZE)
-						break;
-
 					if (!buf->size || fd_arr[i] < 0)
 						continue;
-
 					buf->fd = fd_arr[i];
 				}
 				rc = msm_cvp_unmap_user_persist(inst,
@@ -927,13 +843,8 @@ static int cvp_enqueue_pkt(struct msm_cvp_inst* inst,
 				/* Update the in_pkt s.t iova is replaced back with fd */
 				buf = (struct cvp_buf_type *)&in_pkt->pkt_data[offset];
 				offset += sizeof(*buf) >> 2;
-
-				if (offset > MAX_HFI_PKT_SIZE)
-					break;
-
 				if (!buf->size || fd_arr[i] < 0)
 					continue;
-
 				buf->fd = fd_arr[i];
 			}
 			rc = msm_cvp_unmap_user_persist(inst,
@@ -1171,27 +1082,9 @@ static int cvp_fence_thread_start(struct msm_cvp_inst *inst)
 	struct task_struct *thread;
 	struct cvp_fence_queue *q;
 	struct cvp_session_queue *sq;
-	struct msm_cvp_core *core = NULL;
 
-	if (!inst) {
-		dprintk(CVP_ERR, "%s: invalid inst param\n", __func__);
-		return -EINVAL;
-	}
-
-	core = cvp_driver->cvp_core;
-	if (!core) {
-		dprintk(CVP_ERR, "%s: core is NULL", __func__);
-		return -EINVAL;
-	}
-
-	inst = cvp_get_inst_validate(core, inst);
-	if (!inst)
-		return -EINVAL;
-
-	if (!inst->prop.fthread_nr) {
-		cvp_put_inst(inst);
+	if (!inst->prop.fthread_nr)
 		return 0;
-	}
 
 	q = &inst->fence_cmd_queue;
 	mutex_lock(&q->lock);
@@ -1199,7 +1092,7 @@ static int cvp_fence_thread_start(struct msm_cvp_inst *inst)
 	mutex_unlock(&q->lock);
 
 	for (i = 0; i < inst->prop.fthread_nr; ++i) {
-		if (!cvp_get_inst_validate(core, inst)) {
+		if (!cvp_get_inst_validate(inst->core, inst)) {
 			rc = -ECONNRESET;
 			goto exit;
 		}
@@ -1225,7 +1118,6 @@ exit:
 		mutex_unlock(&q->lock);
 		wake_up_all(&q->wq);
 	}
-	cvp_put_inst(inst);
 	return rc;
 }
 
@@ -1314,7 +1206,7 @@ int msm_cvp_session_start(struct msm_cvp_inst *inst,
 	}
 
 	pr_info_ratelimited(CVP_PID_TAG "session %llx (%#x) started\n",
-		current->pid, current->tgid, "sess", inst, inst->sess_id);
+		current->pid, current->tgid, "sess", inst, hash32_ptr(inst->session));
 	CVPKERNEL_ATRACE_END("msm_cvp_session_start");
 
 	return 0;
@@ -1336,20 +1228,13 @@ int msm_cvp_session_flush_stop(struct msm_cvp_inst *inst)
 	struct cvp_hfi_ops *ops_tbl;
 	u64 ktid;
 	int rc;
-	struct msm_cvp_core *core = NULL;
 
-	if (!inst) {
+	if (!inst || !inst->core) {
 		dprintk(CVP_ERR, "%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	core = cvp_driver->cvp_core;
-	if (!core) {
-		dprintk(CVP_ERR, "%s: core is NULL", __func__);
-		return -EINVAL;
-	}
-
-	s = cvp_get_inst_validate(core, inst);
+	s = cvp_get_inst_validate(inst->core, inst);
 	if (!s)
 		return -ECONNRESET;
 
@@ -1359,7 +1244,7 @@ int msm_cvp_session_flush_stop(struct msm_cvp_inst *inst)
 
 	if (sq->state == QUEUE_STOP) {
 		dprintk(CVP_WARN, "Session %llx (%#x) already stopped\n",
-			inst, inst->sess_id);
+			inst, hash32_ptr(inst->session));
 		spin_unlock(&sq->lock);
 		rc = 0;
 		goto exit;
@@ -1367,7 +1252,7 @@ int msm_cvp_session_flush_stop(struct msm_cvp_inst *inst)
 
 	if (sq->state < QUEUE_START) {
 		dprintk(CVP_WARN, "Session %llx (%#x) not started yet, session state: %d\n",
-			inst, inst->sess_id, sq->state);
+			inst, hash32_ptr(inst->session), sq->state);
 		spin_unlock(&sq->lock);
 		rc = 0;
 		goto stop_thread;
@@ -1380,12 +1265,12 @@ int msm_cvp_session_flush_stop(struct msm_cvp_inst *inst)
 	/*Flush all pending cmds for the error EVA session*/
 	pr_info_ratelimited(CVP_PID_TAG "flush stop session: %pK session_id = %#x\n",
 		current->pid, current->tgid, "sess",
-		inst, inst->sess_id);
+		inst, hash32_ptr(inst->session));
 	rc = cvp_session_flush_all(inst);
 	if (rc) {
 		dprintk(CVP_ERR,
 			"%s: cannot flush session %llx (%#x) rc %d\n",
-			__func__, inst, inst->sess_id, rc);
+			__func__, inst, hash32_ptr(inst->session), rc);
 		goto stop_thread;
 	}
 
@@ -1403,7 +1288,7 @@ int msm_cvp_session_flush_stop(struct msm_cvp_inst *inst)
 	rc = wait_for_sess_signal_receipt(inst, HAL_SESSION_STOP_DONE);
 	if (rc) {
 		dprintk(CVP_WARN, "%s: wait for signal failed, rc %d and session_id = %#x\n",
-				__func__, rc, inst->sess_id);
+				__func__, rc, hash32_ptr(inst->session));
 		goto stop_thread;
 	}
 
@@ -1433,26 +1318,19 @@ int msm_cvp_session_stop(struct msm_cvp_inst *inst,
 	struct msm_cvp_inst *s;
 	struct cvp_hfi_ops *ops_tbl;
 	u64 ktid;
-	struct msm_cvp_core *core = NULL;
 	int rc;
 
 	CVPKERNEL_ATRACE_BEGIN("msm_cvp_session_stop");
 
-	if (!inst) {
+	if (!inst || !inst->core) {
 		dprintk(CVP_ERR, "%s: invalid params\n", __func__);
-		return -EINVAL;
-	}
-
-	core = cvp_driver->cvp_core;
-	if (!core) {
-		dprintk(CVP_ERR, "%s: core is NULL", __func__);
 		return -EINVAL;
 	}
 
 	if (arg)
 		sc = &arg->data.session_ctrl;
 
-	s = cvp_get_inst_validate(core, inst);
+	s = cvp_get_inst_validate(inst->core, inst);
 	if (!s)
 		return -ECONNRESET;
 
@@ -1461,7 +1339,7 @@ int msm_cvp_session_stop(struct msm_cvp_inst *inst,
 	spin_lock(&sq->lock);
 	if (sq->state == QUEUE_STOP) {
 		dprintk(CVP_WARN, "Session %llx (%#x) already stopped\n",
-			inst, inst->sess_id);
+			inst, hash32_ptr(inst->session));
 		spin_unlock(&sq->lock);
 		rc = 0;
 		goto exit;
@@ -1478,7 +1356,7 @@ int msm_cvp_session_stop(struct msm_cvp_inst *inst,
 
 	pr_info_ratelimited(CVP_PID_TAG "Stop session: %pK session_id = %#x\n",
 			current->pid, current->tgid, "sess",
-			inst, inst->sess_id);
+			inst, hash32_ptr(inst->session));
 	spin_unlock(&sq->lock);
 
 	ops_tbl = inst->core->dev_ops;
@@ -1498,7 +1376,7 @@ int msm_cvp_session_stop(struct msm_cvp_inst *inst,
 	if (rc) {
 		dprintk(CVP_WARN,
 			"%s: wait for signal failed, rc %d and session_id = %#x, retry flush_stop\n",
-			__func__, rc, inst->sess_id);
+			__func__, rc, hash32_ptr(inst->session));
 		rc = msm_cvp_session_flush_stop(inst);
 		goto exit;
 	}
@@ -1517,12 +1395,11 @@ stop_thread:
 	call_hfi_op(ops_tbl, pm_qos_update, ops_tbl->hfi_device_data);
 
 exit:
-	pr_info_ratelimited(CVP_PID_TAG "Stop session done for session_id = %#x\n",
-			current->pid, current->tgid, "sess",
-			inst->sess_id);
-
 	cvp_put_inst(s);
 	CVPKERNEL_ATRACE_END("msm_cvp_session_stop");
+	pr_info_ratelimited(CVP_PID_TAG "Stop session done for session_id = %#x\n",
+			current->pid, current->tgid, "sess",
+			hash32_ptr(inst->session));
 	return rc;
 }
 
@@ -1542,7 +1419,7 @@ int msm_cvp_session_queue_stop(struct msm_cvp_inst *inst)
 	sq->state = QUEUE_STOP;
 
 	dprintk(CVP_SESS, "Stop session queue: %pK session_id = %#x\n",
-			inst, inst->sess_id);
+			inst, hash32_ptr(inst->session));
 	spin_unlock(&sq->lock);
 
 	wake_up_all(&inst->session_queue.wq);
@@ -1600,7 +1477,6 @@ static int msm_cvp_get_sysprop(struct msm_cvp_inst *inst,
 	int inst_idx = 0;
 	struct msm_cvp_inst *curr_inst = NULL;
 #endif
-	CVPKERNEL_ATRACE_BEGIN("msm_cvp_get_sysprop");
 
 	if (!inst || !inst->core || !inst->core->dev_ops) {
 		dprintk(CVP_ERR, "%s: invalid params\n", __func__);
@@ -1747,7 +1623,6 @@ static int msm_cvp_get_sysprop(struct msm_cvp_inst *inst,
 			rc = -EFAULT;
 		}
 	}
-	CVPKERNEL_ATRACE_END("msm_cvp_get_sys_prop");
 	return rc;
 }
 
@@ -2096,7 +1971,7 @@ static int cvp_clean_fence_queue(struct msm_cvp_inst *inst, int synx_state)
 		ktid = f->pkt->header.client_data.kdata & (FENCE_BIT - 1);
 
 		dprintk(CVP_SYNX, "%s: (%#x) flush frame %llu %llu wait_list\n",
-			__func__, inst->sess_id, ktid, f->frame_id);
+			__func__, hash32_ptr(inst->session), ktid, f->frame_id);
 
 		if (f->signature != 0xB0BABABE) {
 			list_del_init(&f->list);
@@ -2119,7 +1994,7 @@ check_sched:
 		ktid = f->pkt->header.client_data.kdata & (FENCE_BIT - 1);
 
 		dprintk(CVP_SYNX, "%s: (%#x)flush frame %llu %llu sched_list\n",
-			__func__, inst->sess_id, ktid, f->frame_id);
+			__func__, hash32_ptr(inst->session), ktid, f->frame_id);
 
 		if (f->signature != 0xB0BABABE)
 			/* Kernel Fencing */
@@ -2171,32 +2046,22 @@ int cvp_session_flush_all(struct msm_cvp_inst *inst)
 	struct cvp_fence_queue *q;
 	struct cvp_hfi_ops *ops_tbl;
 	u64 ktid;
-	struct msm_cvp_core *core = NULL;
 
 	CVPKERNEL_ATRACE_BEGIN("cvp_session_flush_all");
 
-	if (!inst) {
+	if (!inst || !inst->core) {
 		dprintk(CVP_ERR, "%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	core = cvp_driver->cvp_core;
-	if (!core) {
-		dprintk(CVP_ERR, "%s: core is NULL", __func__);
-		return -EINVAL;
-	}
-
-	s = cvp_get_inst_validate(core, inst);
+	s = cvp_get_inst_validate(inst->core, inst);
 	if (!s)
 		return -ECONNRESET;
 
 	dprintk(CVP_SESS, "session %llx (%#x)flush all starts\n",
-			inst, inst->sess_id);
+			inst, hash32_ptr(inst->session));
 	q = &inst->fence_cmd_queue;
 	ops_tbl = inst->core->dev_ops;
-
-	/* Boost EVA clock frequency before sending flush to FW*/
-	msm_cvp_set_fmax(inst->core);
 
 	/*
 	 * Session fence queue is set to OP_DRAIN mode below
@@ -2207,8 +2072,9 @@ int cvp_session_flush_all(struct msm_cvp_inst *inst)
 		goto exit;
 
 	dprintk(CVP_SESS, "%s: (%#x) send flush to fw\n",
-			__func__, inst->sess_id);
+			__func__, hash32_ptr(inst->session));
 
+	/* Send flush to FW */
 	ktid = atomic64_inc_return(&inst->core->kernel_trans_id);
 	ktid &= (FENCE_BIT - 1);
 	rc = call_hfi_op(ops_tbl, session_flush, (void *)inst->session, ktid);
@@ -2225,11 +2091,9 @@ int cvp_session_flush_all(struct msm_cvp_inst *inst)
 			__func__, rc);
 	else
 		dprintk(CVP_SESS, "%s: (%#x) received flush from fw\n",
-			__func__, inst->sess_id);
+			__func__, hash32_ptr(inst->session));
 
 exit:
-	/* Restore original EVA clock freq */
-	msm_cvp_set_clocks(inst->core);
 	if (!rc)
 		rc = cvp_drain_fence_sched_list(inst);
 
@@ -2251,8 +2115,7 @@ int msm_cvp_handle_syscall(struct msm_cvp_inst *inst, struct eva_kmd_arg *arg)
 		dprintk(CVP_ERR, "%s: invalid args\n", __func__);
 		return -EINVAL;
 	}
-	dprintk(CVP_HFI, "%s: arg->type = %x, for session_id 0x%x",
-			__func__, arg->type, inst->sess_id);
+	dprintk(CVP_HFI, "%s: arg->type = %x", __func__, arg->type);
 
 	if (arg->type != EVA_KMD_SESSION_CONTROL &&
 		arg->type != EVA_KMD_SET_SYS_PROPERTY &&
@@ -2355,10 +2218,10 @@ int msm_cvp_session_deinit(struct msm_cvp_inst *inst)
 		return -EINVAL;
 	}
 	dprintk(CVP_SESS, "%s: inst %pK (%#x)\n", __func__,
-		inst, inst->sess_id);
+		inst, hash32_ptr(inst->session));
 
-	session = (struct cvp_hal_session *)get_sess_from_idr(inst);
-	if (!session || session != inst->session)
+	session = (struct cvp_hal_session *)inst->session;
+	if (!session)
 		return rc;
 
 	rc = msm_cvp_comm_try_state(inst, MSM_CVP_CLOSE_DONE);
@@ -2379,7 +2242,7 @@ int msm_cvp_session_init(struct msm_cvp_inst *inst)
 	}
 
 	dprintk(CVP_SESS, "%s: inst %pK (%#x)\n", __func__,
-		inst, inst->sess_id);
+		inst, hash32_ptr(inst->session));
 
 	/* set default frequency */
 	inst->clk_data.min_freq = 1000;

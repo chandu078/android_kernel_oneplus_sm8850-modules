@@ -16,7 +16,6 @@
 #include <linux/types.h>
 #include <linux/version.h>
 #include <linux/io.h>
-#include <linux/vmalloc.h>
 #include "msm_cvp_core.h"
 #include "msm_cvp_common.h"
 #include "msm_cvp_debug.h"
@@ -133,8 +132,6 @@ static int msm_cvp_initialize_core(struct platform_device *pdev,
 	INIT_LIST_HEAD(&core->instances);
 	mutex_init(&core->lock);
 	mutex_init(&core->clk_lock);
-	mutex_init(&core->idr_lock);
-	idr_init(&core->sess_idr);
 
 	core->state = CVP_CORE_UNINIT;
 	for (i = SYS_MSG_INDEX(SYS_MSG_START);
@@ -298,11 +295,8 @@ static int msm_probe_cvp_device(struct platform_device *pdev)
 	}
 
 	core = kzalloc(sizeof(*core), GFP_KERNEL);
-	if (!core) {
-		dprintk(CVP_ERR, "Failed to allocate memory for core, size 0x%x\n",
-				sizeof(*core));
+	if (!core)
 		return -ENOMEM;
-	}
 
 	core->platform_data = cvp_get_drv_data(&pdev->dev);
 	dev_set_drvdata(&pdev->dev, core);
@@ -385,16 +379,6 @@ static int msm_probe_cvp_device(struct platform_device *pdev)
 
 	cvp_driver->sku_version = core->resources.sku_version;
 
-	core->kmd_trace.kmd_debug_log.log = vmalloc(sizeof(struct cvp_debug_log));
-	if (!core->kmd_trace.kmd_debug_log.log) {
-		dprintk(CVP_ERR, "%s: cvp_debug_log memory allocation failed, size 0x%x\n",
-				__func__, sizeof(struct cvp_debug_log));
-		rc = -ENOMEM;
-		goto fail_dbglog_alloc;
-	} else {
-		memset((void *)core->kmd_trace.kmd_debug_log.log, 0, sizeof(struct cvp_debug_log));
-	}
-
 	dprintk(CVP_CORE, "populating sub devices\n");
 	/*
 	 * Trigger probe for each sub-device i.e. qcom,msm-cvp,context-bank.
@@ -429,9 +413,6 @@ static int msm_probe_cvp_device(struct platform_device *pdev)
 	return rc;
 
 err_fail_sub_device_probe:
-	vfree(core->kmd_trace.kmd_debug_log.log);
-	core->kmd_trace.kmd_debug_log.log = NULL;
-fail_dbglog_alloc:
 	cvp_hfi_deinitialize(core->hfi_type, core->dev_ops);
 	debugfs_remove_recursive(cvp_driver->debugfs_root);
 err_hfi_initialize:
@@ -527,14 +508,10 @@ static int msm_cvp_remove(struct platform_device *pdev)
 		goto exit;
 	}
 
-	if (core->kmd_trace.kmd_debug_log.log)
-		vfree(core->kmd_trace.kmd_debug_log.log);
 	cvp_hfi_deinitialize(core->hfi_type, core->dev_ops);
 	msm_cvp_free_platform_resources(&core->resources);
 	sysfs_remove_group(&pdev->dev.kobj, &msm_cvp_core_attr_group);
 	dev_set_drvdata(&pdev->dev, NULL);
-	idr_destroy(&core->sess_idr);
-	mutex_destroy(&core->idr_lock);
 	mutex_destroy(&core->lock);
 	mutex_destroy(&core->clk_lock);
 	kfree(core);

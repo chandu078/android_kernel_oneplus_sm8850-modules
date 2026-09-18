@@ -1,4 +1,3 @@
-load(":repo_paths.bzl", "soc_label")
 load(
     "//build/kernel/kleaf:kernel.bzl",
     "ddk_module",
@@ -83,8 +82,8 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
     kernel_build = "{}_{}".format(target, variant)
 
     kernel_build_label = select({
-        "//build/kernel/kleaf:socrepo_true": soc_label("{}_{}_base_kernel".format(target, variant)),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}_{}".format(target, variant),
+        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_{}_base_kernel".format(target, variant),
+        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}_{}".format(target, variant),
     })
 
     modules = [registry.get(module_name) for module_name in modules]
@@ -94,15 +93,15 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
 
     headers = select({
          "//build/kernel/kleaf:socrepo_true": [
-            soc_label("all_headers"),
-            soc_label("{}_{}/drivers/firmware/qcom/qcom-scm".format(target, variant)),
-            soc_label("{}_{}/drivers/soc/qcom/mdt_loader".format(target, variant)),
-            soc_label("{}_{}/drivers/soc/qcom/llcc-qcom".format(target, variant)),
-            soc_label("{}_{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(target, variant)),
-            soc_label("{}_{}/drivers/virt/gunyah/gh_rm_drv".format(target, variant)),
-            soc_label("{}_{}/drivers/virt/gunyah/gh_msgq".format(target, variant)),
+            "//vendor/qcom/kernel:all_headers",
+            "//vendor/qcom/kernel:{}_{}/drivers/firmware/qcom/qcom-scm".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/soc/qcom/mdt_loader".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/soc/qcom/llcc-qcom".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/soc/qcom/mem_buf/mem_buf_dev".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/virt/gunyah/gh_rm_drv".format(target, variant),
+            "//vendor/qcom/kernel:{}_{}/drivers/virt/gunyah/gh_msgq".format(target, variant),
             ],
-         "//build/kernel/kleaf:socrepo_false":["//msm-kernel:all_headers"],
+         "//build/kernel/kleaf:socrepo_false":["//vendor/qcom/kernel:all_headers"],
     })
 
     all_module_rules = []
