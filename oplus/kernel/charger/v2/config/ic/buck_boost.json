@@ -1742,27 +1742,8 @@
                     }
                 }
             }
-        },
-        {
-            "lable": "OPLUS_IC_FUNC_BUCK_SEND_GET_SINK_CAP",
-            "desc": {
-                "zh": "发送get_sink_cap命令"
-            },
-            "auto_debug_code": true,
-            "parameter_list": [],
-            "parameter_desc": [],
-            "vict": {
-                "read": false,
-                "write": {
-                    "cmd": "vict -f {id} -S vic-*",
-                    "desc": {
-                        "zh": "N/A"
-                    }
-                },
-                "overwrite": false
-            }
         }
     ],
 
-    "version": "V8.0:64:c961fd8b65f56b4b1d4ddccc2bb6ba951b69517bb7c9becec2f0a061d448f4fd"
+    "version": "V7.1:63:653970e0a9666b16c5c3183bae9e6c90ce08ba89ff76cd7e1db7b10a40780fc9"
 }

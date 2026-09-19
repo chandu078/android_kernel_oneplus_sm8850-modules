@@ -807,13 +807,17 @@ static const char * const bg_kthread_comm[] = {
 	"bp_prefill_camera",
 	"bp_camera",
 	"bp_mtk_mm",
+
 	/* hybridswapd */
 	"hybridswapd",
+
+	/* chp kthread */
+	"khpage_poold",
+
 	/* uxmem refill kthread */
 	"ux_page_pool_",
-	/* ezreclaimd renamed to erm_reclaimd on kernel 6.12 */
-	"erm_reclaimd",
-	"erm_released",
+	/*ezreclaimd */
+	"ezreclaimd",
 };
 
 /*
@@ -903,8 +907,6 @@ static int __init logger_init(void)
 	osvelte_common_init(osvelte_kobj);
 
 	/* lowmem_dbg need common module */
-	mm_config_init(root);
-
 	ret = osvelte_lowmem_dbg_init(osvelte_kobj, root);
 	if (unlikely(ret))
 		goto remove_procfs;
@@ -912,6 +914,8 @@ static int __init logger_init(void)
 	ret = sys_memstat_init(root);
 	if (unlikely(ret))
 		goto remove_procfs;
+
+	mm_config_init(root);
 
 	ret = create_log(DEV_NAME, 512 * 1024);
 	if (unlikely(ret))

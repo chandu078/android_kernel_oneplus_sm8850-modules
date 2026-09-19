@@ -1,4 +1,4 @@
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_define.bzl",
+load("//build/kernel/oplus:oplus_modules_define.bzl",
     "oplus_ddk_get_target",
     "oplus_ddk_get_variant")
 

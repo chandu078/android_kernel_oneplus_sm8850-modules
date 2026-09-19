@@ -1,6 +1,6 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_kernel_version", "oplus_ddk_get_target", "oplus_ddk_get_variant", "bazel_support_platform")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
+load("//build/kernel/oplus:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_kernel_version", "oplus_ddk_get_target", "oplus_ddk_get_variant", "bazel_support_platform")
+load("//build/kernel/oplus:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
 
 def version_compare(v1, v2):
     v1_parts = [int(x) for x in v1.split(".")]
@@ -29,8 +29,8 @@ def define_oplus_local_modules():
     else :
         oplus_fp_ko_deps =select({
                 "//build/kernel/kleaf:socrepo_true": [
-                    "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/touchpanel_notify/bazel:oplus_bsp_tp_notify",
-                    "//vendor/qcom/kernel:{}/drivers/soc/qcom/panel_event_notifier".format(kernel_build_variant),
+                    "//vendor/oplus/kernel/touchpanel/touchpanel_notify/bazel:oplus_bsp_tp_notify",
+                    "//soc-repo:{}/drivers/soc/qcom/panel_event_notifier".format(kernel_build_variant),
                 ],
                 "//build/kernel/kleaf:socrepo_false": [],
             })
@@ -57,7 +57,7 @@ def define_oplus_local_modules():
         },
         local_defines = ["CONFIG_OPLUS_FINGERPRINT_GKI_ENABLE","CONFIG_TOUCHPANEL_NOTIFY"],
         header_deps = [
-            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/oplus_touchscreen_v2:config_headers",
+            "//vendor/oplus/kernel/touchpanel/oplus_touchscreen_v2:config_headers",
         ],
     )
 

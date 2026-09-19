@@ -1,6 +1,6 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_target", "bazel_support_platform", "oplus_ddk_get_variant")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
+load("//build/kernel/oplus:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_target", "bazel_support_platform", "oplus_ddk_get_variant")
+load("//build/kernel/oplus:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
 
 def define_oplus_game_opt_local_modules():
     target = oplus_ddk_get_target()
@@ -8,9 +8,9 @@ def define_oplus_game_opt_local_modules():
     kernel_build_variant = "{}_{}".format(target, variant)
 
     if bazel_support_platform == "qcom" :
-        ddk_config = "//vendor/qcom/kernel:{}_config".format(kernel_build_variant)
+        ddk_config = "//soc-repo:{}_config".format(kernel_build_variant)
         copts = []
-        ko_deps = ["//vendor/qcom/kernel:{}/kernel/sched/walt/sched-walt".format(kernel_build_variant)]
+        ko_deps = ["//soc-repo:{}/kernel/sched/walt/sched-walt".format(kernel_build_variant)]
     else :
         ddk_config = None
         copts = [
@@ -54,6 +54,6 @@ def define_oplus_game_opt_local_modules():
         config = ddk_config,
         copts = copts,
         ko_deps = ko_deps,
-        header_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/cpu:config_headers"],
+        header_deps = ["//vendor/oplus/kernel/cpu:config_headers"],
         local_defines = [],
     )

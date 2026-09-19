@@ -10754,50 +10754,6 @@ static int oplus_chg_get_vdm_info(struct oplus_chg_ic_dev *ic_dev, u32 *data, in
 
 	return 0;
 }
-
-static int oplus_send_get_sink_cap(struct battery_chg_dev *bcdev)
-{
-	struct psy_state *pst = NULL;
-	int rc = 0;
-	pst = &bcdev->psy_list[PSY_TYPE_USB];
-
-	if (bcdev->soccp_support) {
-		rc = write_property_id(bcdev, &bcdev->oplus_psy, OPLUS_SET_PD_SINK_CAP, true);
-	} else {
-		rc = write_property_id(bcdev, pst, USB_PD_SEND_GET_SINK_CAP, true);
-	}
-	if (rc)
-		chg_err("adsp send get_sink_cap failed, rc=%d\n", rc);
-
-	return rc;
-}
-
-static int oplus_chg_send_get_sink_cap(struct oplus_chg_ic_dev *ic_dev)
-{
-	struct battery_chg_dev *bcdev;
-	int rc = 0;
-
-	if (ic_dev == NULL) {
-		chg_err("ic_dev is NULL");
-		return -ENODEV;
-	}
-
-	bcdev = oplus_chg_ic_get_drvdata(ic_dev);
-
-	if (bcdev == NULL) {
-		chg_err("bcdev is NULL");
-		return -ENODEV;
-	}
-
-	if (!bcdev->otg_online) {
-		chg_err("not source, skip");
-		return -EINVAL;
-	}
-
-	rc = oplus_send_get_sink_cap(bcdev);
-	return rc;
-}
-
 static void *oplus_chg_8350_buck_get_func(struct oplus_chg_ic_dev *ic_dev, enum oplus_chg_ic_func func_id)
 {
 	void *func = NULL;
@@ -11048,9 +11004,6 @@ static void *oplus_chg_8350_buck_get_func(struct oplus_chg_ic_dev *ic_dev, enum 
 		break;
 	case OPLUS_IC_FUNC_BUCK_GET_VDM_INFO:
 		func = OPLUS_CHG_IC_FUNC_CHECK(OPLUS_IC_FUNC_BUCK_GET_VDM_INFO, oplus_chg_get_vdm_info);
-		break;
-	case OPLUS_IC_FUNC_BUCK_SEND_GET_SINK_CAP:
-		func = OPLUS_CHG_IC_FUNC_CHECK(OPLUS_IC_FUNC_BUCK_SEND_GET_SINK_CAP, oplus_chg_send_get_sink_cap);
 		break;
 	default:
 		chg_err("this func(=%d) is not supported\n", func_id);

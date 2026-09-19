@@ -384,16 +384,6 @@ static void sc8547d_awake_init(struct sc8547d_device *chip)
 	chip->chip_ws = wakeup_source_register(chip->dev, "sc8547d_ws");
 }
 
-static void sc8547d_awake_deinit(struct sc8547d_device *chip)
-{
-	if (!chip || !chip->chip_ws) {
-		chg_err("chip is NULL\n");
-		return;
-	}
-	wakeup_source_unregister(chip->chip_ws);
-	chip->chip_ws = NULL;
-}
-
 __maybe_unused static void sc8547d_set_awake(struct sc8547d_device *chip, bool awake)
 {
 	static bool pm_flag = false;
@@ -627,8 +617,6 @@ static void sc8547_voocphy_update_data(struct oplus_voocphy_manager *chip)
 		chip->cp_vbat, chip->cp_vac, chip->interrupt_flag, chip->int_column[0],
 		chip->int_column[1], chip->int_column[2], chip->int_column[3]);
 
-	if (chip->voocphy_dual_cp_support)
-		sc8547_slave_update_data(chip);
 }
 
 static int sc8547_voocphy_get_cp_ichg(struct oplus_voocphy_manager *voocphy)
@@ -2130,26 +2118,8 @@ static u8 sc8547d_voocphy_get_vbus_status(struct oplus_voocphy_manager *chip)
 
 static void sc8547_create_device_node(struct device *dev)
 {
-	int ret;
-
-	ret = device_create_file(dev, &dev_attr_registers);
-	if (ret && ret != -EEXIST)
-		chg_err("create registers node failed, rc=%d\n", ret);
-
-	ret = device_create_file(dev, &dev_attr_track_reg);
-	if (ret && ret != -EEXIST)
-		chg_err("create track_reg node failed, rc=%d\n", ret);
-}
-
-static void sc8547_remove_device_node(struct device *dev)
-{
-	if (!dev) {
-		chg_err("device is NULL\n");
-		return;
-	}
-
-	device_remove_file(dev, &dev_attr_registers);
-	device_remove_file(dev, &dev_attr_track_reg);
+	device_create_file(dev, &dev_attr_registers);
+	device_create_file(dev, &dev_attr_track_reg);
 }
 
 static struct oplus_voocphy_operations oplus_sc8547_ops = {
@@ -2545,7 +2515,12 @@ static int sc8547_slave_charger_choose(struct sc8547d_device *chip)
 		pr_err("0x07 = %d\n", ret);
 		if (ret < 0) {
 			pr_err("i2c communication fail");
-			return -EPROBE_DEFER;
+			if (oplus_voocphy_slave_chip_is_null()) {
+				return -EPROBE_DEFER;
+			} else {
+				chg_err("not use sc8547d slave");
+				return ret;
+			}
 		}
 		else
 			return 1;
@@ -3791,6 +3766,7 @@ static int sc8547d_parse_dt(struct sc8547d_device *chip)
 	chg_info("use_vooc_phy=%d, use_ufcs_phy=%d, use_slave_cp=%d, vac_support=%d, always_otg_en=%d\n",
 		 chip->use_vooc_phy, chip->use_ufcs_phy, chip->use_slave_cp, chip->vac_support,
 		 chip->always_otg_en);
+
 	return 0;
 }
 
@@ -3805,15 +3781,6 @@ static void sc8547_mms_wait_topic(struct sc8547d_device *chip)
 	if (chip->use_ufcs_phy)
 		oplus_mms_wait_topic("error", sc8547d_subscribe_error_topic, chip);
 	oplus_mms_wait_topic("wired", sc8547d_subscribe_wired_topic, chip);
-}
-
-static void sc8547d_init_default(struct sc8547d_device *chip)
-{
-	chip->ufcs_enable = false;
-	chip->voocphy_enable = false;
-	vote(chip->disable_votable, DEF_VOTER, false, 0, false);
-
-	sc8547_mms_wait_topic(chip);
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0))
@@ -3874,7 +3841,7 @@ static int sc8547d_driver_probe(struct i2c_client *client,
 		rc = sc8547_charger_choose(chip);
 		if (rc <= 0) {
 			chg_err("choose error, rc=%d\n", rc);
-			goto choose_err;
+			goto regmap_init_err;
 		}
 		if (!sc8547d_hw_version_check(chip)) {
 			chg_err("not sc8547d\n");
@@ -3891,7 +3858,7 @@ static int sc8547d_driver_probe(struct i2c_client *client,
 		rc = sc8547_slave_charger_choose(chip);
 		if (rc <= 0) {
 			chg_err("slave cp choose error, rc=%d\n", rc);
-			goto choose_err;
+			goto regmap_init_err;
 		}
 		if (!sc8547d_hw_version_check(chip)) {
 			chg_err("not sc8547d\n");
@@ -3939,7 +3906,11 @@ skip_ufcs_reg:
 		goto cp_reg_err;
 	}
 
-	sc8547d_init_default(chip);
+	chip->ufcs_enable = false;
+	chip->voocphy_enable = false;
+	vote(chip->disable_votable, DEF_VOTER, false, 0, false);
+
+	sc8547_mms_wait_topic(chip);
 	chg_info("sc8547d(%s) probe successfully\n", chip->dev->of_node->name);
 
 	return 0;
@@ -3955,9 +3926,6 @@ irq_reg_err:
 		ufcs_device_unregister(chip->ufcs);
 reg_ufcs_err:
 reg_voocphy_err:
-choose_err:
-	sc8547d_awake_deinit(chip);
-	sc8547_remove_device_node(&(client->dev));
 regmap_init_err:
 parse_dt_err:
 	devm_kfree(&client->dev, voocphy);

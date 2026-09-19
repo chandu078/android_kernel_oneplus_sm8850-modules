@@ -20,10 +20,11 @@ EXPORT_SYMBOL(game_update_geas_bwmon_params);
 int (*game_update_geas_emi_params)(struct emi_params * emi_datas) = NULL;
 EXPORT_SYMBOL(game_update_geas_emi_params);
 
+#if 0
 int (*game_update_geas_npu_params)(struct npu_params * npu_datas) = NULL;
 EXPORT_SYMBOL(game_update_geas_npu_params);
+#endif
 
-#if IS_ENABLED(CONFIG_CPU_IDLE_GOV_QCOM_LPM)
 extern int (*game_lpm_disable_cpu)(int cpu, u64 *timeout);
 
 static DEFINE_PER_CPU(int, cpu_lpm_disable);
@@ -71,7 +72,6 @@ int gameopt_lpm_disable_cpu(int cpu, u64 *timeout)
 	}
 	return 0;
 }
-#endif /* CONFIG_CPU_IDLE_GOV_QCOM_LPM */
 
 static long update_geas_params(void __user *uarg)
 {
@@ -90,36 +90,25 @@ static long update_geas_params(void __user *uarg)
 		goto ERROR_HANDLE;
 	}
 
-	if ((info.geasFlag & FRDR_FLAG) && game_update_geas_fdrive_params != NULL) {
-		info.fdrive_datas.resv[0] = info.resv[0];
+	if (info.geasFlag & FRDR_FLAG && game_update_geas_fdrive_params != NULL)
 		game_update_geas_fdrive_params(&(info.fdrive_datas));
-	}
 
-	if ((info.geasFlag & GPU_FLAG) && game_update_geas_gpu_params != NULL) {
-		info.gpu_datas.resv[0] = info.resv[0];
+	if (info.geasFlag & GPU_FLAG && game_update_geas_gpu_params != NULL)
 		game_update_geas_gpu_params(&(info.gpu_datas));
-	}
 
-	if ((info.geasFlag & MEM_FALG) && game_update_geas_memlat_params != NULL) {
-		info.memlat_datas.resv[0] = info.resv[0];
+	if (info.geasFlag & MEM_FALG && game_update_geas_memlat_params != NULL)
 		game_update_geas_memlat_params(&(info.memlat_datas));
-	}
 
-	if ((info.geasFlag & BWM_FLAG) && game_update_geas_bwmon_params != NULL) {
-		info.bwmon_datas.resv[0] = info.resv[0];
+	if (info.geasFlag & BWM_FLAG && game_update_geas_bwmon_params != NULL)
 		game_update_geas_bwmon_params(&(info.bwmon_datas));
-	}
 
-	if ((info.geasFlag & EMI_FLAG) && game_update_geas_emi_params != NULL) {
-		info.emi_datas.resv[0] = info.resv[0];
+	if (info.geasFlag & EMI_FLAG && game_update_geas_emi_params != NULL)
 		game_update_geas_emi_params(&(info.emi_datas));
-	}
 
-	if ((info.geasFlag & NPU_FLAG) && game_update_geas_npu_params != NULL) {
-		info.npu_datas.resv[0] = info.resv[0];
+#if 0
+	if (info.cxFlag & NPU_FLAG && game_update_geas_npu_params != NULL)
 		game_update_geas_npu_params(&(info.npu_datas));
-	}
-
+#endif
 	goto out;
 
 ERROR_HANDLE:

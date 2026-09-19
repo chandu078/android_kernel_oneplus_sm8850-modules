@@ -1,6 +1,6 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_target", "oplus_ddk_get_variant", "bazel_support_platform", "oplus_ddk_get_kernel_version")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
+load("//build/kernel/oplus:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_target", "oplus_ddk_get_variant", "bazel_support_platform", "oplus_ddk_get_kernel_version")
+load("//build/kernel/oplus:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
 
 def define_oplus_geas_system_local_modules():
     target = oplus_ddk_get_target()
@@ -17,18 +17,18 @@ def define_oplus_geas_system_local_modules():
 
     if bazel_support_platform == "qcom":
         deps = [
-            "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_frame_boost",
-            "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_game_opt",
-            "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:ua_cpu_ioctl",
-            "//vendor/qcom/sm8850-modules/qcom/opensource/graphics-kernel:{}_msm_kgsl".format(tv),
-            "//vendor/qcom/kernel:{}/drivers/soc/qcom/dcvs/bwmon".format(tv),
-            "//vendor/qcom/kernel:{}/drivers/soc/qcom/dcvs/memlat".format(tv),
-            "//vendor/qcom/kernel:{}/drivers/soc/qcom/dcvs/qcom-pmu-lib".format(tv),
-            "//vendor/qcom/kernel:{}/drivers/soc/qcom/dcvs/qcom-dcvs".format(tv),
+            "//vendor/oplus/kernel/cpu:oplus_bsp_frame_boost",
+            "//vendor/oplus/kernel/cpu:oplus_bsp_game_opt",
+            "//vendor/oplus/kernel/cpu:ua_cpu_ioctl",
+            "//vendor/qcom/opensource/graphics-kernel:{}_msm_kgsl".format(tv),
+            "//soc-repo:{}/drivers/soc/qcom/dcvs/bwmon".format(tv),
+            "//soc-repo:{}/drivers/soc/qcom/dcvs/memlat".format(tv),
+            "//soc-repo:{}/drivers/soc/qcom/dcvs/qcom-pmu-lib".format(tv),
+            "//soc-repo:{}/drivers/soc/qcom/dcvs/qcom-dcvs".format(tv),
         ]
     elif bazel_support_platform == "mtk":
         deps = [
-            "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_game_opt",
+            "//vendor/oplus/kernel/cpu:oplus_bsp_game_opt",
             "//kernel_device_modules-{}/drivers/misc/mediatek/dvfsrc:mtk-dvfsrc-helper".format(kernel_version),
         ]
     else :

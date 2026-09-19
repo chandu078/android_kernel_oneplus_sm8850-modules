@@ -14,7 +14,6 @@ ccflags-$(CONFIG_OPLUS_PD_MANAGER_CHARGER) += -I$(srctree)/drivers/usb/typec/tcp
 ccflags-$(CONFIG_OPLUS_PD_EXT_SUPPORT) += -I$(srctree)/drivers/power/oplus/pd_ext/inc
 ccflags-$(CONFIG_OPLUS_MT6375_CHARGER) += -I$(srctree)/drivers/misc/mediatek/typec/tcpc/inc
 ccflags-$(CONFIG_OPLUS_MT6379_CHARGER) += -I$(srctree)/drivers/misc/mediatek/typec/tcpc/inc
-ccflags-$(CONFIG_OPLUS_MT6769_CHARGER) += -I$(DEVICE_MODULES_PATH)/drivers/power/oplus/pd_ext/inc
 ccflags-y += -I$(srctree)/$(src)/ufcs/include
 ccflags-$(CONFIG_OPLUS_DYNAMIC_CONFIG_CHARGER) += -I$(srctree)/$(src)/../config
 ccflags-y += -Werror=parentheses
@@ -38,11 +37,6 @@ ccflags-$(CONFIG_OPLUS_MT6789_CHARGER) += -I$(DEVICE_MODULES_PATH)/drivers/misc/
 ccflags-$(CONFIG_OPLUS_MT6375_CHARGER) += -I$(DEVICE_MODULES_PATH)/drivers/power/supply
 ccflags-$(CONFIG_OPLUS_MT6375_CHARGER) += -I$(DEVICE_MODULES_PATH)/drivers/gpu/drm/mediatek/mediatek_v2
 ccflags-$(CONFIG_OPLUS_MT6375_CHARGER) += -I$(DEVICE_MODULES_PATH)/drivers/base/kernelFwUpdate
-
-ccflags-$(CONFIG_OPLUS_MT6769_CHARGER) += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/usb20/
-ccflags-$(CONFIG_OPLUS_MT6769_CHARGER) += -I$(DEVICE_MODULES_PATH)/drivers/power/supply
-ccflags-$(CONFIG_OPLUS_MT6769_CHARGER) += -I$(DEVICE_MODULES_PATH)/drivers/gpu/drm/mediatek/mediatek_v2
-ccflags-$(CONFIG_OPLUS_MT6769_CHARGER) += -I$(DEVICE_MODULES_PATH)/drivers/base/kernelFwUpdate
 
 ccflags-$(CONFIG_OPLUS_MT6379_CHARGER) += -I$(DEVICE_MODULES_PATH)/drivers/power/supply
 ccflags-$(CONFIG_OPLUS_MT6379_CHARGER) += -I$(DEVICE_MODULES_PATH)/drivers/gpu/drm/mediatek/mediatek_v2
@@ -141,13 +135,11 @@ oplus_chg_v2-$(CONFIG_OPLUS_ADSP_CHARGER) += charger_ic/oplus_hal_adsp.o
 oplus_chg_v2-$(CONFIG_OPLUS_MP2762_CHARGER) += charger_ic/oplus_hal_mp2650.o
 oplus_chg_v2-$(CONFIG_OPLUS_SGM41512_CHARGER) += charger_ic/oplus_hal_sgm41512.o
 oplus_chg_v2-$(CONFIG_OPLUS_SC6607_CHARGER) += charger_ic/oplus_hal_sc6607.o
-oplus_chg_v2-$(CONFIG_OPLUS_SY6974B_CHARGER) += charger_ic/oplus_hal_sy6974b.o
 oplus_chg_v2-$(CONFIG_OPLUS_SGM41515_CHARGER) += charger_ic/oplus_hal_sgm41515.o
 oplus_chg_v2-$(CONFIG_OPLUS_PD_MANAGER_CHARGER) += charger_ic/oplus_hal_pd_manager.o
 oplus_chg_v2-$(CONFIG_OPLUS_PD_EXT_SUPPORT) += charger_ic/oplus_hal_pd_manager.o
 oplus_chg_v2-$(CONFIG_OPLUS_MT6375_CHARGER) += charger_ic/oplus_hal_mtk6895S.o
 oplus_chg_v2-$(CONFIG_OPLUS_MT6835_CHARGER) += charger_ic/oplus_hal_mtk6895S.o
-oplus_chg_v2-$(CONFIG_OPLUS_MT6769_CHARGER) += charger_ic/oplus_hal_mtk6895S.o
 oplus_chg_v2-$(CONFIG_OPLUS_MT6375_CHARGER) += charger_ic/oplus_hal_mt6375.o
 oplus_chg_v2-$(CONFIG_OPLUS_MT6379_CHARGER) += charger_ic/oplus_hal_mtk6991V.o
 oplus_chg_v2-$(CONFIG_OPLUS_ADSP_SM8450_CHARGER) += charger_ic/oplus_hal_sm8450.o
@@ -157,7 +149,6 @@ oplus_chg_v2-$(CONFIG_OPLUS_SY6603_BATT_BAL) += batt_bal_ic/oplus_hal_sy6603.o
 oplus_chg_v2-$(CONFIG_OPLUS_SC7637_LEVEL_SHIFT) += level_shift_ic/oplus_hal_sc7637.o
 oplus_chg_v2-$(CONFIG_OPLUS_MT6375_CHARGER) += gauge_ic/oplus_hal_mtk_platform_gauge.o
 oplus_chg_v2-$(CONFIG_OPLUS_MT6835_CHARGER) += gauge_ic/oplus_hal_mtk_platform_gauge.o
-oplus_chg_v2-$(CONFIG_OPLUS_MT6769_CHARGER) += gauge_ic/oplus_hal_mtk_platform_gauge.o
 oplus_chg_v2-$(CONFIG_GAUGE_MT6379) += gauge_ic/oplus_hal_mtk_platform_gauge.o
 oplus_chg_v2-$(CONFIG_OPLUS_CHARGER_OPTIGA) += gauge_ic/oplus_optiga/ECC/Optiga_Ecc.o
 oplus_chg_v2-$(CONFIG_OPLUS_CHARGER_OPTIGA) += gauge_ic/oplus_optiga/ECC/Optiga_Math.o
@@ -190,6 +181,7 @@ oplus_chg_v2-$(CONFIG_OPLUS_CHG_VOOCPHY_CHGLIB) += voocphy/chglib/oplus_chglib.o
 oplus_chg_v2-$(CONFIG_OPLUS_VOOCPHY_MASTER_SC8547) += voocphy/phy/oplus_sc8547.o
 oplus_chg_v2-$(CONFIG_OPLUS_VOOCPHY_SLAVE_SC8547) += voocphy/phy/oplus_sc8547_slave.o
 oplus_chg_v2-$(CONFIG_OPLUS_VOOCPHY_SC8517) += voocphy/phy/oplus_sc8517.o
+oplus_chg_v2-$(CONFIG_OPLUS_VOOCPHY_SC8527) += voocphy/phy/oplus_sc8527.o
 oplus_chg_v2-$(CONFIG_OPLUS_VOOCPHY_MAX77939) += voocphy/phy/oplus_max77939.o
 oplus_chg_v2-$(CONFIG_OPLUS_VOOCPHY_HL7138) += voocphy/phy/oplus_hl7138.o
 oplus_chg_v2-$(CONFIG_OPLUS_VOOCPHY_SLAVE_HL7138) += voocphy/phy/oplus_hl7138_slave.o
@@ -211,6 +203,8 @@ oplus_chg_v2-$(CONFIG_OPLUS_WIRELESS_NU1669) += wireless_ic/oplus_hal_nu1669.o
 oplus_chg_v2-$(CONFIG_OPLUS_WIRELESS_P9415) += wireless_ic/oplus_hal_p9415.o
 oplus_chg_v2-$(CONFIG_OPLUS_WIRELESS_SC96257) += wireless_ic/oplus_hal_sc96257.o
 oplus_chg_v2-$(CONFIG_OPLUS_CHARGEPUMP_HL7227) += chargepump_ic/oplus_hal_hl7227.o
+
+oplus_chg_v2-$(CONFIG_OPLUS_BOOST_SC83107) += boost_ic/oplus_sc83107.o
 
 oplus_chg_v2-$(CONFIG_OPLUS_DEBUG_AUTH) += debug/oplus_debug_auth.o
 

@@ -1,7 +1,7 @@
 load("//build/kernel/kleaf:kernel.bzl", "checkpatch", "ddk_headers", "ddk_module")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_define.bzl", "oplus_ddk_get_target", "define_oplus_ddk_module",
+load("//build/kernel/oplus:oplus_modules_define.bzl", "oplus_ddk_get_target", "define_oplus_ddk_module",
  "oplus_ddk_get_kernel_version", "bazel_support_platform", "oplus_ddk_get_variant")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
+load("//build/kernel/oplus:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
 
 def version_compare(v1, v2):
     v1_parts = [int(x) for x in v1.split(".")]
@@ -106,15 +106,15 @@ def define_oplus_local_modules():
             "oplus_wificapcenter",
         ]
 
-        # QCOM only: used to form labels into //vendor/qcom/kernel:{target}_{variant}/
+        # QCOM only: used to form labels into //soc-repo:{target}_{variant}/
         if bazel_support_platform == "qcom" :
             _KERNEL_BUILD_VARIANT = "{}_{}".format(oplus_ddk_get_target(), oplus_ddk_get_variant())
             target = oplus_ddk_get_target()
 
             if target == "canoe":
                 wonder_ko_deps = [
-                    "//vendor/qcom/kernel:{}/net/wireless/cfg80211".format(_KERNEL_BUILD_VARIANT),
-                    "//vendor/qcom/kernel:{}/net/mac80211/mac80211".format(_KERNEL_BUILD_VARIANT),
+                    "//soc-repo:{}/net/wireless/cfg80211".format(_KERNEL_BUILD_VARIANT),
+                    "//soc-repo:{}/net/mac80211/mac80211".format(_KERNEL_BUILD_VARIANT),
                 ]
 
                 define_oplus_ddk_module(

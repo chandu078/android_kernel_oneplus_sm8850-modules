@@ -1,9 +1,9 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
 load("//build/kernel/kleaf:hermetic_tools.bzl", "hermetic_genrule")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_define.bzl", "define_oplus_ddk_module",
+load("//build/kernel/oplus:oplus_modules_define.bzl", "define_oplus_ddk_module",
     "oplus_ddk_get_kernel_version",
     "bazel_support_platform")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
+load("//build/kernel/oplus:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
 
 load(":kleaf-scripts/prebuild.bzl", "oplus_chg_ic_prebuild")
 load(":kleaf-scripts/targets.bzl", "oplus_modules_get_target_variant")
@@ -12,27 +12,27 @@ load(":kleaf-scripts/filter_target.bzl", "filter_deps_map")
 conditional_ko_deps = {
     "CONFIG_OPLUS_ADSP_CHARGER": {
         True: [
-            "//vendor/qcom/kernel:{target_variant}/drivers/soc/qcom/panel_event_notifier",
-            "//vendor/qcom/kernel:{target_variant}/drivers/soc/qcom/qti_pmic_glink",
-            "//vendor/qcom/kernel:{target_variant}/drivers/soc/qcom/pdr_interface",
-            "//vendor/qcom/kernel:{target_variant}/drivers/soc/qcom/qmi_helpers",
-            "//vendor/qcom/kernel:{target_variant}/drivers/remoteproc/rproc_qcom_common",
-            "//vendor/qcom/kernel:{target_variant}/drivers/rpmsg/qcom_smd",
-            "//vendor/qcom/kernel:{target_variant}/drivers/rpmsg/qcom_glink_smem",
-            "//vendor/qcom/kernel:{target_variant}/drivers/rpmsg/qcom_glink",
-            "//vendor/qcom/kernel:{target_variant}/kernel/trace/qcom_ipc_logging",
-            "//vendor/qcom/kernel:{target_variant}/drivers/soc/qcom/minidump",
-            "//vendor/qcom/kernel:{target_variant}/drivers/soc/qcom/smem",
-            "//vendor/qcom/kernel:{target_variant}/drivers/soc/qcom/debug_symbol",
-            "//vendor/qcom/kernel:{target_variant}/drivers/dma-buf/heaps/qcom_dma_heaps",
-            "//vendor/qcom/kernel:{target_variant}/drivers/iommu/msm_dma_iommu_mapping",
-            "//vendor/qcom/kernel:{target_variant}/drivers/soc/qcom/mem_buf/mem_buf_dev",
-            "//vendor/qcom/kernel:{target_variant}/drivers/soc/qcom/secure_buffer",
-            "//vendor/qcom/kernel:{target_variant}/drivers/firmware/qcom/qcom-scm",
-            "//vendor/qcom/kernel:{target_variant}/drivers/virt/gunyah/gh_rm_drv",
-            "//vendor/qcom/kernel:{target_variant}/drivers/virt/gunyah/gh_msgq",
-            "//vendor/qcom/kernel:{target_variant}/drivers/virt/gunyah/gh_dbl",
-            "//vendor/qcom/kernel:{target_variant}/arch/arm64/gunyah/gh_arm_drv",
+            "//soc-repo:{target_variant}/drivers/soc/qcom/panel_event_notifier",
+            "//soc-repo:{target_variant}/drivers/soc/qcom/qti_pmic_glink",
+            "//soc-repo:{target_variant}/drivers/soc/qcom/pdr_interface",
+            "//soc-repo:{target_variant}/drivers/soc/qcom/qmi_helpers",
+            "//soc-repo:{target_variant}/drivers/remoteproc/rproc_qcom_common",
+            "//soc-repo:{target_variant}/drivers/rpmsg/qcom_smd",
+            "//soc-repo:{target_variant}/drivers/rpmsg/qcom_glink_smem",
+            "//soc-repo:{target_variant}/drivers/rpmsg/qcom_glink",
+            "//soc-repo:{target_variant}/kernel/trace/qcom_ipc_logging",
+            "//soc-repo:{target_variant}/drivers/soc/qcom/minidump",
+            "//soc-repo:{target_variant}/drivers/soc/qcom/smem",
+            "//soc-repo:{target_variant}/drivers/soc/qcom/debug_symbol",
+            "//soc-repo:{target_variant}/drivers/dma-buf/heaps/qcom_dma_heaps",
+            "//soc-repo:{target_variant}/drivers/iommu/msm_dma_iommu_mapping",
+            "//soc-repo:{target_variant}/drivers/soc/qcom/mem_buf/mem_buf_dev",
+            "//soc-repo:{target_variant}/drivers/soc/qcom/secure_buffer",
+            "//soc-repo:{target_variant}/drivers/firmware/qcom/qcom-scm",
+            "//soc-repo:{target_variant}/drivers/virt/gunyah/gh_rm_drv",
+            "//soc-repo:{target_variant}/drivers/virt/gunyah/gh_msgq",
+            "//soc-repo:{target_variant}/drivers/virt/gunyah/gh_dbl",
+            "//soc-repo:{target_variant}/arch/arm64/gunyah/gh_arm_drv",
         ],
     },
     "CONFIG_OPLUS_CHARGER_MTK": {
@@ -95,10 +95,15 @@ conditional_ko_deps = {
     },
     "CONFIG_DISABLE_OPLUS_FUNCTION": {
         False: [
-            "//vendor/qcom/sm8850-modules/oplus/kernel/device_info/device_info/bazel:device_info",
-            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_bootmode",
-            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
-            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/kernelFwUpdate/bazel:oplus_bsp_fw_update",
+            "//vendor/oplus/kernel/device_info/device_info/bazel:device_info",
+            "//vendor/oplus/kernel/boot:oplus_bsp_bootmode",
+            "//vendor/oplus/kernel/boot:oplus_bsp_boot_projectinfo",
+            "//vendor/oplus/kernel/touchpanel/kernelFwUpdate/bazel:oplus_bsp_fw_update",
+        ],
+    },
+    "CONFIG_OPLUS_FEATURE_FEEDBACK": {
+        True: [
+             "//vendor/oplus/kernel/dft/bazel:oplus_bsp_dft_kernel_fb",
         ],
     },
 }
@@ -121,7 +126,7 @@ conditional_hdr_deps = {
     },
     "CONFIG_DISABLE_OPLUS_FUNCTION": {
         False: [
-            "//vendor/qcom/sm8850-modules/oplus/kernel/touchpanel/kernelFwUpdate/bazel:oplus_bsp_fw_update_headers",
+            "//vendor/oplus/kernel/touchpanel/kernelFwUpdate/bazel:oplus_bsp_fw_update_headers",
         ],
     },
 }

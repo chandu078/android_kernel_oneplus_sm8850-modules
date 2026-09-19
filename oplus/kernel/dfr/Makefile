@@ -31,6 +31,7 @@ obj-$(CONFIG_OPLUS_FEATURE_DUMP_REASON)	+=  qcom/dump_reason/
 obj-$(CONFIG_OPLUS_FEATURE_FULLDUMP_BACK) += qcom/oplus_ordump/
 #endif /* OPLUS_FEATURE_FULLDUMP_BACK */
 
+
 # common feature
 #ifdef OPLUS_FEATURE_SHUTDOWN_DETECT
 obj-$(CONFIG_OPLUS_FEATURE_SHUTDOWN_DETECT) += common/shutdown_detect/

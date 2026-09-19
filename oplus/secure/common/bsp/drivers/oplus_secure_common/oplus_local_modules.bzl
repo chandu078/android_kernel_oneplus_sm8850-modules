@@ -1,6 +1,6 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_target", "oplus_ddk_get_variant", "bazel_support_platform")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
+load("//build/kernel/oplus:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_target", "oplus_ddk_get_variant", "bazel_support_platform")
+load("//build/kernel/oplus:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
 
 def define_oplus_local_modules():
     target = oplus_ddk_get_target()
@@ -8,7 +8,7 @@ def define_oplus_local_modules():
     kernel_build_variant = "{}_{}".format(target, variant)
 
     if bazel_support_platform == "qcom" :
-        ko_deps = ["//vendor/qcom/kernel:{}/drivers/firmware/qcom/qcom-scm".format(kernel_build_variant)]
+        ko_deps = ["//soc-repo:{}/drivers/firmware/qcom/qcom-scm".format(kernel_build_variant)]
     else :
         ko_deps = []
 

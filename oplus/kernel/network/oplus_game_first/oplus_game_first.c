@@ -160,6 +160,7 @@ static struct ctl_table oplus_game_first_sysctl_table[] = {
 		.mode = 0644,
 		.proc_handler = proc_dointvec,
 	},
+	{}
 };
 
 static inline int genl_msg_prepare_usr_msg(u8 cmd, size_t size, pid_t pid, struct sk_buff **skbp)
@@ -576,8 +577,6 @@ static int __init oplus_game_first_init(void)
 
 static void __exit oplus_game_first_exit(void)
 {
-	nf_unregister_net_hooks(&init_net, oplus_tx_class_netfilter_ops,
-				ARRAY_SIZE(oplus_tx_class_netfilter_ops));
 	deinit_oplus_game_first_ctl();
 	unregister_hook_func();
 	oplus_game_first_netlink_exit();

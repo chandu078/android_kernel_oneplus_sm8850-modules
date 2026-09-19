@@ -1,5 +1,5 @@
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_kernel_version", "oplus_ddk_get_target", "oplus_ddk_get_variant", "bazel_support_platform")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
+load("//build/kernel/oplus:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_kernel_version", "oplus_ddk_get_target", "oplus_ddk_get_variant", "bazel_support_platform")
+load("//build/kernel/oplus:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
 
 def define_oplus_frame_boost_local_modules():
@@ -14,7 +14,7 @@ def define_oplus_frame_boost_local_modules():
         copts = ["-DCONFIG_SCHED_WALT"]
         kconfig = None
         defconfig = None
-        ddk_config = "//vendor/qcom/kernel:{}_config".format(kernel_build_variant)
+        ddk_config = "//soc-repo:{}_config".format(kernel_build_variant)
     else :
         ko_deps = [
         ]
@@ -57,7 +57,7 @@ def define_oplus_frame_boost_local_modules():
             "mtk":  ["CONFIG_OPLUS_SYSTEM_KERNEL_MTK"],
             "qcom": ["CONFIG_OPLUS_SYSTEM_KERNEL_QCOM","CONFIG_SCHED_WALT"],
         },
-        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist"],
+        ko_deps = ["//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist"],
         copts = copts,
         includes = ["."],
     )

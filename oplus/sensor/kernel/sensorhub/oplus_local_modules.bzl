@@ -1,6 +1,6 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_kernel_version", "oplus_ddk_get_target", "oplus_ddk_get_variant", "bazel_support_platform")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
+load("//build/kernel/oplus:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_kernel_version", "oplus_ddk_get_target", "oplus_ddk_get_variant", "bazel_support_platform")
+load("//build/kernel/oplus:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
 
 def version_compare(v1, v2):
     v1_parts = [int(x) for x in v1.split(".")]
@@ -41,7 +41,7 @@ def define_oplus_local_modules():
         includes = ["oplus_consumer_ir"],
         copts = oplus_mtk_copts,
         ko_deps = [
-            "//vendor/qcom/sm8850-modules/oplus/sensor/kernel/sensorhub:oplus_sensor_ir_core",
+            "//vendor/oplus/sensor/kernel/sensorhub:oplus_sensor_ir_core",
         ] + oplus_mtk_deps,
         local_defines = [],
         out = "oplus_sensor_kookong_ir_pwm.ko",

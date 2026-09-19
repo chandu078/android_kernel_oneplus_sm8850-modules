@@ -1,6 +1,6 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_kernel_version", "oplus_ddk_get_target", "oplus_ddk_get_variant", "bazel_support_platform")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
+load("//build/kernel/oplus:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_kernel_version", "oplus_ddk_get_target", "oplus_ddk_get_variant", "bazel_support_platform")
+load("//build/kernel/oplus:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
 
 def define_oplus_local_modules():
     target = oplus_ddk_get_target()
@@ -23,7 +23,7 @@ def define_oplus_local_modules():
             "//kernel_device_modules-{}/drivers/misc/mediatek/boot_common:mtk_boot_common".format(kernel_version),
         ]
         kmsg_wb_ko_deps = [
-            "//vendor/qcom/sm8850-modules/oplus/kernel/boot:oplus_bsp_dfr_phoenix",
+            "//vendor/oplus/kernel/boot:oplus_bsp_dfr_phoenix",
             "//kernel_device_modules-{}/drivers/soc/oplus/boot:oplus_bsp_boot_projectinfo".format(kernel_version),
         ]
 
@@ -100,7 +100,7 @@ def define_oplus_local_modules():
         ko_deps = [
                 ":buildvariant",
                 ":oplusboot",
-                "//vendor/qcom/kernel:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
+                "//soc-repo:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
         ]
         copts = ["-DCONFIG_QCOM_SMEM"]
     else :

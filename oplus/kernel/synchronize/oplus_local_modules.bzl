@@ -1,6 +1,6 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_define.bzl", "define_oplus_ddk_module")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
+load("//build/kernel/oplus:oplus_modules_define.bzl", "define_oplus_ddk_module")
+load("//build/kernel/oplus:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
 
 def define_oplus_local_modules():
 
@@ -33,7 +33,7 @@ def define_oplus_local_modules():
         conditional_defines = {
             "qcom": ["CONFIG_OPLUS_SYSTEM_KERNEL_QCOM"],
         },
-        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist"],
+        ko_deps = ["//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist"],
     )
 
     ddk_headers(
@@ -62,8 +62,8 @@ def define_oplus_local_modules():
             "qcom": ["CONFIG_OPLUS_SYSTEM_KERNEL_QCOM"],
         },
         ko_deps = [
-                            "//vendor/qcom/sm8850-modules/oplus/kernel/synchronize:oplus_locking_strategy",
-                            "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist",
+                            "//vendor/oplus/kernel/synchronize:oplus_locking_strategy",
+                            "//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist",
                         ],
     )
 

@@ -7,5 +7,5 @@ oplus_config = {
             "perf": oplus_canoe_perf_config,
             "consolidate": oplus_canoe_perf_config | oplus_canoe_consolidate_config
         }
-    }
+    },
 }

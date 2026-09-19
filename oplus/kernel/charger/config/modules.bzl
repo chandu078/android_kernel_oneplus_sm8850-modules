@@ -1,8 +1,8 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_define.bzl",
+load("//build/kernel/oplus:oplus_modules_define.bzl",
     "define_oplus_ddk_module", "oplus_ddk_get_kernel_version",
     "bazel_support_platform")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
+load("//build/kernel/oplus:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
 
 load(":kleaf-scripts/targets.bzl", "oplus_modules_get_target_variant")
 load(":kleaf-scripts/filter_target.bzl", "filter_deps_map")
@@ -18,7 +18,7 @@ def define_oplus_cfg_module():
         kconfig = None
         defconfig = None
         if version_compare(kernel_version, "6.12") :
-            ddk_config = "//vendor/qcom/kernel:{}_config".format(target)
+            ddk_config = "//soc-repo:{}_config".format(target)
     else:
         kconfig = ":kconfig.oplus_chg.generated"
         defconfig = ":oplus_chg_{}_defconfig".format(target)

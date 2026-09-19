@@ -1,6 +1,6 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_target", "oplus_ddk_get_variant")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
+load("//build/kernel/oplus:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_target", "oplus_ddk_get_variant")
+load("//build/kernel/oplus:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
 
 def define_oplus_local_modules():
     target = oplus_ddk_get_target()
@@ -9,7 +9,7 @@ def define_oplus_local_modules():
     bazel_support_target = oplus_ddk_get_target()
     if bazel_support_target == "canoe" :
         smem_ko_deps = [
-            "//vendor/qcom/kernel:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
+            "//soc-repo:{}/drivers/soc/qcom/smem".format(kernel_build_variant),
         ]
     else :
         smem_ko_deps = []

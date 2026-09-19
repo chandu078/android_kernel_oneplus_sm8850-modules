@@ -209,7 +209,7 @@ static void sys_delay(int ms)
 	msleep(ms);
 }
 
-static int focal_abs(int value)
+int focal_abs(int value)
 {
 	if (value < 0) {
 		value = 0 - value;
@@ -218,7 +218,7 @@ static int focal_abs(int value)
 	return value;
 }
 
-static void print_buffer(int *buffer, int length, int line_num)
+void print_buffer(int *buffer, int length, int line_num)
 {
 	int i = 0;
 	int j = 0;
@@ -265,7 +265,7 @@ static void print_buffer(int *buffer, int length, int line_num)
 #define CHANNEL_MATCH   2
 #define CHEN_MATCH      3
 #define ONE_MATCH       4
-static int ft3683g_output_data(int *buffer, struct chip_data_ft3683g *ts_data,
+int ft3683g_output_data(int *buffer, struct chip_data_ft3683g *ts_data,
                        struct auto_testdata *focal_testdata, int limit_type)
 {
 	uint8_t data_buf[64];
@@ -704,7 +704,7 @@ static int start_scan(void)
 /*
  * start_scan - start to scan a frame
  */
-static int ft3683g_start_scan(int frame_num)
+int ft3683g_start_scan(int frame_num)
 {
 	int ret = 0;
 	u8 addr = 0;
@@ -2476,7 +2476,7 @@ test_err:
 	return ret;
 }
 
-static int ft3683g_membist_write_cmd(int offset, int num)
+int ft3683g_membist_write_cmd(int offset, int num)
 {
 	u8 state_cmd[] = {0x70, 0x06, 0xf9, 0x80, 0x4e, 0x00, 0x00};
 	u8 addr_value = 0x71;
@@ -2513,7 +2513,7 @@ static int ft3683g_membist_write_cmd(int offset, int num)
 	return 0;
 }
 
-static int ft3683g_membist_read_cmd(u8 *cmd, u8 *data)
+int ft3683g_membist_read_cmd(u8 *cmd, u8 *data)
 {
 	int ret = 0;
 	u8 addr_value = 0x71;
@@ -2534,7 +2534,7 @@ static int ft3683g_membist_read_cmd(u8 *cmd, u8 *data)
 	return 0;
 }
 
-static bool ft3683g_debug_mode_check(void)
+bool ft3683g_debug_mode_check(void)
 {
 	u8 cmd[] = {0x70, 0x06, 0xf9, 0x80, 0x0d, 0x00, 0x00};
 	u8 addr_value = 0x71;
@@ -2561,7 +2561,7 @@ static bool ft3683g_debug_mode_check(void)
 	return false;
 }
 
-static bool ft3683g_enter_into_debug_mode(void)
+bool ft3683g_enter_into_debug_mode(void)
 {
 	int i = 0;
 	int ret = 0;

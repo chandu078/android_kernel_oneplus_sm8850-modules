@@ -24,7 +24,6 @@
 #include "../mm_osvelte/common.h"
 
 static struct config_oplus_bsp_zram_opt *config;
-static bool ezr_enabled;
 #endif /* CONFIG_OPLUS_FEATURE_MM_OSVELTE */
 
 static int g_direct_swappiness = 60;
@@ -146,6 +145,7 @@ static void balance_reclaim(void *unused, bool *balance_anon_file_reclaim)
 	unsigned long free_pages_threshold = 0;
 	unsigned long normal_zone_free_pages = 0;
 
+
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_OSVELTE)
 	if (config && config->balance_anon_file_reclaim_always_true) {
 		*balance_anon_file_reclaim = true;
@@ -240,10 +240,6 @@ static int register_zram_opt_vendor_hooks(void)
 {
 	int ret = 0;
 
-	/* if ezr is enabled, we skip swappiness hook */
-	if (ezr_enabled)
-		goto bypass_swappiness_hook;
-
 	ret = register_trace_android_vh_tune_swappiness(zo_set_swappiness, NULL);
 	if (ret != 0) {
 		pr_err("register_trace_android_vh_set_swappiness failed! ret=%d\n", ret);
@@ -270,7 +266,6 @@ static int register_zram_opt_vendor_hooks(void)
 			pr_err("register_trace_android_rvh_perform_reclaim failed! ret=%d\n", ret);
 	}
 
-bypass_swappiness_hook:
 #if IS_ENABLED(CONFIG_OPLUS_BALANCE_ANON_FILE_RECLAIM)
 	ret = register_trace_android_rvh_set_balance_anon_file_reclaim(balance_reclaim,
 								       NULL);
@@ -567,18 +562,12 @@ static int __init zram_opt_init(void)
 	int ret = 0;
 
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_OSVELTE)
-	struct config_ezreclaimd *erm_config;
-
 	config = oplus_read_mm_config(module_name_zram_opt);
 	if (config) {
 		pr_info("%s balance_anon_file_reclaim_always_true:%d\n",
 			module_name_zram_opt,
 			config->balance_anon_file_reclaim_always_true);
 	}
-
-	erm_config = oplus_read_mm_config(module_name_ezreclaimd);
-	if (erm_config)
-		ezr_enabled = erm_config->enable;
 #endif /* CONFIG_OPLUS_FEATURE_MM_OSVELTE */
 	ret = create_swappiness_para_proc();
 	if (ret)

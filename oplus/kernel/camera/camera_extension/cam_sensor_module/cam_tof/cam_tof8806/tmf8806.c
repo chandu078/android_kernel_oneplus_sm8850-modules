@@ -222,8 +222,8 @@ const tmf8806MeasureCmd defaultConfig =
 					}
 		, .algo = { .reserved0 = 0
 					, .distanceEnabled = 1
-					, .vcselClkDiv2 = 0
-					, .distanceMode = 0                             // 0=2.5m
+					, .vcselClkDiv2 = 1
+					, .distanceMode = 1                             // 0=2.5m
 					, .immediateInterrupt = 0
 					, .reserved = 0
 					, .algKeepReady = 0                             // 0 = power saving on
@@ -235,8 +235,8 @@ const tmf8806MeasureCmd defaultConfig =
 		, .snr = { .threshold = 6
 					, .vcselClkSpreadSpecAmplitude = 0
 					}
-		, .repetitionPeriodMs = 33
-		, .kIters  = 400
+		, .repetitionPeriodMs = 66
+		, .kIters  = 900
 		, .command = TMF8806_COM_CMD_STAT__cmd_measure
 		}
 };

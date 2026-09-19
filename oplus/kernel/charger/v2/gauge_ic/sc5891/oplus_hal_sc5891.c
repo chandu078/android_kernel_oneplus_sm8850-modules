@@ -1444,13 +1444,6 @@ static int sc5891_hardware_init(struct sc5891_device *chip)
 		return -EINVAL;
 	}
 
-	mutex_lock(&chip->flow_lock);
-
-	if (READ_ONCE(chip->hardware_init_ok)) {
-		mutex_unlock(&chip->flow_lock);
-		return 0;
-	}
-
 	chg_info("sc5891_hardware_init");
 	sc5891_pinctrl_avoid(chip, true);
 
@@ -1474,10 +1467,9 @@ static int sc5891_hardware_init(struct sc5891_device *chip)
 	}
 
 	sc5891_ic_enter_shutdown(chip);
-	WRITE_ONCE(chip->hardware_init_ok, true);
+	chip->hardware_init_ok = true;
 err:
 	sc5891_pinctrl_avoid(chip, false);
-	mutex_unlock(&chip->flow_lock);
 	return rc;
 }
 
@@ -1620,7 +1612,7 @@ static int sc5891_ecdsa(struct oplus_chg_ic_dev *ic_dev, bool *valid)
 		return -ENODEV;
 	}
 
-	if (!READ_ONCE(chip->hardware_init_ok)) {
+	if (!chip->hardware_init_ok) {
 		rc = sc5891_hardware_init(chip);
 		if (rc < 0)
 			return rc;
@@ -1652,7 +1644,7 @@ static int sc5891_ecw(struct oplus_chg_ic_dev *ic_dev, bool *valid)
 		return -ENODEV;
 	}
 
-	if (!READ_ONCE(chip->hardware_init_ok)) {
+	if (!chip->hardware_init_ok) {
 		rc = sc5891_hardware_init(chip);
 		if (rc < 0) {
 			chg_err("hardware_init err %d\n", rc);

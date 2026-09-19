@@ -402,7 +402,6 @@ enum usb_property_id {
 	USB_SET_WIRED_USB_STATUS,
 	/* PD partner SVID (lower 16 bits valid) */
 	USB_ADAPTER_SVID,
-	USB_PD_SEND_GET_SINK_CAP,
 #endif /*OPLUS_FEATURE_CHG_BASIC*/
 	USB_PROP_MAX,
 };

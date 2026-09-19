@@ -159,6 +159,24 @@ static int camera_extension_parse_dts(struct camera_extension_data *plat_priv)
 		CAM_EXT_INFO(CAM_EXT_CORE, "%s, enable_camera_extension:%d .\n", __func__, plat_priv->enable_camera_extension);
 	}
 
+	plat_priv->non_exclusive_rgltr_count = of_property_count_strings(np, "non_exclusive_rgltr");
+	if (plat_priv->non_exclusive_rgltr_count > 0) {
+		plat_priv->non_exclusive_rgltr = kcalloc(plat_priv->non_exclusive_rgltr_count, sizeof(const char *), GFP_KERNEL);
+		if (!plat_priv->non_exclusive_rgltr) {
+			CAM_EXT_ERR(CAM_EXT_CORE, "%s, failed to allocate memory for non_exclusive_rgltr", __func__);
+			plat_priv->non_exclusive_rgltr_count = 0;
+		} else {
+			ret = of_property_read_string_array(np, "non_exclusive_rgltr",
+				plat_priv->non_exclusive_rgltr, plat_priv->non_exclusive_rgltr_count);
+			if (ret < 0) {
+				CAM_EXT_ERR(CAM_EXT_CORE, "%s, failed to read non_exclusive_rgltr property, ret=%d", __func__, ret);
+				kfree(plat_priv->non_exclusive_rgltr);
+				plat_priv->non_exclusive_rgltr = NULL;
+				plat_priv->non_exclusive_rgltr_count = 0;
+			}
+		}
+	}
+
 	CAM_EXT_INFO(CAM_EXT_CORE, "%s, done.\n", __func__);
 
 	return ret;
@@ -229,6 +247,10 @@ static int camera_extension_remove(struct platform_device *plat_dev)
 {
 	struct camera_extension_data *plat_priv = platform_get_drvdata(plat_dev);
 
+	if (plat_priv->non_exclusive_rgltr != NULL) {
+		kfree(plat_priv->non_exclusive_rgltr);
+		plat_priv->non_exclusive_rgltr = NULL;
+	}
 	misc_deregister(&plat_priv->dev);
 
 	return 0;

@@ -1,6 +1,6 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_target", "oplus_ddk_get_variant", "bazel_support_platform")
-load("//vendor/qcom/sm8850-modules/oplus/bazel:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
+load("//build/kernel/oplus:oplus_modules_define.bzl", "define_oplus_ddk_module", "oplus_ddk_get_target", "oplus_ddk_get_variant", "bazel_support_platform")
+load("//build/kernel/oplus:oplus_modules_dist.bzl", "ddk_copy_to_dist_dir")
 
 def define_oplus_local_modules():
     target = oplus_ddk_get_target()
@@ -8,8 +8,16 @@ def define_oplus_local_modules():
     kernel_build_variant = "{}_{}".format(target, variant)
 
     if bazel_support_platform == "qcom" :
-        zram_opt_ko_deps = ["//vendor/qcom/kernel:{}/drivers/block/zram/zram".format(kernel_build_variant),"//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist",":oplus_bsp_mm_osvelte"]
+        zram_opt_ko_deps = ["//soc-repo:{}/drivers/block/zram/zram".format(kernel_build_variant),"//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist",":oplus_bsp_mm_osvelte"]
         hybridswap_zram_ko_deps = []
+    elif bazel_support_platform == "mtk" :
+        hybridswap_zram_ko_deps = ["//kernel_device_modules-6.12/drivers/gpu/drm/mediatek/mediatek_v2:mtk_disp_notify",":oplus_bsp_mm_osvelte"]
+        if target in ["k6789v1_64", "k6895v1_64"] :
+            zram_opt_ko_deps = ["//vendor/oplus/kernel/mm:oplus_bsp_hybridswap_zram","//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist",":oplus_bsp_mm_osvelte"]
+        else :
+            zram_opt_ko_deps = ["//kernel_device_modules-6.12/drivers/misc/mediatek/mtk_zram:mtk_zram","//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist",":oplus_bsp_mm_osvelte"]
+    else :
+        zram_opt_ko_deps = ["//vendor/oplus/kernel/mm:oplus_bsp_hybridswap_zram","//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist",":oplus_bsp_mm_osvelte"]
 
 #    define_oplus_ddk_module(
 #        name = "oplus_bsp_memleak_detect_simple",
@@ -21,6 +29,37 @@ def define_oplus_local_modules():
 #        includes = ["."],
 #        )
 #
+    define_oplus_ddk_module(
+        name = "oplus_bsp_hybridswap_zram",
+        srcs = native.glob([
+            "**/*.h",
+            "hybridswap_zram/zcomp.c",
+            "hybridswap_zram/zram_drv.c",
+            "hybridswap_zram/kcompressd.c",
+            "hybridswap_zram/hybridswap/hybridmain.c",
+            "hybridswap_zram/hybridswap/hybridswapd.c",
+            "hybridswap_zram/hybridswap/hybridswap.c",
+            "hybridswap_zram/hybridswap/ezreclaimd.c",
+            "hybridswap_zram/hybridswap/display.c",
+            "hybridswap_zram/hybridswap/ezreclaimd.h",
+        ]),
+        hdrs = native.glob(["**/*.h"]),
+        ko_deps = hybridswap_zram_ko_deps,
+        includes = ["."],
+        local_defines = [
+            "CONFIG_HYBRIDSWAP",
+            "CONFIG_HYBRIDSWAP_SWAPD",
+            "CONFIG_HYBRIDSWAP_CORE",
+            "CONFIG_HYBRIDSWAP_OPLUS_ZRAM",
+            "CONFIG_OPLUS_FEATURE_MM_EZRECLAIMD",
+            "CONFIG_CRYPTO_ZSTDN_O",
+            "CONFIG_KCOMPRESSD"
+        ],
+        conditional_defines = {
+            "qcom":  ["CONFIG_QCOM_PANEL_EVENT_NOTIFIER"],
+            "mtk":  ["CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY"],
+        },
+    )
 
     define_oplus_ddk_module(
         name = "oplus_bsp_sigkill_diagnosis",
@@ -71,7 +110,7 @@ def define_oplus_local_modules():
         ]),
         includes = ["."],
         local_defines = ["CONFIG_OPLUS_FEATURE_UXMEM_OPT"],
-        ko_deps = [":oplus_bsp_mm_osvelte", "//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist"],
+        ko_deps = [":oplus_bsp_mm_osvelte", "//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist"],
     )
 
     define_oplus_ddk_module(
@@ -82,7 +121,7 @@ def define_oplus_local_modules():
         ]),
         includes = ["."],
         local_defines = ["CONFIG_OPLUS_FEATURE_MGLRU_OPT"],
-        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/mm:oplus_bsp_mm_osvelte"],
+        ko_deps = ["//vendor/oplus/kernel/mm:oplus_bsp_mm_osvelte"],
     )
 
     define_oplus_ddk_module(
@@ -93,7 +132,7 @@ def define_oplus_local_modules():
         ]),
         includes = ["."],
         local_defines = ["CONFIG_OPLUS_FEATURE_DYNAMIC_READAHEAD"],
-        ko_deps = ["//vendor/qcom/sm8850-modules/oplus/kernel/cpu:oplus_bsp_sched_assist"],
+        ko_deps = ["//vendor/oplus/kernel/cpu:oplus_bsp_sched_assist"],
     )
 
     define_oplus_ddk_module(
@@ -190,14 +229,8 @@ def define_oplus_local_modules():
             "mm_osvelte/mm-trace.h",
             "mm_osvelte/proc-memstat.h",
             "mm_osvelte/sys-memstat.h",
-            "mm_osvelte/mm-hooks.h",
-            "mm_osvelte/hooks.c",
         ]),
         includes = ["."],
-        conditional_defines = {
-            "qcom":  [ "CONFIG_OPLUS_VENDOR_QCOM" ],
-            "mtk": [ "CONFIG_OPLUS_VENDOR_MTK" ],
-        },
         local_defines = ["CONFIG_OPLUS_FEATURE_MM_BOOSTPOOL"],
     )
 

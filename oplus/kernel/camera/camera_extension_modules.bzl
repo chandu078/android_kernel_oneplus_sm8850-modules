@@ -6,13 +6,13 @@ def _define_module(target, variant):
     tv = "{}_{}".format(target, variant)
 
     kernel_build = select({
-        "//build/kernel/kleaf:socrepo_true": "//vendor/qcom/kernel:{}_base_kernel".format(tv),
-        "//build/kernel/kleaf:socrepo_false": "//vendor/qcom/kernel:{}".format(tv),
+        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
     })
 
     deps_load = select({
-        "//build/kernel/kleaf:socrepo_true": ["//vendor/qcom/kernel:all_headers"],
-        "//build/kernel/kleaf:socrepo_false": ["//vendor/qcom/kernel:all_headers"],
+        "//build/kernel/kleaf:socrepo_true": ["//soc-repo:all_headers"],
+        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
     })
 
     ddk_module(
@@ -52,9 +52,9 @@ def _define_module(target, variant):
         ]),
         local_defines = ["OPLUS_FEATURE_CAMERA_COMMON", "FEATURE_ENABLE=1"],
         deps  = deps_load + [
-             "//vendor/qcom/sm8850-modules/qcom/opensource/camera-kernel:camera_headers",
-             "//vendor/qcom/sm8850-modules/qcom/opensource/camera-kernel:camera_banner",
-             "//vendor/qcom/sm8850-modules/qcom/opensource/camera-kernel:{}_camera".format(tv),
+             "//vendor/qcom/opensource/camera-kernel:camera_headers",
+             "//vendor/qcom/opensource/camera-kernel:camera_banner",
+             "//vendor/qcom/opensource/camera-kernel:{}_camera".format(tv),
              ":camera_extension_headers",
         ],
 
